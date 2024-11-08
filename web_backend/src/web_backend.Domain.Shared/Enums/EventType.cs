@@ -15,9 +15,20 @@ namespace web_backend.Enums
         Basketball,
         [Description("Baseball")]
         Baseball,
+        [Description("Softball")]
+        Softball,
+        [Description("Lacrosse")]
+        Lacrosse,
+        [Description("Rugby")]
+        Rugby,
         [Description("Soccer")]
         Soccer,
+        [Description("Tennis")]
+        Tennis,
         [Description("Volleyball")]
-        Volleyball
+        Volleyball,
+        [Description("Hockey")]
+        Hockey
     }
+
 }

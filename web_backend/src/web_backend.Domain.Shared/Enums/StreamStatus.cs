@@ -9,11 +9,13 @@ namespace web_backend.Enums
 {
     public enum StreamStatus
     {
+        [Description("User has setup a game and received a stream key, waiting on user to access RTMP server with this stream key")]
+        AwaitingConnection,
+        [Description("User is using instance specific stream key, pending 'start' of livestream")]
+        PendingStart,
         [Description("Livestream is active and good to broadcast")]
-        Active,
-        [Description("Livestream is pending, something is still loading and it is not ready to broadcast")]
-        Pending,
-        [Description("Livestream has ended")]
-        Complete
+        Live,
+        [Description("Livestream has ended, remove from active streams")]
+        Completed
     }
 }
