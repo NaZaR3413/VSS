@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.29020.237
+# Visual Studio Version 17
+VisualStudioVersion = 17.11.35327.3
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "web_backend.Domain", "src\web_backend.Domain\web_backend.Domain.csproj", "{554AD327-6DBA-4F8F-96F8-81CE7A0C863F}"
 EndProject
@@ -37,7 +37,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "web_backend.HttpApi.Host", 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "web_backend.Blazor", "src\web_backend.Blazor\web_backend.Blazor.csproj", "{27B2DDC7-8B75-4322-A312-25419C15D9D8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "web_backend.Blazor.Client", "src\web_backend.Blazor.Client\web_backend.Blazor.Client.csproj", "{188A64AD-A1A7-4F95-85D1-C935594611B7}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "web_backend.Blazor.Client", "src\web_backend.Blazor.Client\web_backend.Blazor.Client.csproj", "{188A64AD-A1A7-4F95-85D1-C935594611B7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
