@@ -1,0 +1,70 @@
+﻿@inherits LayoutComponentBase
+
+<div class="vss-container">
+    <header class="vss-header navbar navbar-expand-lg">
+        <!-- Company Logo -->
+        <a class="vss-header__logo navbar-brand" href="/">
+            <img src="/images/varsitylogoempty.jpg" alt="VSS Company Header Logo" width="120" />
+        </a>
+
+        <!-- Navbar Toggler for Mobile View -->
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#vssNavbar" aria-controls="vssNavbar" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <!-- Navigation Bar with Links and Dropdowns -->
+        <nav class="collapse navbar-collapse vss-header" id="vssNavbar">
+            <ul class="vss-nav navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="vss-nav__item nav-item">
+                    <a class="vss-nav__link nav-link" href="/">Home</a>
+                </li>
+
+                <li class="vss-nav__item nav-item dropdown">
+                    <a class="vss-nav__link nav-link dropdown-toggle" href="#" id="sportsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        Sports
+                    </a>
+                    <ul class="vss-dropdown dropdown-menu" aria-labelledby="sportsDropdown">
+                        <li class="vss-dropdown__item">
+                            <a class="vss-dropdown__link dropdown-item" href="/sports/football">Football</a>
+                        </li>
+                        <li class="vss-dropdown__item">
+                            <a class="vss-dropdown__link dropdown-item" href="/sports/basketball">Basketball</a>
+                        </li>
+                        <li class="vss-dropdown__item">
+                            <a class="vss-dropdown__link dropdown-item" href="/sports/baseball">Baseball</a>
+                        </li>
+                    </ul>
+                </li>
+
+                <li class="vss-nav__item nav-item">
+                    <a class="vss-nav__link nav-link" href="/schedule">Sport Schedules</a>
+                </li>
+                <li class="vss-nav__item nav-item">
+                    <a class="vss-nav__link nav-link" href="/contact">Contact Us</a>
+                </li>
+            </ul>
+
+            <div class="vss-auth d-flex">
+                @if (IsLoggedIn)
+                {
+                    <span class="vss-auth__username navbar-text me-3">Hello, @UserName</span>
+                    <a class="vss-auth__link nav-link" href="/logout">Logout</a>
+                }
+                else
+                {
+                    <a class="vss-auth__button btn btn-secondary me-3" href="/login">Login</a>
+                    <a class="vss-auth__button btn btn-primary" href="/register">Register</a>
+                }
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Content Area -->
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-12 col-md-10 col-lg-8">
+                @Body
+            </div>
+        </div>
+    </div>
+</div>
