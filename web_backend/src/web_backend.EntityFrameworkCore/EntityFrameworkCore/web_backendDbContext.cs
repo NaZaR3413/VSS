@@ -12,6 +12,8 @@ using Volo.Abp.PermissionManagement.EntityFrameworkCore;
 using Volo.Abp.SettingManagement.EntityFrameworkCore;
 using Volo.Abp.TenantManagement;
 using Volo.Abp.TenantManagement.EntityFrameworkCore;
+using web_backend.Configurations;
+using web_backend.Livestreams;
 
 namespace web_backend.EntityFrameworkCore;
 
@@ -24,6 +26,7 @@ public class web_backendDbContext :
     ITenantManagementDbContext
 {
     /* Add DbSet properties for your Aggregate Roots / Entities here. */
+    public DbSet<Livestream> Livestreams { get; set; }
 
     #region Entities from the modules
 
@@ -75,6 +78,7 @@ public class web_backendDbContext :
         builder.ConfigureTenantManagement();
 
         /* Configure your own tables/entities inside here */
+        builder.ApplyConfiguration(new LivestreamConfiguration());
 
         //builder.Entity<YourEntity>(b =>
         //{
