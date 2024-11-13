@@ -6,15 +6,20 @@ namespace web_backend.Blazor.Client
 {
     public partial class MainLayout : LayoutComponentBase
     {
-        [CascadingParameter]
-        private Task<AuthenticationState> AuthenticationStateTask { get; set; }
-
-        protected bool IsLoggedIn { get; set; }
-        protected string UserName { get; set; }
+        private bool IsLoggedIn { get; set; }
+        private string UserName { get; set; }
 
         protected override async Task OnInitializedAsync()
         {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
 
+            IsLoggedIn = user.Identity?.IsAuthenticated ?? false;
+
+            if (IsLoggedIn)
+            {
+                UserName = user.Identity.Name;
+            }
         }
     }
 }

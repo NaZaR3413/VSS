@@ -1,4 +1,6 @@
 ﻿@inherits LayoutComponentBase
+@using Volo.Abp.MultiTenancy
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <div class="vss-container">
     <header class="vss-header navbar navbar-expand-lg">
@@ -48,12 +50,12 @@
                 @if (IsLoggedIn)
                 {
                     <span class="vss-auth__username navbar-text me-3">Hello, @UserName</span>
-                    <a class="vss-auth__link nav-link" href="/logout">Logout</a>
+                    <a class="vss-auth__link nav-link" href="/Account/Logout">Logout</a>
                 }
                 else
                 {
-                    <a class="vss-auth__button btn btn-secondary me-3" href="/login">Login</a>
-                    <a class="vss-auth__button btn btn-primary" href="/register">Register</a>
+                    <a class="vss-auth__button btn btn-secondary me-3" href="/Account/Login">Login</a>
+                    <a class="vss-auth__button btn btn-primary" href="/Account/Register">Register</a>
                 }
             </div>
         </nav>
