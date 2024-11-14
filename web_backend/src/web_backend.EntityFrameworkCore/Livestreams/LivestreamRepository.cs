@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.EntityFrameworkCore;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -14,6 +15,25 @@ namespace web_backend.Livestreams
         public LivestreamRepository(IDbContextProvider<web_backendDbContext> dbContextProvider)
             : base(dbContextProvider)
         {
+        }
+
+        public async Task<Livestream> GetAsync(Guid id)
+        {
+            var query = await GetQueryableAsync();
+            var result = await query.FirstOrDefaultAsync(x => x.Id == id);
+
+            return result;
+        }
+
+        public async Task<List<Livestream>> GetListAsync()
+        {
+            var query = await GetQueryableAsync();
+            return await query.ToListAsync();
+        }
+
+        public async Task<Livestream> CreateAsync(Livestream livestream)
+        {
+            return await InsertAsync(livestream);
         }
     }
 }
