@@ -12,6 +12,7 @@ namespace web_backend.Livestreams
         public LivestreamApplicationAutoMapperProfile()
         {
             CreateMap<Livestream, LivestreamDto>();
+            CreateMap<CreateLivestreamDto, Livestream>();
         }
     }
 }
