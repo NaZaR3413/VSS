@@ -11,6 +11,7 @@ namespace web_backend.Livestreams
         Task<Livestream> GetAsync(Guid id);
         Task<List<Livestream>> GetListAsync();
         Task<Livestream> CreateAsync(Livestream livestream);
+        Task<Livestream> UpdateAsync(Livestream livestream);
 
     }
 }

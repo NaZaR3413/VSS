@@ -6,6 +6,7 @@ using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using System.Threading.Tasks;
 using Volo.Abp.Application.Services;
+using Volo.Abp.Domain.Entities;
 
 namespace web_backend.Livestreams
 {
@@ -54,6 +55,28 @@ namespace web_backend.Livestreams
 
             // map new entity onto livestreamDto and return
             var result = ObjectMapper.Map<Livestream, LivestreamDto>(createdLivestream);
+
+            return result;
+        }
+
+        // update livestream instance
+        public async Task<LivestreamDto> UpdateAsync(Guid id, UpdateLivestreamDto input)
+        {
+            // retrieve existing livestream
+            var livestream = await _livestreamRepository.GetAsync(id);
+            if(livestream == null)
+            {
+                throw new EntityNotFoundException(typeof(Livestream), id);
+            }
+
+            // map input dto onto existing livestream entity
+            ObjectMapper.Map(input, livestream);
+
+            // update livestream using _repository
+            var updatedLivestream = await _livestreamRepository.UpdateAsync(livestream);
+
+            // map updated entity onto livestreamDto and return
+            var result = ObjectMapper.Map<Livestream, LivestreamDto>(updatedLivestream);
 
             return result;
         }

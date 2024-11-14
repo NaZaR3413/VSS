@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Volo.Abp.Domain.Repositories.EntityFrameworkCore;
 using Volo.Abp.EntityFrameworkCore;
@@ -34,6 +35,13 @@ namespace web_backend.Livestreams
         public async Task<Livestream> CreateAsync(Livestream livestream)
         {
             return await InsertAsync(livestream);
+        }
+
+        public async Task<Livestream> UpdateAsync(Livestream livestream)
+        {
+            var updatedLivestream = await base.UpdateAsync(livestream);
+
+            return updatedLivestream;
         }
     }
 }

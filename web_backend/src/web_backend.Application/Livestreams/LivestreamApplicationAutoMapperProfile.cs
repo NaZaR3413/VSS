@@ -13,6 +13,8 @@ namespace web_backend.Livestreams
         {
             CreateMap<Livestream, LivestreamDto>();
             CreateMap<CreateLivestreamDto, Livestream>();
+            CreateMap<UpdateLivestreamDto, Livestream>()
+            .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null)); // Only map non-null values
         }
     }
 }
