@@ -1,0 +1,51 @@
+﻿@page "/livestream/landing"
+@inherits LiveStreamLandingBase
+
+<div class="vss-page">
+    <header class="vss-header">
+        <h1 class="vss-header__title">Live Streams</h1>
+    </header>
+
+    <main class="vss-main">
+        <div class="vss-filters dropdown">
+            <button class="vss-filter__button btn dropdown-toggle" type="button" id="filterDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                Filter
+            </button>
+            <ul class="dropdown-menu" aria-labelledby="filterDropdown">
+                <li class="dropdown-submenu">
+                    <a class="dropdown-item dropdown-toggle" href="#">Sports</a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" @onclick='() => ApplyFilter("sport", "football")'>Football</a></li>
+                        <li><a class="dropdown-item" href="#" @onclick='() => ApplyFilter("sport", "basketball")'>Basketball</a></li>
+                    </ul>
+                </li>
+                <li class="dropdown-submenu">
+                    <a class="dropdown-item dropdown-toggle" href="#">Teams</a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" @onclick='() => ApplyFilter("team", "Team A")'>Team A</a></li>
+                        <li><a class="dropdown-item" href="#" @onclick='() => ApplyFilter("team", "Team B")'>Team B</a></li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+
+        @if (LiveStreams.Count > 0)
+        {
+            <div class="vss-livestream-list">
+                @foreach (var stream in LiveStreams)
+                {
+                    <div class="vss-livestream-item">
+                        <h2>@stream.Title</h2>
+                        <p>@stream.Description</p>
+                        <span class="badge bg-success">@stream.Status</span>
+                        <a href="/livestream/@stream.Id" class="btn btn-primary">Watch Now</a>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <p class="vss-no-streams">There are no active live streams at this time. Please check back later.</p>
+        }
+    </main>
+</div>

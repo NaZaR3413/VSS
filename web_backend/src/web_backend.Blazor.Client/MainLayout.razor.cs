@@ -21,5 +21,8 @@ namespace web_backend.Blazor.Client
                 UserName = user.Identity.Name;
             }
         }
+
+        [Parameter]
+        public string Sport { get; set; } = "default";
     }
 }

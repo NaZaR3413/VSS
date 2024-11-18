@@ -1,0 +1,24 @@
+﻿@page "/livestream/{id:int}"
+@inherits LiveStreamBase
+
+
+<div class="vss-page">
+    <header class="vss-header">
+        <h1 class="vss-header__title">Live Stream</h1>
+    </header>
+
+    <main class="vss-main">
+        <div class="vss-video-container">
+            <!-- Video Player -->
+            <video class="vss-video-player" controls autoplay>
+                <source src="@VideoUrl" type="application/x-mpegURL">
+                Your browser does not support the video tag.
+            </video>
+
+            <!-- Stream Title -->
+            <div class="vss-video-title">
+                <h2>@StreamTitle</h2>
+            </div>
+        </div>
+    </main>
+</div>
