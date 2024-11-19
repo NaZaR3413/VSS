@@ -1,10 +1,10 @@
 ﻿@inherits LayoutComponentBase
-@using Volo.Abp.MultiTenancy
+@using Microsoft.AspNetCore.Components.Authorization
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
 <div class="vss-page">
     <header class="vss-header navbar navbar-expand-lg">
-        <!-- Company Logo -->
+        <!-- Logo -->
         <a class="vss-header__logo navbar-brand" href="/">
             <img src="/images/varsitylogoempty.jpg" alt="VSS Company Header Logo" width="120" />
         </a>
@@ -80,9 +80,9 @@
             </ul>
 
             <div class="vss-auth d-flex">
-                @if (IsLoggedIn)
+                @if (authState.User.Identity?.IsAuthenticated ?? false)
                 {
-                    <span class="vss-auth__username navbar-text me-3">Hello, @UserName</span>
+                    <span class="vss-auth__username navbar-text me-3">Hello, @authState.User.Identity.Name</span>
                     <a class="vss-auth__link nav-link" href="/Account/Logout">Logout</a>
                 }
                 else
@@ -109,3 +109,12 @@
         @Body
     </main>
 </div>
+
+@code {
+    private AuthenticationState authState;
+
+    protected override async Task OnInitializedAsync()
+    {
+        authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+    }
+}

@@ -1,14 +1,23 @@
-﻿using Microsoft.AspNetCore.Components;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Components;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Components.Authorization;
 
 namespace web_backend.Blazor.Client.Pages
 {
+    [Authorize]
     public class LiveStreamBase : MainLayout
     {
         [Inject]
         protected HttpClient HttpClient { get; set; }
+
+        [Inject]
+        protected NavigationManager NavigationManager { get; set; }
+
+        [Inject]
+        protected AuthenticationStateProvider AuthenticationStateProvider { get; set; }
 
         [Parameter]
         public int Id { get; set; }
@@ -18,7 +27,34 @@ namespace web_backend.Blazor.Client.Pages
 
         protected override async Task OnInitializedAsync()
         {
+            var isAuthorized = await CheckUserAuthorizationAsync();
+            if (!isAuthorized)
+            {
+                return;
+            }
+
             await LoadLiveStreamAsync();
+        }
+
+        private async Task<bool> CheckUserAuthorizationAsync()
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            if (!user.Identity?.IsAuthenticated ?? true)
+            {
+                NavigationManager.NavigateTo("/Account/Login", true);
+                return false;
+            }
+
+            var subscriptionClaim = user.FindFirst("Subscription");
+            if (subscriptionClaim == null || subscriptionClaim.Value != "Active")
+            {
+                NavigationManager.NavigateTo("/placeholder....", true);
+                return false;
+            }
+
+            return true;
         }
 
         private async Task LoadLiveStreamAsync()
