@@ -8,12 +8,13 @@ require('dotenv').config();
 
 // Database configuration from environment variables
 const dbConfig = {
-  user: "",
-  password: "",
-  server: "host.docker.internal",
-  database: "",
-  options: {
-    trustServerCertificate: true // This is common for local dev environments
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  server: process.env.DB_SERVER,
+  database: process.env.DB_NAME,
+  options: { // may or may not be optional depending on env and OS
+    encrypt: true,
+    trustServerCertificate: true 
   },
   authentication: true === 'true' ? {
     type: 'default'
