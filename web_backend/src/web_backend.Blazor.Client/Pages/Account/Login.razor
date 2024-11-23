@@ -1,0 +1,47 @@
+﻿@page "/Account/Login"
+@inherits LayoutComponentBase
+
+<div class="container">
+	<div class ="row justify-content-center">
+		<div class="col-10 col-md-10 col-lg-7 py-5">
+			<div class="card vss-login">
+				<!-- Logo -->
+				<img src="/images/varsitylogoempty.jpg" alt="VSS Logo" />
+				<h3>Login</h3>
+				<div class="card-body" style="text-align:center;"> 
+					<EditForm Model="@loginModel" OnValidSubmit="HandleValidSubmit">
+						<DataAnnotationsValidator/>
+						<!-- Username -->
+						<div class="vss-login-inputs">
+							<input class="form-control" placeholder="Username" id="usernameInput" @bind-value="loginModel.Username" />
+							<ValidationMessage For="@(() => loginModel.Username)" class="alert-danger"/>
+						</div>
+						<!-- Password -->
+						<div class="vss-login-inputs">
+							<input type="password" class="form-control" placeholder="Password" id="pwInput" @bind-value="loginModel.Password" />
+							<ValidationMessage For="@(() => loginModel.Password)" class="alert-danger" />
+						</div>
+						<!-- Remember Me -->
+						<div class="form-group">
+							<input class="form-check-input" type="checkbox" id="rememberMe" @bind="loginModel.RememberMe" />
+							<label class="form-check-label" for="rememberMe"> Remember Me </label>
+						</div>
+						<!-- Login Button -->
+						<div>
+							<button type="submit" class="btn btn-primary vss-login-btn">Login</button>
+						</div>
+						<!-- Forgot Password -->
+						<div>
+							<a href="/Account/ForgotPassword" class="text-primary">Forgot Password?</a>
+						</div>
+
+						<!-- Don't have an account -->
+						<div>
+							<p> <strong>Don't have an account? </strong><a href="/Account/Register" class="text-primary">Sign up</a></p>
+						</div>
+					</EditForm>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>

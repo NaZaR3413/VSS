@@ -1,0 +1,56 @@
+﻿@page "/Account/Register"
+@inherits LayoutComponentBase;
+<div class="container">
+	<div class="row justify-content-center">
+		<div class="col-12 col-md-10 col-lg-9 py-5">
+			<div class="card vss-register">
+				<!-- Logo -->
+				<img src="/images/varsitylogoempty.jpg" alt="VSS Logo" />
+				<h5 style="font-weight: bold;">Create Your Account</h5>
+				<p>Sign up to access live varsity sporting events and more.</p>
+				<div class="card-body" style="text-align:center;"> 
+					<EditForm Model="@registerModel" OnValidSubmit="HandleValidSubmit">
+						<DataAnnotationsValidator/>
+						<div class="form-group d-flex" style="gap:15px;">
+							<!-- User First Name -->
+							<input class="form-control" placeholder="First Name" id="firstNameInput" @bind-value="registerModel.FirstName" />						
+							
+							<!-- User Last Name -->
+							<input class="form-control" placeholder="Last Name" id="lastNameInput" @bind-value="registerModel.LastName" />
+						</div>
+						<ValidationMessage For="@(() => registerModel.FirstName)" class="alert-danger" />
+						<ValidationMessage For="@(() => registerModel.LastName)" class="alert-danger" />
+						<div class="form-group">
+							<!-- Username -->
+							<input class="form-control vss-register-inputs" placeholder="Username" id="userNameInput" @bind-value="registerModel.Username" />
+							<ValidationMessage For="@(() => registerModel.Username)" class="alert-danger" />
+							
+							<!-- Email -->
+							<input class="form-control vss-register-inputs" placeholder="Email" type="email" id="emailInput" @bind-value="registerModel.Email" />
+							<ValidationMessage For="@(() => registerModel.Email)" class="alert-danger" />
+							
+							<!-- Password -->
+							<input class="form-control vss-register-inputs" placeholder="Password" type="password" id="passwordInput" @bind-value="registerModel.Password" />
+							<ValidationMessage For="@(() => registerModel.Password)" class="alert-danger" />
+							
+							<!-- Confirm Password -->
+							<input class="form-control vss-register-inputs" placeholder="Confirm Password" type="password" id="confirmPasswordInput" @bind-value="registerModel.ConfirmPassword" />
+							<ValidationMessage For="@(() => registerModel.ConfirmPassword)" class="alert-danger" />
+
+							<!-- Accept terms and conditions -->
+							<div class="form-group"> 
+								<input class="form-check-input" type="checkbox" id="acceptTerms" @bind="registerModel.checkedTerms"/>
+								<label class="form-check-label" for="acceptTerms"> I accept the <a href="/">terms & conditions.</a> </label>		
+							</div>
+
+							<!-- Sign up button, enabled if terms are checked, otherwise disabled -->
+							<div>
+								<button type="submit" class="btn vss-profile-buttons" disabled="@(registerModel.checkedTerms == false)">Sign up</button>
+							</div>
+						</div>				
+					</EditForm>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>

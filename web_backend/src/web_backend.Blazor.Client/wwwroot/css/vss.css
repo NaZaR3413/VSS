@@ -62,3 +62,109 @@
 .vss-main-content {
     padding: 20px;
 }
+
+/* Register Styling */
+.vss-register {
+    text-align: center;
+    font-size: 15px;
+}
+    .vss-register img {
+        width: 175px;
+        height: 100px;
+        margin-top: 15px;
+        margin-bottom: 15px;
+        margin-right: auto;
+        margin-left: auto;
+        display: flex;
+    }
+.vss-register-inputs {
+    margin-bottom: 15px;
+    margin-top: 15px;
+}
+
+/* Profile Image */
+.vss-profile-img {
+    background: #13125F;
+    width: 175px;
+    height: 175px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin: 0 auto;
+}
+
+/* Profile View Card */
+.vss-profile-card {
+    padding: 25px;
+    text-align: center;
+    margin-bottom: 30px;
+    align-items: center;
+}
+.vss-profile-card .card-title {
+    margin-top: 25px;
+    font-weight: bold;
+}
+.vss-profile-buttons {
+    width: 200px;
+    margin-top: 20px;
+    text-align: center;
+    background-color: #13125F;
+    color: white;
+    transition: background-color 0.3s ease;
+}
+    .vss-profile-buttons:hover {
+        background-color: #FED700;
+        color: #13125F;
+
+    }
+    
+/* Profile Info Card */
+.vss-profile-info-card {
+    padding: 30px;
+    text-align: left;
+    margin-bottom: 30px;
+}
+.vss-profile-info-card .card-title {
+    font-weight: bold;
+    margin-bottom: 30px;
+}
+.vss-profile-info-card .card-text {
+    margin-bottom: 30px;
+}
+.vss-profile-info-card p {
+    margin-bottom: 10px;
+}
+
+
+/* Login Layout */
+.vss-login {
+    align-items: center;
+    margin-left: 50px;
+    margin-right: 50px;    
+}
+.vss-login-inputs {
+    margin-bottom: 15px;
+}
+.vss-login h3 {
+    text-align: center;
+    font-weight: bold;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+.vss-login img {
+    width: 175px;
+    height: 100px;
+    margin-top: 15px;
+    margin-bottom: 15px;
+    margin-right: auto;
+    margin-left: auto;
+    display: flex;
+}
+.vss-login-btn {
+    height: auto;
+    width: auto;
+    color: white;
+    background-color: #13125F;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    border-radius: 15px;
+}

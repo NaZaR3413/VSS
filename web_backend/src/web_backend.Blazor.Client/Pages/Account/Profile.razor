@@ -1,0 +1,91 @@
+﻿@page "/Account/Profile"
+@inherits LayoutComponentBase
+
+<div class="container">
+	<div class ="row justify-content-center">
+		<div class="col-12 col-md-10 col-lg-9 py-5">
+			<!-- User name and User Profile Image -->
+			<div class="card vss-profile-card">
+				<img src="" style="border:solid; border-color:black" class="rounded-circle" alt="User Image" />
+				<h5 class="card-title">Username</h5>
+			</div>
+			
+			<!-- Profile Information -->
+			<div class="card vss-profile-info-card">
+				<!-- Card body -->
+				<div class="card-body">
+					<h4 class="card-title">
+						Profile Information
+					</h4>
+					<!-- Full Name -->
+					<div class="form-group">
+						<label for="userFullName" class="form-label">Full Name</label>
+						<input type="text" class="form-control" id="userFullName"/>
+					</div>
+					<!-- Email -->
+					<div class="form-group">
+						<label for="userEmail" class="form-label">Email</label>
+						<input type="email" class="form-control" id="userEmail"/>
+					</div>
+					<!-- Phone number -->
+					<div class="form-group"> 
+						<label for="userPhone" class="form-label">Phone</label>
+						<input type="text" class="form-control" id="userPhone"/>
+					</div>
+					<!-- Save changes button -->
+					<button type="submit" style="width:auto;" class="btn btn-primary vss-profile-buttons">Save Changes</button>
+				</div>
+			</div>
+			
+			<!-- Subscription Details-->
+			<div class="card vss-profile-info-card">
+				<!-- Card body-->
+				<div class="card-body">
+					<h4 class="card-title">
+						Subcription Details
+					</h4>
+					<h5 class="card-subtitle">
+						Current Plan
+					</h5>
+					<h6 class="card-text text-muted">
+						Premium
+					</h6>
+					
+					<h5 class="card-subtitle">
+						Next Billing Date
+					</h5>
+					<h6 class="card-text text-muted">
+						March 1, 2025
+					</h6>
+					
+					<h5 class="card-subtitle">
+						Payment Method
+					</h5>
+					<h6 class="card-text text-muted">
+						Visa ending in 1234
+					</h6>
+					<!-- Cancel Subcription Button -->
+					<button type="button" class="btn btn-danger" @onclick="CancelSubscriptionCancelation">Cancel Subscription</button>
+				</div>
+			</div>
+			
+			<!-- Delete Account -->
+			<div class="card vss-profile-info-card">
+				<div class="card-body">
+					<h4 class="card-title">
+						Delete Account
+					</h4>
+					<p class="card-text text-muted">
+						Deleting your account will permantly remove all your data. This action cannot be undone.
+					</p>
+				</div>
+				<button class="btn btn-danger">Delete Account</button>
+			</div>
+		
+		</div>
+	</div>
+</div>
+
+@code {
+
+}
