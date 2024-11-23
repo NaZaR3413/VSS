@@ -5,3 +5,4 @@ FROM tiangolo/nginx-rtmp
 RUN apt-get update && apt-get install -y openssl
 
 COPY nginx.conf /etc/nginx/nginx.conf
+COPY index.html /www/
