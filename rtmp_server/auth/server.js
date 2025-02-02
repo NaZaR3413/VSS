@@ -35,7 +35,17 @@ sql.connect(dbConfig)
           const result = await sql.query`SELECT * FROM Livestream WHERE Id = ${streamKey}`;
           if (result.recordset.length > 0) {
               console.log('Stream key is valid');
-              res.status(200).send('OK');  // Send 'OK' if the stream key is valid
+
+              // Construct the HLS URL dynamically using the stream key
+              const hlsUrl = `http://localhost:8080/hls/${streamKey}.m3u8`;
+
+              // Update the HlsUrl and StreamStatus in the database
+              await sql.query`
+                UPDATE Livestream 
+                SET HlsUrl = ${hlsUrl}, StreamStatus = 2
+                WHERE Id = ${streamKey}`;
+
+                res.status(200).send('OK');  // Send 'OK' if the stream key is valid and table is properly updated
           } else {
               console.log('Invalid stream key');
               res.status(403).send('Invalid stream key');  // Send 403 if the stream key is not valid
