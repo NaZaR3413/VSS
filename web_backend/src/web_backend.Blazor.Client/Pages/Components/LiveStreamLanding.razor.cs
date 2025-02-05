@@ -50,7 +50,7 @@ namespace web_backend.Blazor.Client.Pages
             var subscriptionClaim = user.FindFirst("Subscription");
             if (subscriptionClaim == null || subscriptionClaim.Value != "Active")
             {
-                NavigationManager.NavigateTo("/placeholder.......", true);
+                NavigationManager.NavigateTo("/livestream/landing", true);
                 return false;
             }
 
