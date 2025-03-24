@@ -3,7 +3,8 @@ using Microsoft.AspNetCore.Components;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Components.Authorization;
+using web_backend.Livestreams;
+using System;
 
 namespace web_backend.Blazor.Client.Pages
 {
@@ -16,73 +17,65 @@ namespace web_backend.Blazor.Client.Pages
         [Inject]
         protected NavigationManager NavigationManager { get; set; }
 
-        [Inject]
-        protected AuthenticationStateProvider AuthenticationStateProvider { get; set; }
-
         [Parameter]
-        public int Id { get; set; }
+        public Guid Id { get; set; }
 
         protected string VideoUrl { get; set; } = string.Empty;
         protected string StreamTitle { get; set; } = string.Empty;
 
+        protected override void OnParametersSet()
+        {
+            Console.WriteLine($"Video URL in Blazor: {VideoUrl}");
+        }
+
         protected override async Task OnInitializedAsync()
         {
-            var isAuthorized = await CheckUserAuthorizationAsync();
-            if (!isAuthorized)
+            if (Id == Guid.Empty)
             {
+                StreamTitle = "Invalid live stream ID.";
                 return;
             }
 
             await LoadLiveStreamAsync();
         }
-
-        private async Task<bool> CheckUserAuthorizationAsync()
-        {
-            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            var user = authState.User;
-
-            if (!user.Identity?.IsAuthenticated ?? true)
-            {
-                NavigationManager.NavigateTo("/Account/Login", true);
-                return false;
-            }
-
-            var subscriptionClaim = user.FindFirst("Subscription");
-            if (subscriptionClaim == null || subscriptionClaim.Value != "Active")
-            {
-                NavigationManager.NavigateTo("livestream", true);
-                return false;
-            }
-
-            return true;
-        }
-
         private async Task LoadLiveStreamAsync()
         {
             try
             {
-                var liveStream = await HttpClient.GetFromJsonAsync<LiveStreamDto>($"/api/livestreams/{Id}");
+                HttpClient.BaseAddress = new Uri("https://localhost:44356/");
+                var fullUrl = $"{HttpClient.BaseAddress}api/livestreams/{Id}";
+                Console.WriteLine($"Fetching livestream from: {fullUrl}");
 
-                if (liveStream != null)
+                var response = await HttpClient.GetAsync($"api/livestreams/{Id}");
+                Console.WriteLine($"API Response Status: {response.StatusCode}");
+
+                if (response.IsSuccessStatusCode)
                 {
-                    VideoUrl = liveStream.VideoUrl;
-                    StreamTitle = liveStream.Title;
+                    var liveStream = await response.Content.ReadFromJsonAsync<LivestreamDto>();
+                    if (liveStream != null)
+                    {
+                        Console.WriteLine($"API Data Received: {liveStream.HlsUrl}");
+                        VideoUrl = liveStream.HlsUrl;
+                        StreamTitle = $"{liveStream.HomeTeam} vs {liveStream.AwayTeam}";
+                    }
+                    else
+                    {
+                        Console.WriteLine("API returned null.");
+                        StreamTitle = "Live stream not found.";
+                    }
                 }
                 else
                 {
-                    StreamTitle = "Live stream not found.";
+                    Console.WriteLine($"API Error: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}");
+                    StreamTitle = "Error loading live stream.";
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"Exception: {ex.Message}");
                 StreamTitle = "Error loading live stream.";
             }
         }
 
-        protected class LiveStreamDto
-        {
-            public string Title { get; set; } = string.Empty;
-            public string VideoUrl { get; set; } = string.Empty;
-        }
     }
 }

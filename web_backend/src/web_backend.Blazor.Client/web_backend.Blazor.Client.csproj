@@ -32,6 +32,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\web_backend.HttpApi.Client\web_backend.HttpApi.Client.csproj" />
+    <ProjectReference Include="..\web_backend.Application.Contracts\web_backend.Application.Contracts.csproj" />
+    <ProjectReference Include="..\web_backend.Application\web_backend.Application.csproj" />
   </ItemGroup>
 
 

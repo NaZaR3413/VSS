@@ -1,23 +1,35 @@
-﻿@page "/livestream"
+﻿@page "/livestream/{Id:guid}"
 @inherits LiveStreamBase
 
 <div class="vss-page">
     <header class="vss-header">
-        <h1 class="vss-header__title">Live Stream</h1>
+        <h1 class="vss-header__title">@StreamTitle</h1>
     </header>
 
     <main class="vss-main">
         <div class="vss-video-container">
-            <!-- Video Player -->
-            <video class="vss-video-player" controls autoplay>
-                <source src="@VideoUrl" type="application/x-mpegURL">
-                Your browser does not support the video tag.
-            </video>
+            <video id="videoPlayer" class="vss-video-player" controls autoplay></video>
 
-            <!-- Stream Title -->
             <div class="vss-video-title">
                 <h2>@StreamTitle</h2>
             </div>
         </div>
     </main>
 </div>
+
+@code {
+    private bool hasLoadedVideo;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Whenever VideoUrl becomes non-empty and we've not yet loaded it, call the JS method
+        if (!hasLoadedVideo && !string.IsNullOrEmpty(VideoUrl))
+        {
+            hasLoadedVideo = true;
+            Console.WriteLine($"Automatically loading video: {VideoUrl}");
+            await JS.InvokeVoidAsync("loadHlsStream", VideoUrl);
+        }
+    }
+
+    [Inject] private IJSRuntime JS { get; set; }
+}

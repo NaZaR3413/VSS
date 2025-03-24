@@ -1,15 +1,15 @@
 ﻿:root {
-    --navbar-bg-color: #FED700;
-    --navbar-text-color: #002868;
-    --navbar-hover-text-color: #ccc;
-    --dropdown-text-color: #000;
+    --navbar-bg-color: #13125F; /* Changed from #FED700 */
+    --navbar-text-color: #F2F2F2; /* Changed from #002868 */
+    --navbar-hover-text-color: #F2F2F2; /* Changed from #ccc */
+    --dropdown-text-color: #000000; /* Changed from #000 */
     --dropdown-hover-bg-color: #f8f9fa;
     --auth-button-text-color: #fff;
-    --page-bg-color: #13125F;
-    --main-text-color: #fff;
+    --page-bg-color: #F2F2F2; /* Changed from #13125F */
+    --main-text-color: #000000; /* Changed from #F2F2F2 */
     --primary-btn-color: #13125F;
     --filter-btn-color: #FED700;
-    --filter-btn-text-color: #002868;
+    --filter-btn-text-color: #000000; /* Changed from #002868 */
 }
 
 /* Header Styling */
@@ -17,6 +17,8 @@
     background-color: var(--navbar-bg-color);
     padding: 0 20px;
     color: var(--navbar-text-color);
+    width: 100%;
+    text-align: center;
 }
 
 .vss-header__logo img {
@@ -54,6 +56,7 @@
     .vss-nav .nav-link:hover {
         font-weight: 700;
         letter-spacing: 1px;
+        color: var(--navbar-hover-text-color); /* Ensure hover text color remains F2F2F2 */
     }
 
         .vss-nav .nav-link:hover rect {
@@ -63,6 +66,10 @@
             stroke-dashoffset: 48;
             transition: all 1.35s cubic-bezier(0.19, 1, 0.22, 1);
         }
+
+    .vss-nav .nav-link:active {
+        color: var(--navbar-hover-text-color); /* Ensure active text color remains F2F2F2 */
+    }
 
 /* Navbar Toggler Icon */
 .navbar-toggler {
@@ -101,15 +108,33 @@
 
     .vss-dropdown .dropdown-item:hover {
         background-color: var(--dropdown-hover-bg-color);
+        color: var(--dropdown-text-color); /* Ensure hover text color remains F2F2F2 */
     }
 
-        .vss-dropdown .dropdown-item:hover rect {
-            stroke: #BF0A30;
-            stroke-width: 5;
-            stroke-dasharray: 15, 310;
-            stroke-dashoffset: 48;
-            transition: all 1.35s cubic-bezier(0.19, 1, 0.22, 1);
-        }
+    .vss-dropdown .dropdown-item:active {
+        color: var(--dropdown-text-color); /* Ensure active text color remains F2F2F2 */
+    }
+
+    .vss-dropdown .dropdown-item:hover rect {
+        stroke: #BF0A30;
+        stroke-width: 5;
+        stroke-dasharray: 15, 310;
+        stroke-dashoffset: 48;
+        transition: all 1.35s cubic-bezier(0.19, 1, 0.22, 1);
+    }
+
+/* Dropdown Header Styling */
+.vss-dropdown-header {
+    color: var(--navbar-text-color); /* Ensure dropdown header text color remains F2F2F2 */
+}
+
+    .vss-dropdown-header:hover {
+        color: var(--navbar-text-color); /* Ensure hover text color remains F2F2F2 */
+    }
+
+    .vss-dropdown-header:active {
+        color: var(--navbar-text-color); /* Ensure active text color remains F2F2F2 */
+    }
 
 /* Authentication Links */
 .vss-auth__username {
@@ -129,7 +154,7 @@
     position: relative;
     display: inline-block;
     padding: 10px 20px;
-    color: var(--main-text-color);
+    color: var(--navbar-text-color);
     background-color: var(--primary-btn-color);
     font-size: 20px;
     font-weight: 600;
@@ -260,6 +285,7 @@
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    align-items: center;
 }
 
 /* Main content area */
@@ -270,11 +296,11 @@
     align-items: center;
     padding: 20px;
     color: var(--main-text-color);
+    width: 100%;
 }
 
-    /* Center the content */
     .vss-main > * {
-        max-width: 800px;
+        max-width: 2400px;
         width: 100%;
         text-align: center;
     }
@@ -298,7 +324,7 @@
 
     .vss-livestream-item p {
         font-size: 16px;
-        color: var(--navbar-text-color);
+        color: var (--navbar-text-color);
     }
 
     .vss-livestream-item .btn {
@@ -341,17 +367,19 @@
             margin-top: -0.5rem;
         }
 
+/* Video Player Styling */
 .vss-video-container {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     width: 100%;
+    padding: 20px;
 }
 
 .vss-video-player {
     width: 100%;
-    max-width: 1200px;
+    max-width: 1600px;
     height: auto;
     border: 4px solid var(--navbar-bg-color);
     border-radius: 8px;
@@ -365,6 +393,13 @@
 }
 
     .vss-video-title h2 {
-        font-size: 24px;
+        font-size: 28px;
         font-weight: bold;
     }
+
+.vss-header__title {
+    font-size: 36px;
+    font-weight: bold;
+    margin: 0;
+    padding: 20px 0;
+}
