@@ -2,16 +2,24 @@ const sql = require('mssql');
 const express = require('express');
 const app = express();
 app.use(express.urlencoded({ extended: true }));
+const { DefaultAzureCredential } = require('@azure/identity');
+const { SecretClient } = require('@azure/keyvault-secrets');
 
 // Load environment variables from .env file
-require('dotenv').config();
+//require('dotenv').config();
+
+const credential = new DefaultAzureCredential();
+const vaultName = "VSS-keys";
+const url = `https://${vaultName}.vault.azure.net`;
+
+const client = new SecretClient(url, credential);
 
 // Database configuration from environment variables
 const dbConfig = {
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  server: process.env.DB_SERVER,
-  database: process.env.DB_NAME,
+  user: await client.getSecret("DB-USER"),
+  password: await client.getSecret("DB-PASSWORD"),
+  server: await client.getSecret("DB-SERVER"),
+  database: await client.getSecret("DB-NAME"),
   options: { // may or may not be optional depending on env and OS
     encrypt: true,
     trustServerCertificate: true 
@@ -37,7 +45,7 @@ sql.connect(dbConfig)
               console.log('Stream key is valid');
 
               // Construct the HLS URL dynamically using the stream key
-              const hlsUrl = `http://localhost:8080/hls/${streamKey}.m3u8`;
+              const hlsUrl = `http://20.3.254.14:8080/hls/${streamKey}.m3u8`;
 
               // Update the HlsUrl and StreamStatus in the database
               await sql.query`
