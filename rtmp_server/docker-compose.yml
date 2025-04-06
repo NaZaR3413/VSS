@@ -9,12 +9,14 @@ services:
       - ./data:/hls
     networks:
       - vssnet
+    restart: always
 
   auth:
     build: ./auth
     container_name: auth_server
     networks:
       - vssnet
+    restart: always
 
 networks:
   vssnet:
