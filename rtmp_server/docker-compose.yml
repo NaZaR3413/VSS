@@ -7,8 +7,15 @@ services:
     container_name: rtmp_server
     volumes:
       - ./data:/hls
+    networks:
+      - vssnet
 
   auth:
     build: ./auth
     container_name: auth_server
-    network_mode: "host"
+    networks:
+      - vssnet
+
+networks:
+  vssnet:
+    driver: bridge
