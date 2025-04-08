@@ -1,0 +1,87 @@
+﻿@page "/admin/gametimes"
+@using System.Net.Http.Json
+@using web_backend.Domain.Shared.Dtos
+@inject HttpClient HttpClient
+
+<AuthorizeView Roles="admin" Context="auth">
+    <Authorized>
+        <h3>Manage Game Times</h3>
+
+        <button @onclick="ShowAddGameTimeModal">Add Game Time</button>
+
+        <ul>
+            @foreach (var gameTime in gameTimes)
+            {
+                <li>
+                    @gameTime.TeamA vs @gameTime.TeamB: @gameTime.Time
+                    <button @onclick="() => EditGameTime(gameTime)">Edit</button>
+                    <button @onclick="() => DeleteGameTime(gameTime.Id)">Delete</button>
+                </li>
+            }
+        </ul>
+
+        <EditForm Model="newGameTime" OnValidSubmit="AddGameTime">
+            <DataAnnotationsValidator />
+            <Microsoft.AspNetCore.Components.Forms.ValidationSummary />
+
+            <div class="mb-3">
+                <label for="teamA">Team A</label>
+                <InputText id="teamA" class="form-control" @bind-Value="newGameTime.TeamA" />
+            </div>
+
+            <div class="mb-3">
+                <label for="teamB">Team B</label>
+                <InputText id="teamB" class="form-control" @bind-Value="newGameTime.TeamB" />
+            </div>
+
+            <div class="mb-3">
+                <label for="time">Time</label>
+                <InputDate id="time" class="form-control" @bind-Value="newGameTime.Time" />
+            </div>
+
+            <button type="submit" class="btn btn-primary">Save</button>
+        </EditForm>
+    </Authorized>
+
+    <NotAuthorized>
+        <p>You do not have permission to view this page.</p>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private List<GameTimeDto> gameTimes = new();
+    private GameTimeDto newGameTime = new GameTimeDto();
+
+    protected override async Task OnInitializedAsync()
+    {
+        gameTimes = await HttpClient.GetFromJsonAsync<List<GameTimeDto>>("/api/gametimes");
+    }
+
+    private void ShowAddGameTimeModal()
+    {
+        newGameTime = new GameTimeDto();
+    }
+
+    private async Task AddGameTime()
+    {
+        await HttpClient.PostAsJsonAsync("/api/gametimes", newGameTime);
+        gameTimes = await HttpClient.GetFromJsonAsync<List<GameTimeDto>>("/api/gametimes");
+    }
+
+    private void EditGameTime(GameTimeDto gameTime)
+    {
+        newGameTime = new GameTimeDto
+            {
+                Id = gameTime.Id,
+                TeamA = gameTime.TeamA,
+                TeamB = gameTime.TeamB,
+                Time = gameTime.Time
+            };
+    }
+
+    private async Task DeleteGameTime(Guid id)
+    {
+        await HttpClient.DeleteAsync($"/api/gametimes/{id}");
+        gameTimes = await HttpClient.GetFromJsonAsync<List<GameTimeDto>>("/api/gametimes");
+    }
+}

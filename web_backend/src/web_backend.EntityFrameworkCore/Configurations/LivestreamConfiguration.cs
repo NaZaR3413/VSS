@@ -20,12 +20,14 @@ namespace web_backend.Configurations
             builder.HasKey(c => c.Id);
 
             builder.Property(cs => cs.HlsUrl).IsRequired();
-            builder.Property(cs => cs.HomeTeam).IsRequired().HasMaxLength(100);
-            builder.Property(cs => cs.AwayTeam).IsRequired().HasMaxLength(100);
+            builder.Property(cs => cs.HomeTeamId).IsRequired();
+            builder.Property(cs => cs.AwayTeamId).IsRequired();
             builder.Property(cs => cs.HomeScore).IsRequired();
             builder.Property(cs => cs.AwayScore).IsRequired();
             builder.Property(cs => cs.EventType).IsRequired();
             builder.Property(cs => cs.StreamStatus).IsRequired();
+            builder.Property(cs => cs.EventDate).IsRequired();
         }
+
     }
 }

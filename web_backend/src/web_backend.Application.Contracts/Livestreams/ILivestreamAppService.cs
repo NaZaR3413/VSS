@@ -9,5 +9,10 @@ namespace web_backend.Livestreams
 {
     public interface ILivestreamAppService : IApplicationService
     {
+        Task<LivestreamDto> GetAsync(Guid id);
+        Task<List<LivestreamDto>> GetListAsync();
+        Task<LivestreamDto> CreateAsync(CreateLivestreamDto input);
+        Task<LivestreamDto> UpdateAsync(Guid id, UpdateLivestreamDto input);
+        Task DeleteAsync(Guid id);
     }
 }

@@ -8,10 +8,10 @@ require('dotenv').config();
 
 // Database configuration from environment variables
 const dbConfig = {
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  server: process.env.DB_SERVER,
-  database: process.env.DB_NAME,
+  user: "eleros",
+  password: "Greecia12!",
+  server: "host.docker.internal",
+    database: "vsstest",
   options: { // may or may not be optional depending on env and OS
     encrypt: true,
     trustServerCertificate: true 

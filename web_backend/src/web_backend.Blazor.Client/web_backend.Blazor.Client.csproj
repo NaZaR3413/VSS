@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+﻿<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
 
   <Import Project="..\..\common.props" />
 
@@ -32,6 +32,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\web_backend.HttpApi.Client\web_backend.HttpApi.Client.csproj" />
+	<ProjectReference Include="..\web_backend.Domain.Shared\web_backend.Domain.Shared.csproj" />
   </ItemGroup>
 
 
