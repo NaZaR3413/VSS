@@ -1828,10 +1828,11 @@ namespace web_backend.Migrations
                     b.Property<int>("AwayScore")
                         .HasColumnType("int");
 
-                    b.Property<string>("AwayTeam")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                    b.Property<Guid>("AwayTeamId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("EventDate")
+                        .HasColumnType("datetime2");
 
                     b.Property<int>("EventType")
                         .HasColumnType("int");
@@ -1843,10 +1844,8 @@ namespace web_backend.Migrations
                     b.Property<int>("HomeScore")
                         .HasColumnType("int");
 
-                    b.Property<string>("HomeTeam")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                    b.Property<Guid>("HomeTeamId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<int>("StreamStatus")
                         .HasColumnType("int");

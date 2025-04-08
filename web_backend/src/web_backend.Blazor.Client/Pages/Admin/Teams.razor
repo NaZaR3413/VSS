@@ -1,0 +1,75 @@
+﻿@page "/admin/teams"
+@using System.Net.Http.Json
+@using web_backend.Domain.Shared.Dtos
+@inject HttpClient HttpClient
+
+<AuthorizeView Roles="admin" Context="auth">
+    <Authorized>
+        <h3>Manage Teams</h3>
+
+        <button @onclick="ShowAddTeamModal">Add Team</button>
+
+        <ul>
+            @foreach (var team in teams)
+            {
+                <li>
+                    @team.Name
+                    <button @onclick="() => EditTeam(team)">Edit</button>
+                    <button @onclick="() => DeleteTeam(team.Id)">Delete</button>
+                </li>
+            }
+        </ul>
+
+        <EditForm Model="newTeam" OnValidSubmit="AddTeam">
+            <DataAnnotationsValidator />
+            <Microsoft.AspNetCore.Components.Forms.ValidationSummary />
+
+            <div class="mb-3">
+                <label for="name">Team Name</label>
+                <InputText id="name" class="form-control" @bind-Value="newTeam.Name" />
+            </div>
+
+            <button type="submit" class="btn btn-primary">Save</button>
+        </EditForm>
+    </Authorized>
+
+    <NotAuthorized>
+        <p>You do not have permission to view this page.</p>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private List<TeamDto> teams = new();
+    private TeamDto newTeam = new TeamDto();
+
+    protected override async Task OnInitializedAsync()
+    {
+        teams = await HttpClient.GetFromJsonAsync<List<TeamDto>>("/api/teams");
+    }
+
+    private void ShowAddTeamModal()
+    {
+        newTeam = new TeamDto();
+    }
+
+    private async Task AddTeam()
+    {
+        await HttpClient.PostAsJsonAsync("/api/teams", newTeam);
+        teams = await HttpClient.GetFromJsonAsync<List<TeamDto>>("/api/teams");
+    }
+
+    private void EditTeam(TeamDto team)
+    {
+        newTeam = new TeamDto
+            {
+                Id = team.Id,
+                Name = team.Name
+            };
+    }
+
+    private async Task DeleteTeam(Guid id)
+    {
+        await HttpClient.DeleteAsync($"/api/teams/{id}");
+        teams = await HttpClient.GetFromJsonAsync<List<TeamDto>>("/api/teams");
+    }
+}

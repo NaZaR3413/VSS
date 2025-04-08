@@ -9,6 +9,8 @@ using Volo.Abp.Identity.Blazor;
 using Volo.Abp.SettingManagement.Blazor.Menus;
 using Volo.Abp.TenantManagement.Blazor.Navigation;
 using Volo.Abp.UI.Navigation;
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace web_backend.Blazor.Client.Menus;
 
@@ -33,7 +35,7 @@ public class web_backendMenuContributor : IMenuContributor
         }
     }
 
-    private Task ConfigureMainMenuAsync(MenuConfigurationContext context)
+    private async Task<Task> ConfigureMainMenuAsync(MenuConfigurationContext context)
     {
         var l = context.GetLocalizer<web_backendResource>();
 
@@ -61,8 +63,42 @@ public class web_backendMenuContributor : IMenuContributor
         administration.SetSubItemOrder(IdentityMenuNames.GroupName, 2);
         administration.SetSubItemOrder(SettingManagementMenus.GroupName, 3);
 
+        // Add Admin menu item if the user is an admin
+        var authState = await context.ServiceProvider.GetRequiredService<AuthenticationStateProvider>().GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.IsInRole("Admin"))
+        {
+            context.Menu.Items.Add(
+                new ApplicationMenuItem(
+                    "Admin",
+                    l["Menu:Admin"],
+                    icon: "fas fa-cog"
+                ).AddItem(
+                    new ApplicationMenuItem(
+                        "Admin.Teams",
+                        l["Menu:Teams"],
+                        "/admin/teams"
+                    )
+                ).AddItem(
+                    new ApplicationMenuItem(
+                        "Admin.Scores",
+                        l["Menu:Scores"],
+                        "/admin/scores"
+                    )
+                ).AddItem(
+                    new ApplicationMenuItem(
+                        "Admin.GameTimes",
+                        l["Menu:GameTimes"],
+                        "/admin/gametimes"
+                    )
+                )
+            );
+        }
+
         return Task.CompletedTask;
     }
+
 
     private Task ConfigureUserMenuAsync(MenuConfigurationContext context)
     {

@@ -57,16 +57,23 @@ namespace web_backend.Livestreams
         // create livestream instance 
         public async Task<LivestreamDto> CreateAsync(CreateLivestreamDto input)
         {
-            // map input dto onto livestream 
-            var livestream = ObjectMapper.Map<CreateLivestreamDto, Livestream>(input);
+            using (_dataFilter.Disable<IMultiTenant>())
+            {
+                var livestream = new Livestream
+                {
+                    HlsUrl = input.HlsUrl,
+                    HomeTeamId = input.HomeTeamId,
+                    AwayTeamId = input.AwayTeamId,
+                    HomeScore = input.HomeScore,
+                    AwayScore = input.AwayScore,
+                    EventDate = input.EventDate,
+                    EventType = input.EventType,
+                    StreamStatus = input.StreamStatus
+                };
 
-            // create livestream instance
-            var createdLivestream = await _livestreamRepository.CreateAsync(livestream);
-
-            // map new entity onto livestreamDto and return
-            var result = ObjectMapper.Map<Livestream, LivestreamDto>(createdLivestream);
-
-            return result;
+                var created = await _livestreamRepository.CreateAsync(livestream);
+                return ObjectMapper.Map<Livestream, LivestreamDto>(created);
+            }
         }
 
         // update livestream instance

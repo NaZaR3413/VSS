@@ -56,7 +56,7 @@ namespace web_backend.Blazor.Client.Pages
                     {
                         Console.WriteLine($"API Data Received: {liveStream.HlsUrl}");
                         VideoUrl = liveStream.HlsUrl;
-                        StreamTitle = $"{liveStream.HomeTeam} vs {liveStream.AwayTeam}";
+                        StreamTitle = $"{liveStream.HomeTeam} {liveStream.HomeScore} - {liveStream.AwayScore} {liveStream.AwayTeam}";
                     }
                     else
                     {

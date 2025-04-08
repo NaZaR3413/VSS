@@ -11,6 +11,10 @@
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:auth\\server.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
     },
     {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Evangelos Leros\\source\\repos\\VSS\\rtmp_server\\.gitignore||{3B902123-F8A7-4915-9F01-361F908088D0}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:.gitignore||{3B902123-F8A7-4915-9F01-361F908088D0}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Evangelos Leros\\source\\repos\\VSS\\rtmp_server\\auth\\Dockerfile||{8B382828-6202-11D1-8870-0000F87579D2}",
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:auth\\Dockerfile||{8B382828-6202-11D1-8870-0000F87579D2}"
     },
@@ -21,10 +25,6 @@
     {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Evangelos Leros\\source\\repos\\VSS\\rtmp_server\\auth\\package.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:auth\\package.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Evangelos Leros\\source\\repos\\VSS\\rtmp_server\\.gitignore||{3B902123-F8A7-4915-9F01-361F908088D0}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:.gitignore||{3B902123-F8A7-4915-9F01-361F908088D0}"
     }
   ],
   "DocumentGroupContainers": [
@@ -52,14 +52,14 @@
               "RelativeDocumentMoniker": "rtmp\\nginx.conf",
               "ToolTip": "C:\\Users\\Evangelos Leros\\source\\repos\\VSS\\rtmp_server\\rtmp\\nginx.conf",
               "RelativeToolTip": "rtmp\\nginx.conf",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAACMAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABcAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
               "WhenOpened": "2025-02-21T07:07:44.858Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 3,
               "Title": "Dockerfile",
               "DocumentMoniker": "C:\\Users\\Evangelos Leros\\source\\repos\\VSS\\rtmp_server\\auth\\Dockerfile",
               "RelativeDocumentMoniker": "auth\\Dockerfile",
@@ -71,7 +71,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 4,
               "Title": "package-lock.json",
               "DocumentMoniker": "C:\\Users\\Evangelos Leros\\source\\repos\\VSS\\rtmp_server\\auth\\package-lock.json",
               "RelativeDocumentMoniker": "auth\\package-lock.json",
@@ -83,7 +83,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 5,
               "Title": "package.json",
               "DocumentMoniker": "C:\\Users\\Evangelos Leros\\source\\repos\\VSS\\rtmp_server\\auth\\package.json",
               "RelativeDocumentMoniker": "auth\\package.json",
@@ -101,14 +101,14 @@
               "RelativeDocumentMoniker": "auth\\server.js",
               "ToolTip": "C:\\Users\\Evangelos Leros\\source\\repos\\VSS\\rtmp_server\\auth\\server.js",
               "RelativeToolTip": "auth\\server.js",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABIAAAAlAAAAAAAAAA==",
+              "ViewState": "AgIAAAUAAAAAAAAAAAAIwCkAAABDAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
               "WhenOpened": "2025-02-05T06:11:07.401Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 2,
               "Title": ".gitignore",
               "DocumentMoniker": "C:\\Users\\Evangelos Leros\\source\\repos\\VSS\\rtmp_server\\.gitignore",
               "RelativeDocumentMoniker": ".gitignore",

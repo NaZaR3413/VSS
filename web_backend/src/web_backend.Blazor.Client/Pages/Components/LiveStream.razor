@@ -2,17 +2,51 @@
 @inherits LiveStreamBase
 
 <div class="vss-page">
-    <header class="vss-header">
-        <h1 class="vss-header__title">@StreamTitle</h1>
+    <header class="vss-header py-4">
+        <div class="container">
+            <h1 class="vss-header__title">@StreamTitle</h1>
+            <p class="vss-subheading">
+                Your home for Arizona high school sports – live, on-demand, and in-depth.
+
+            </p>
+        </div>
     </header>
 
     <main class="vss-main">
-        <div class="vss-video-container">
-            <video id="videoPlayer" class="vss-video-player" controls autoplay></video>
+        <div class="container">
+            <!-- Video Player -->
+            <section class="vss-featured mb-5">
+                <div class="vss-video-container position-relative">
+                    <span class="badge bg-danger position-absolute top-0 start-0 m-2">LIVE</span>
+                    <video id="videoPlayer" class="vss-video-player" controls autoplay></video>
+                    <div class="vss-video-title mt-3">
+                        <h2>@StreamTitle</h2>
+                    </div>
+                </div>
+            </section>
 
-            <div class="vss-video-title">
-                <h2>@StreamTitle</h2>
-            </div>
+            <!-- Stream Info -->
+            <section class="mb-5">
+                <h2 class="text-start">Game Information</h2>
+                <div class="row">
+                    <div class="col-md-6">
+                        <ul class="list-unstyled">
+                            <li><strong>Date:</strong> @DateTime.Now.ToString("MMMM dd, yyyy")</li>
+                            <li><strong>Time:</strong> @DateTime.Now.ToString("h:mm tt")</li>
+                            <li><strong>Status:</strong> <span class="text-success">Live</span></li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <p>Welcome to the official live broadcast of today's featured matchup. Stay tuned for all the action, commentary, and analysis directly from the Varsity Sports Show team.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Contact Support -->
+            <section class="text-center">
+                <h4>Need Help?</h4>
+                <p>If you're experiencing issues with playback or need assistance, <a class="vss-auth__link" href="mailto:info@varsitysportsshow.com">contact our support team</a>.</p>
+            </section>
         </div>
     </main>
 </div>
@@ -22,7 +56,6 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // Whenever VideoUrl becomes non-empty and we've not yet loaded it, call the JS method
         if (!hasLoadedVideo && !string.IsNullOrEmpty(VideoUrl))
         {
             hasLoadedVideo = true;
