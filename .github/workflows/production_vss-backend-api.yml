@@ -24,13 +24,13 @@ jobs:
         run: dotnet build ./web_backend/src/web_backend.HttpApi.Host/web_backend.HttpApi.Host.csproj --configuration Release
 
       - name: dotnet publish
-        run: dotnet publish ./web_backend/src/web_backend.HttpApi.Host/web_backend.HttpApi.Host.csproj -c Release -o ./myapp
+        run: dotnet publish ./web_backend/src/web_backend.HttpApi.Host/web_backend.HttpApi.Host.csproj -c Release -o myapp
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
-          name: .net-app
-          path: ./myapp
+          name: myapp
+          path: myapp
 
   deploy:
     runs-on: ubuntu-latest
@@ -43,7 +43,8 @@ jobs:
       - name: Download artifact from build job
         uses: actions/download-artifact@v4
         with:
-          name: .net-app
+          name: myapp
+          path: myapp
 
       - name: Login to Azure
         uses: azure/login@v2
@@ -53,8 +54,7 @@ jobs:
           subscription-id: ${{ secrets.VSS_SUBSCRIPTION_ID }}
 
       - name: Deploy to Azure Web App
-        id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'vss-backend-api'
-          package: ./myapp
+          package: myapp
