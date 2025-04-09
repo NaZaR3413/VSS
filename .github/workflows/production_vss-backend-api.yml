@@ -63,5 +63,4 @@ jobs:
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'vss-backend-api'
-          slot-name: 'Production'
           package: .
