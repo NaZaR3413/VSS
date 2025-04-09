@@ -63,4 +63,4 @@ jobs:
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'vss-backend-api'
-          package: .
+          package: ${{ github.workspace }}/myapp
