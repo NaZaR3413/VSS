@@ -56,14 +56,15 @@ public class web_backendHttpApiHostModule : AbpModule
         Console.WriteLine($"Hosting Environment: {hostingEnvironment.EnvironmentName}");
 
         // Only run production config in a non-Development environment
-        if (!hostingEnvironment.IsDevelopment())
+        if (true)
         {
             Console.WriteLine("Running production OpenIddict configuration...");
 
             PreConfigure<AbpOpenIddictAspNetCoreOptions>(options =>
             {
-                Console.WriteLine("Disabling development signing/encryption certificate.");
+                // Disable automatic development certificates individually.
                 options.AddDevelopmentEncryptionAndSigningCertificate = false;
+                Console.WriteLine("Disabled development signing/encryption certificates.");
             });
 
             PreConfigure<OpenIddictServerBuilder>(serverBuilder =>
@@ -71,7 +72,7 @@ public class web_backendHttpApiHostModule : AbpModule
                 try
                 {
                     var configuration = context.Services.GetConfiguration();
-                    //var pfxPassword = configuration["OpenIddict:Certificates:Default:Password"];
+                    var pfxPassword = configuration["OpenIddict:Certificates:Default:Password"];
 
                     Console.WriteLine("Retrieved PFX password from configuration.");
                     var certPath = Path.Combine(AppContext.BaseDirectory, "openiddict.pfx");
@@ -107,7 +108,6 @@ public class web_backendHttpApiHostModule : AbpModule
         {
             Console.WriteLine("Development environment detected. Skipping production certificate configuration.");
         }
-        
 
         PreConfigure<OpenIddictBuilder>(builder =>
         {
@@ -120,6 +120,7 @@ public class web_backendHttpApiHostModule : AbpModule
             });
         });
     }
+
 
 
     public override void ConfigureServices(ServiceConfigurationContext context)
