@@ -32,6 +32,7 @@ using Volo.Abp.Swashbuckle;
 using Volo.Abp.UI.Navigation.Urls;
 using Volo.Abp.VirtualFileSystem;
 using Volo.Abp.OpenIddict;
+using System.Security.Cryptography.X509Certificates;
 
 namespace web_backend;
 
@@ -66,12 +67,15 @@ public class web_backendHttpApiHostModule : AbpModule
                 var configuration = context.Services.GetConfiguration();
                 var pfxPassword = configuration["OpenIddict:Certificates:Default:Password"];
 
-                // Provide your .pfx path and password to use a real certificate
-                // so ABP won't attempt to auto-generate dev certs.
-                serverBuilder.AddProductionEncryptionAndSigningCertificate(
-                    "openiddict.pfx",
-                    pfxPassword
+                // Manually load the certificate with correct flags
+                var certificate = new X509Certificate2(
+                    Path.Combine(AppContext.BaseDirectory, "openiddict.pfx"),
+                    pfxPassword,
+                    X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.EphemeralKeySet
                 );
+
+                serverBuilder.AddEncryptionCertificate(certificate);
+                serverBuilder.AddSigningCertificate(certificate);
             });
         }
 
