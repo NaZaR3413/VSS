@@ -31,6 +31,7 @@ using Volo.Abp.Security.Claims;
 using Volo.Abp.Swashbuckle;
 using Volo.Abp.UI.Navigation.Urls;
 using Volo.Abp.VirtualFileSystem;
+using Volo.Abp.OpenIddict;
 
 namespace web_backend;
 
@@ -49,6 +50,31 @@ public class web_backendHttpApiHostModule : AbpModule
 {
     public override void PreConfigureServices(ServiceConfigurationContext context)
     {
+        var hostingEnvironment = context.Services.GetHostingEnvironment();
+
+        // Only run production config in a non-Development environment
+        if (!hostingEnvironment.IsDevelopment())
+        {
+            PreConfigure<AbpOpenIddictAspNetCoreOptions>(options =>
+            {
+                // Disable the dev cert creation
+                options.AddDevelopmentEncryptionAndSigningCertificate = false;
+            });
+
+            PreConfigure<OpenIddictServerBuilder>(serverBuilder =>
+            {
+                var configuration = context.Services.GetConfiguration();
+                var pfxPassword = configuration["OpenIddict:Certificates:Default:Password"];
+
+                // Provide your .pfx path and password to use a real certificate
+                // so ABP won't attempt to auto-generate dev certs.
+                serverBuilder.AddProductionEncryptionAndSigningCertificate(
+                    "openiddict.pfx",
+                    pfxPassword
+                );
+            });
+        }
+
         PreConfigure<OpenIddictBuilder>(builder =>
         {
             builder.AddValidation(options =>
