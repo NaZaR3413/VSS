@@ -56,7 +56,6 @@ public class web_backendHttpApiHostModule : AbpModule
         Console.WriteLine($"Hosting Environment: {hostingEnvironment.EnvironmentName}");
 
         // Only run production config in a non-Development environment
-        /*
         if (!hostingEnvironment.IsDevelopment())
         {
             Console.WriteLine("Running production OpenIddict configuration...");
@@ -108,7 +107,7 @@ public class web_backendHttpApiHostModule : AbpModule
         {
             Console.WriteLine("Development environment detected. Skipping production certificate configuration.");
         }
-        */
+        
 
         PreConfigure<OpenIddictBuilder>(builder =>
         {
