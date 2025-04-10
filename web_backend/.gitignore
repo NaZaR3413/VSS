@@ -259,6 +259,3 @@ src/web_backend.HttpApi.Host/Logs/*
 src/web_backend.DbMigrator/Logs/*
 src/web_backend.Blazor.Server/Logs/*
 src/web_backend.Blazor.Server.Tiered/Logs/*
-
-# Use abp install-libs to restore.
-**/wwwroot/libs/*

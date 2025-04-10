@@ -20,18 +20,6 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Initialize local tool manifest
-        run: dotnet new tool-manifest
-        working-directory: ./web_backend/src/web_backend.HttpApi.Host
-
-      - name: Install ABP CLI locally
-        run: dotnet tool install Volo.Abp.Cli
-        working-directory: ./web_backend/src/web_backend.HttpApi.Host
-
-      - name: Install ABP static libs
-        run: dotnet tool run abp install-libs
-        working-directory: ./web_backend/src/web_backend.HttpApi.Host
-
       - name: Build with dotnet
         run: dotnet build ./web_backend/src/web_backend.HttpApi.Host/web_backend.HttpApi.Host.csproj --configuration Release
 
