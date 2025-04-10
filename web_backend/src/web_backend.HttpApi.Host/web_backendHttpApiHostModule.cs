@@ -71,7 +71,7 @@ public class web_backendHttpApiHostModule : AbpModule
                 try
                 {
                     var configuration = context.Services.GetConfiguration();
-                    var pfxPassword = configuration["OpenIddict:Certificates:Default:Password"];
+                    //var pfxPassword = configuration["OpenIddict:Certificates:Default:Password"];
 
                     Console.WriteLine("Retrieved PFX password from configuration.");
                     var certPath = Path.Combine(AppContext.BaseDirectory, "openiddict.pfx");
@@ -84,7 +84,7 @@ public class web_backendHttpApiHostModule : AbpModule
                     }
 
                     var certificate = new X509Certificate2(
-                        "openiddict.pfx",
+                        certPath,
                         "Varsity2024",
                         X509KeyStorageFlags.MachineKeySet
                     );
