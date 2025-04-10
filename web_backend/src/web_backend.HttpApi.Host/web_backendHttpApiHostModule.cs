@@ -56,6 +56,7 @@ public class web_backendHttpApiHostModule : AbpModule
         Console.WriteLine($"Hosting Environment: {hostingEnvironment.EnvironmentName}");
 
         // Only run production config in a non-Development environment
+        /*
         if (!hostingEnvironment.IsDevelopment())
         {
             Console.WriteLine("Running production OpenIddict configuration...");
@@ -86,7 +87,7 @@ public class web_backendHttpApiHostModule : AbpModule
                     var certificate = new X509Certificate2(
                         certPath,
                         "Varsity2024",
-                        X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.EphemeralKeySet
+                        X509KeyStorageFlags.MachineKeySet
                     );
 
                     Console.WriteLine("Certificate loaded successfully.");
@@ -107,6 +108,7 @@ public class web_backendHttpApiHostModule : AbpModule
         {
             Console.WriteLine("Development environment detected. Skipping production certificate configuration.");
         }
+        */
 
         PreConfigure<OpenIddictBuilder>(builder =>
         {
