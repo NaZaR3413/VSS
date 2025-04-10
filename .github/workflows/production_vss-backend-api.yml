@@ -23,7 +23,7 @@ jobs:
           include-prerelease: true
     
       - name: Build with dotnet
-        run: dotnet build --configuration Release
+        run: dotnet build ./web_backend.sln --configuration Release
 
       - name: Run migrations
         run: dotnet run -- "${{ secrets.CONNECTION_STRING }}"
