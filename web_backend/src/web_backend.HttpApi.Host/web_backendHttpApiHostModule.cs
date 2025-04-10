@@ -84,7 +84,7 @@ public class web_backendHttpApiHostModule : AbpModule
                     }
 
                     var certificate = new X509Certificate2(
-                        certPath,
+                        "openiddict.pfx",
                         "Varsity2024",
                         X509KeyStorageFlags.MachineKeySet
                     );
