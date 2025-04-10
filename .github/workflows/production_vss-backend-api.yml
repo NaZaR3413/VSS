@@ -20,6 +20,16 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Install ABP CLI
+        run: dotnet tool install -g Volo.Abp.Cli
+
+      - name: Add ABP CLI to PATH
+        run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+
+      - name: Install ABP static libs
+        run: abp install-libs
+        working-directory: ./web_backend/src/web_backend.HttpApi.Host
+
       - name: Build with dotnet
         run: dotnet build ./web_backend/src/web_backend.HttpApi.Host/web_backend.HttpApi.Host.csproj --configuration Release
 
