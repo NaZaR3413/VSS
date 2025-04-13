@@ -19,9 +19,8 @@ jobs:
 
       # 1) Publish your Blazor Client
       - name: Publish Blazor WASM
-        run: dotnet publish \
-             web_backend/src/web_backend.Blazor.Client/web_backend.Blazor.Client.csproj \
-             -c Release -o published
+        run: dotnet publish web_backend/src/web_backend.Blazor.Client/web_backend.Blazor.Client.csproj -c Release -o published
+
 
       # 2) Deploy that published output to SWA
       - name: Deploy to Azure Static Web Apps
