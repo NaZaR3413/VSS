@@ -1,0 +1,158 @@
+﻿@page "/admin/manage-livestreams"
+@using web_backend.Livestreams
+@using web_backend.Enums
+@inject ILivestreamAppService LivestreamService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+@attribute [Authorize(Roles = "admin")]
+
+<div class="container mt-4">
+    <h2>Manage Livestreams</h2>
+
+    <div class="mb-3">
+        <button class="btn btn-primary" @onclick="RefreshLivestreams">
+            <i class="bi bi-arrow-clockwise"></i> Refresh List
+        </button>
+        <button class="btn btn-success ms-2" @onclick="() => NavigationManager.NavigateTo('/admin/create-livestream')">
+            <i class="bi bi-plus-circle"></i> Create New Livestream
+        </button>
+    </div>
+
+    @if (loading)
+    {
+        <div class="text-center my-4">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (livestreams == null || !livestreams.Any())
+    {
+        <div class="alert alert-info">
+            No livestreams found.
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Home Team</th>
+                        <th>Away Team</th>
+                        <th>Score</th>
+                        <th>Event Type</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var stream in livestreams)
+                    {
+                        <tr>
+                            <td>@stream.Id.ToString().Substring(0, 8)...</td>
+                            <td>@stream.HomeTeam</td>
+                            <td>@stream.AwayTeam</td>
+                            <td>@stream.HomeScore - @stream.AwayScore</td>
+                            <td>@stream.EventType</td>
+                            <td>
+                                <span class="badge bg-@GetStatusColor(stream.StreamStatus)">
+                                    @stream.StreamStatus.ToString()
+                                </span>
+                            </td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <button class="btn btn-sm btn-primary" @onclick="() => ViewLivestream(stream.Id)">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-success" @onclick="() => UpdateStatus(stream.Id, StreamStatus.Live)">
+                                        <i class="bi bi-broadcast"></i> Set Live
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" @onclick="() => UpdateStatus(stream.Id, StreamStatus.Completed)">
+                                        <i class="bi bi-stop-circle"></i> Set Completed
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private List<LivestreamDto> livestreams;
+    private bool loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLivestreams();
+    }
+
+    private async Task LoadLivestreams()
+    {
+        loading = true;
+        try
+        {
+            livestreams = await LivestreamService.GetListAsync();
+            // Sort by status (Live first, then PendingStart, then AwaitingConnection, then Completed)
+            livestreams = livestreams.OrderBy(l =>
+                l.StreamStatus == StreamStatus.Live ? 0 :
+                l.StreamStatus == StreamStatus.PendingStart ? 1 :
+                l.StreamStatus == StreamStatus.AwaitingConnection ? 2 : 3)
+                .ThenByDescending(l => l.Id)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("console.error", $"Error loading livestreams: {ex.Message}");
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task RefreshLivestreams()
+    {
+        await LoadLivestreams();
+    }
+
+    private void ViewLivestream(Guid id)
+    {
+        NavigationManager.NavigateTo($"/livestream/{id}");
+    }
+
+    private async Task UpdateStatus(Guid id, StreamStatus status)
+    {
+        try
+        {
+            var updateDto = new UpdateLivestreamDto
+                {
+                    StreamStatus = status
+                };
+
+            await LivestreamService.UpdateAsync(id, updateDto);
+            await JS.InvokeVoidAsync("alert", $"Livestream status updated to {status}");
+            await RefreshLivestreams();
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error updating livestream status: {ex.Message}");
+        }
+    }
+
+    private string GetStatusColor(StreamStatus status)
+    {
+        return status switch
+        {
+            StreamStatus.Live => "success",
+            StreamStatus.PendingStart => "info",
+            StreamStatus.AwaitingConnection => "warning",
+            StreamStatus.Completed => "secondary",
+            _ => "dark"
+        };
+    }
+}

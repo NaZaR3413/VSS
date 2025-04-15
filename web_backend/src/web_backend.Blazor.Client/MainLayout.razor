@@ -1,16 +1,19 @@
 ﻿@inherits LayoutComponentBase
 @using Microsoft.AspNetCore.Components.Authorization
 @using web_backend.Livestreams
+@using System.Linq
+@using Microsoft.AspNetCore.Components.Web
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
 @inject ILivestreamAppService LivestreamService
-@using web_backend.Enums;
+@inject IJSRuntime JS
+@using web_backend.Enums
+@implements IDisposable
 
 <HeadContent>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="js/hlsPlayer.js"></script>
 </HeadContent>
-
 
 <div class="vss-page">
     <header class="vss-header navbar navbar-expand-lg">
@@ -35,9 +38,31 @@
                 </li>
 
                 <li class="vss-nav__item nav-item">
-                    @if (activeLivestream != null)
+                    @if (activeLivestreams != null && activeLivestreams.Any())
                     {
-                        <a class="vss-nav__link nav-link" href="@($"/livestream/{activeLivestream.Id}")">
+                        <div class="dropdown">
+                            <a class="vss-nav__link nav-link dropdown-toggle" href="#" id="livestreamDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                Livestreams (@activeLivestreams.Count)
+                                <svg><rect x="0" y="0" width="100%" height="100%"></rect></svg>
+                            </a>
+                            <ul class="vss-dropdown dropdown-menu" aria-labelledby="livestreamDropdown">
+                                @foreach (var stream in activeLivestreams)
+                                {
+                                    <li class="vss-dropdown__item">
+                                        <a class="vss-dropdown__link dropdown-item" href="/livestream/@stream.Id" @onclick="@(() => NavigateToLivestream(stream.Id.ToString()))" @onclick:preventDefault>
+                                            @(!string.IsNullOrEmpty(stream.HomeTeam) && !string.IsNullOrEmpty(stream.AwayTeam)
+                                                ? $"{stream.HomeTeam} vs {stream.AwayTeam}"
+                                                : $"Livestream {stream.Id.ToString().Substring(0, 8)}")
+                                            <span class="badge bg-danger">LIVE</span>
+                                        </a>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                    else if (fallbackLivestreamId != Guid.Empty)
+                    {
+                        <a class="vss-nav__link nav-link" href="/livestream/@fallbackLivestreamId" @onclick="@(() => NavigateToLivestream(fallbackLivestreamId.ToString()))" @onclick:preventDefault>
                             Livestreams
                             <svg><rect x="0" y="0" width="100%" height="100%"></rect></svg>
                         </a>
@@ -72,6 +97,16 @@
                             <svg><rect x="0" y="0" width="100%" height="100%"></rect></svg>
                         </a>
                         <ul class="vss-dropdown dropdown-menu" aria-labelledby="adminDropdown">
+                            <li class="vss-dropdown__item">
+                                <a class="vss-dropdown__link dropdown-item" href="admin/create-livestream">
+                                    Create Livestream
+                                </a>
+                            </li>
+                            <li class="vss-dropdown__item">
+                                <a class="vss-dropdown__link dropdown-item" href="/admin/manage-livestreams">
+                                    Manage Livestreams
+                                </a>
+                            </li>
                             <li class="vss-dropdown__item">
                                 <a class="vss-dropdown__link dropdown-item" href="/admin/teams">
                                     Manage Teams
@@ -125,13 +160,95 @@
 
 @code {
     private AuthenticationState authState;
-    private LivestreamDto activeLivestream;
+    private List<LivestreamDto> activeLivestreams = new List<LivestreamDto>();
+
+    // Known working fallback livestream ID
+    private Guid fallbackLivestreamId = Guid.Parse("e7dd52a1-fbad-33d1-6cf4-3a194a5ebc8b");
+
+    // Known HLS stream key - direct reference to the key without Guid formatting
+    private string directHlsKey = "e7dd52a1-fbad-33d1-6cf4-3a194a5ebc8b";
+
+    private System.Threading.Timer refreshTimer;
 
     protected override async Task OnInitializedAsync()
     {
         authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
 
-        var livestreams = await LivestreamService.GetListAsync();
-        activeLivestream = livestreams.FirstOrDefault(l => l.StreamStatus == StreamStatus.Live);
+        // Set up timer to periodically refresh active livestreams - checking more frequently (every 15 seconds)
+        refreshTimer = new System.Threading.Timer(async _ =>
+        {
+            await RefreshLivestreams();
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
+
+        await RefreshLivestreams();
+    }
+
+    private async Task RefreshLivestreams()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("console.log", "Refreshing livestreams list...");
+            var allStreams = await LivestreamService.GetListAsync();
+
+            // Debug output to see what's happening with the data
+            await JS.InvokeVoidAsync("console.log", $"Total streams: {allStreams.Count}");
+
+            foreach (var stream in allStreams)
+            {
+                await JS.InvokeVoidAsync("console.log",
+                    $"Stream ID: {stream.Id}, Status: {stream.StreamStatus} ({(int)stream.StreamStatus}), " +
+                    $"Teams: '{stream.HomeTeam ?? "null"}' vs '{stream.AwayTeam ?? "null"}'");
+            }
+
+            // ONLY include streams that have status EXACTLY equal to StreamStatus.Live (value 2)
+            activeLivestreams = allStreams
+                .Where(l => l.StreamStatus == StreamStatus.Live)
+                .OrderByDescending(l => l.Id)
+                .ToList();
+
+            await JS.InvokeVoidAsync("console.log", $"Found {activeLivestreams.Count} LIVE streams");
+
+            if (!activeLivestreams.Any())
+            {
+                await JS.InvokeVoidAsync("console.log", $"No active livestreams found, using fallback ID: {fallbackLivestreamId}");
+
+                // Try to get the fallback livestream details, but DON'T add it if not Live
+                try
+                {
+                    var fallbackStream = await LivestreamService.GetAsync(fallbackLivestreamId);
+                    if (fallbackStream != null && fallbackStream.StreamStatus == StreamStatus.Live)
+                    {
+                        await JS.InvokeVoidAsync("console.log", $"Loaded fallback stream: {fallbackStream.HomeTeam} vs {fallbackStream.AwayTeam}");
+                        activeLivestreams.Add(fallbackStream);
+                    }
+                    else
+                    {
+                        await JS.InvokeVoidAsync("console.log", $"Fallback stream found but not LIVE: {fallbackStream?.StreamStatus}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    await JS.InvokeVoidAsync("console.error", $"Error loading fallback livestream: {ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("console.error", $"Error fetching livestreams: {ex.Message}");
+        }
+    }
+
+    private void NavigateToLivestream(string livestreamId)
+    {
+        var url = $"/livestream/{livestreamId}";
+        JS.InvokeVoidAsync("console.log", $"Navigating to livestream: {url}");
+        NavigationManager.NavigateTo(url, forceLoad: true);
+    }
+
+    public void Dispose()
+    {
+        // Clean up timer when component is disposed
+        refreshTimer?.Dispose();
     }
 }

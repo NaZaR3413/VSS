@@ -1,5 +1,10 @@
 ﻿@page "/livestream/{Id:guid}"
+@using web_backend.Livestreams
+@using web_backend.Enums
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Authorization
 @inherits LiveStreamBase
+@implements IDisposable
 
 <div class="vss-page">
     <header class="vss-header py-4">
@@ -7,7 +12,6 @@
             <h1 class="vss-header__title">@StreamTitle</h1>
             <p class="vss-subheading">
                 Your home for Arizona high school sports – live, on-demand, and in-depth.
-
             </p>
         </div>
     </header>
@@ -17,7 +21,7 @@
             <!-- Video Player -->
             <section class="vss-featured mb-5">
                 <div class="vss-video-container position-relative">
-                    <span class="badge bg-danger position-absolute top-0 start-0 m-2">LIVE</span>
+                    <span class="badge bg-@statusBadgeColor position-absolute top-0 start-0 m-2">@statusText</span>
                     <video id="videoPlayer" class="vss-video-player" controls autoplay></video>
                     <div class="vss-video-title mt-3">
                         <h2>@StreamTitle</h2>
@@ -33,7 +37,8 @@
                         <ul class="list-unstyled">
                             <li><strong>Date:</strong> @DateTime.Now.ToString("MMMM dd, yyyy")</li>
                             <li><strong>Time:</strong> @DateTime.Now.ToString("h:mm tt")</li>
-                            <li><strong>Status:</strong> <span class="text-success">Live</span></li>
+                            <li><strong>Status:</strong> <span class="text-@statusColor">@statusText</span></li>
+                            <li><strong>Event Type:</strong> @eventType</li>
                         </ul>
                     </div>
                     <div class="col-md-6">
@@ -41,6 +46,33 @@
                     </div>
                 </div>
             </section>
+
+            @if (authState != null && authState.User.IsInRole("admin"))
+            {
+                <div class="alert alert-warning mt-3">
+                    <strong>Admin Controls</strong>
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <span>Stream Status: <span class="badge bg-@statusBadgeColor">@statusText</span></span>
+                        <button class="btn btn-danger" @onclick="EndStream">
+                            <i class="bi bi-stop-circle-fill"></i> End Stream
+                        </button>
+                    </div>
+                </div>
+            }
+
+            @if (HasLoadErrors)
+            {
+                <div class="alert alert-warning">
+                    <h4>Stream Currently Unavailable</h4>
+                    <p>The stream server at <code>@VideoUrl</code> appears to be unavailable or the stream hasn't started yet.</p>
+                    <p>This could be because:</p>
+                    <ul>
+                        <li>The RTMP server is not running on port 8080</li>
+                        <li>The broadcaster (OBS) has not started streaming</li>
+                        <li>The stream key is not correctly configured</li>
+                    </ul>
+                </div>
+            }
 
             <!-- Contact Support -->
             <section class="text-center">
@@ -53,16 +85,372 @@
 
 @code {
     private bool hasLoadedVideo;
+    private System.Threading.Timer refreshTimer;
+    private string statusText = "CONNECTING...";
+    private string statusColor = "warning";
+    private string statusBadgeColor = "warning";
+    private string eventType = "";
+    private HttpClient localHttpClient;
+    private bool HasLoadErrors = false;
+    private int retryCount = 0;
+    private const int MAX_RETRIES = 5;
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    [Inject] private IHttpClientFactory HttpClientFactory { get; set; }
+
+    protected override void OnInitialized()
     {
-        if (!hasLoadedVideo && !string.IsNullOrEmpty(VideoUrl))
+        base.OnInitialized();
+
+        // Set up timer to refresh the stream data every 10 seconds
+        refreshTimer = new System.Threading.Timer(async _ =>
         {
-            hasLoadedVideo = true;
-            Console.WriteLine($"Automatically loading video: {VideoUrl}");
-            await JS.InvokeVoidAsync("loadHlsStream", VideoUrl);
+            await RefreshStreamData();
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(10));
+    }
+
+    private async Task RefreshStreamData()
+    {
+        await LoadLiveStreamDataAsync();
+
+        if (!string.IsNullOrEmpty(VideoUrl))
+        {
+            try
+            {
+                // Try to detect livestream URL and fix it if necessary
+                string fixedUrl = await FixStreamUrlIfNeeded(VideoUrl);
+
+                // If video URL has changed or not loaded yet, reload the player
+                await JS.InvokeVoidAsync("loadHlsStream", fixedUrl);
+                hasLoadedVideo = true;
+
+                // Reset error state if stream loaded successfully
+                if (await JS.InvokeAsync<bool>("isStreamLoaded"))
+                {
+                    HasLoadErrors = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading stream: {ex.Message}");
+                retryCount++;
+
+                if (retryCount > MAX_RETRIES)
+                {
+                    HasLoadErrors = true;
+                }
+            }
         }
     }
 
-    [Inject] private IJSRuntime JS { get; set; }
+    private async Task<string> FixStreamUrlIfNeeded(string originalUrl)
+    {
+        // The URL from error log shows http://localhost:8080/hls/8D18E19C-5E27-49AD-A56B-13DDA3AC9747.m3u8
+        // This is the pattern we need to match
+
+        // Check if we're being given a HLS URL in one format but need another
+        if (originalUrl.Contains("/hls/") && originalUrl.EndsWith(".m3u8"))
+        {
+            // URL is already in correct format, return as is
+            return originalUrl;
+        }
+
+        // Check if there's another format like /hls/{streamKey}/index.m3u8
+        if (originalUrl.Contains("/hls/") && originalUrl.EndsWith("index.m3u8"))
+        {
+            // Extract the stream key
+            int startIndex = originalUrl.IndexOf("/hls/") + 5;
+            int endIndex = originalUrl.LastIndexOf("/index.m3u8");
+
+            if (startIndex >= 5 && endIndex > startIndex)
+            {
+                string streamKey = originalUrl.Substring(startIndex, endIndex - startIndex);
+
+                // Try different HLS URL formats
+                string newUrl = $"http://localhost:8080/hls/{streamKey.ToUpper()}.m3u8";
+                Console.WriteLine($"Converted URL from {originalUrl} to {newUrl}");
+                return newUrl;
+            }
+        }
+
+        // If it doesn't match any known pattern, try to extract a GUID from the URL
+        try
+        {
+            // Look for a GUID pattern in the URL
+            var guidMatches = System.Text.RegularExpressions.Regex.Matches(
+                originalUrl,
+                @"[0-9a-fA-F]{8}[-]?[0-9a-fA-F]{4}[-]?[0-9a-fA-F]{4}[-]?[0-9a-fA-F]{4}[-]?[0-9a-fA-F]{12}"
+            );
+
+            if (guidMatches.Count > 0)
+            {
+                string extractedGuid = guidMatches[0].Value;
+                if (Guid.TryParse(extractedGuid, out Guid streamGuid))
+                {
+                    string newUrl = $"http://localhost:8080/hls/{streamGuid.ToString().ToUpper()}.m3u8";
+                    Console.WriteLine($"Extracted GUID and created URL: {newUrl}");
+                    return newUrl;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error trying to parse URL: {ex.Message}");
+        }
+
+        return originalUrl;
+    }
+
+    private async Task LoadLiveStreamDataAsync()
+    {
+        try
+        {
+            // Create a new HttpClient instance for each request to avoid the "already started" error
+            localHttpClient = HttpClientFactory.CreateClient("API");
+
+            // Try different API endpoints - the correct endpoint format based on log analysis
+            var endpoints = new[]
+            {
+                $"api/app/livestream/{Id}?api-version=1.0",
+                $"api/livestreams/{Id}",
+                $"livestream/{Id}"
+            };
+
+            LivestreamDto liveStream = null;
+            foreach (var endpoint in endpoints)
+            {
+                try
+                {
+                    Console.WriteLine($"Trying endpoint: {endpoint}");
+                    var response = await localHttpClient.GetAsync(endpoint);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        liveStream = await response.Content.ReadFromJsonAsync<LivestreamDto>();
+                        if (liveStream != null)
+                        {
+                            Console.WriteLine($"Success with endpoint: {endpoint}");
+                            break;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error with endpoint {endpoint}: {ex.Message}");
+                    // Continue to next endpoint
+                }
+            }
+
+            if (liveStream != null)
+            {
+                // Update video URL if it has changed
+                if (VideoUrl != liveStream.HlsUrl)
+                {
+                    VideoUrl = liveStream.HlsUrl;
+                    Console.WriteLine($"Updated HLS URL: {VideoUrl}");
+                }
+
+                StreamTitle = $"{liveStream.HomeTeam} {liveStream.HomeScore} - {liveStream.AwayScore} {liveStream.AwayTeam}";
+                eventType = liveStream.EventType.ToString();
+
+                // Update status display based on stream status
+                switch (liveStream.StreamStatus)
+                {
+                    case web_backend.Enums.StreamStatus.Live:
+                        statusText = "LIVE";
+                        statusColor = "success";
+                        statusBadgeColor = "danger";
+                        break;
+                    case web_backend.Enums.StreamStatus.AwaitingConnection:
+                        statusText = "CONNECTING...";
+                        statusColor = "warning";
+                        statusBadgeColor = "warning";
+                        break;
+                    case web_backend.Enums.StreamStatus.PendingStart:
+                        statusText = "STARTING SOON";
+                        statusColor = "info";
+                        statusBadgeColor = "info";
+                        break;
+                    case web_backend.Enums.StreamStatus.Completed:
+                        statusText = "ENDED";
+                        statusColor = "secondary";
+                        statusBadgeColor = "secondary";
+                        break;
+                    default:
+                        statusText = "UNKNOWN";
+                        statusColor = "secondary";
+                        statusBadgeColor = "secondary";
+                        break;
+                }
+            }
+            else
+            {
+                StreamTitle = "Live stream not found.";
+                statusText = "UNAVAILABLE";
+                statusColor = "danger";
+                statusBadgeColor = "danger";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception in LoadLiveStreamDataAsync: {ex.Message}");
+            StreamTitle = "Error loading live stream.";
+            statusText = "ERROR";
+            statusColor = "danger";
+            statusBadgeColor = "danger";
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Check if HLS player script exists
+            bool scriptExists = await JS.InvokeAsync<bool>("eval", "typeof loadHlsStream === 'function'");
+            if (!scriptExists)
+            {
+                // If the HLS player script doesn't exist, create it dynamically
+                await JS.InvokeVoidAsync("eval", @"
+                    let hls = null;
+                    window.streamLoaded = false;
+
+                    window.isStreamLoaded = function() {
+                        return window.streamLoaded;
+                    }
+
+                    window.loadHlsStream = function(streamUrl) {
+                        console.log('Attempting to load video: ' + streamUrl);
+                        if (!streamUrl) {
+                            console.error('Stream URL is null or empty');
+                            return;
+                        }
+
+                        const video = document.getElementById('videoPlayer');
+                        if (!video) {
+                            console.error('Video element not found');
+                            return;
+                        }
+
+                        // Destroy previous instance if it exists
+                        if (hls) {
+                            hls.destroy();
+                            hls = null;
+                        }
+
+                        // Check if Hls is supported
+                        if (Hls.isSupported()) {
+                            hls = new Hls({
+                                debug: true,
+                                xhrSetup: function(xhr, url) {
+                                    // Add CORS headers
+                                    xhr.withCredentials = false;
+                                }
+                            });
+
+                            hls.loadSource(streamUrl);
+                            hls.attachMedia(video);
+
+                            hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                                video.play();
+                                window.streamLoaded = true;
+                                console.log('Stream loaded successfully');
+                            });
+
+                            hls.on(Hls.Events.ERROR, function(event, data) {
+                                console.error('HLS Error:', data);
+                                window.streamLoaded = false;
+
+                                if (data.fatal) {
+                                    switch(data.type) {
+                                        case Hls.ErrorTypes.NETWORK_ERROR:
+                                            // Try to recover network error
+                                            console.log('Network error, trying to recover...');
+                                            hls.startLoad();
+                                            break;
+                                        case Hls.ErrorTypes.MEDIA_ERROR:
+                                            console.log('Media error, trying to recover...');
+                                            hls.recoverMediaError();
+                                            break;
+                                        default:
+                                            // Cannot recover
+                                            hls.destroy();
+                                            console.error('Fatal error, cannot recover');
+                                            break;
+                                    }
+                                }
+                            });
+                        }
+                        // For browsers that natively support HLS
+                        else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                            video.src = streamUrl;
+                            video.addEventListener('loadedmetadata', function() {
+                                video.play();
+                                window.streamLoaded = true;
+                            });
+                            video.addEventListener('error', function() {
+                                window.streamLoaded = false;
+                                console.error('Error loading stream with native HLS support');
+                            });
+                        } else {
+                            console.error('HLS not supported in this browser');
+                            window.streamLoaded = false;
+                        }
+                    };
+                ");
+
+                // Add the HLS.js library if it doesn't exist
+                await JS.InvokeVoidAsync("eval", @"
+                    if (typeof Hls === 'undefined') {
+                        var script = document.createElement('script');
+                        script.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
+                        script.onload = function() {
+                            console.log('HLS.js loaded successfully');
+                            if (typeof loadHlsStream === 'function' && '" + VideoUrl + @"') {
+                                loadHlsStream('" + VideoUrl + @"');
+                            }
+                        };
+                        document.head.appendChild(script);
+                    }
+                ");
+            }
+
+            await LoadLiveStreamDataAsync();
+        }
+
+        if (!string.IsNullOrEmpty(VideoUrl) && !hasLoadedVideo)
+        {
+            string fixedUrl = await FixStreamUrlIfNeeded(VideoUrl);
+            await JS.InvokeVoidAsync("loadHlsStream", fixedUrl);
+            hasLoadedVideo = true;
+        }
+    }
+
+    public void Dispose()
+    {
+        // Clean up timer when component is disposed
+        refreshTimer?.Dispose();
+    }
+
+    private async Task EndStream()
+    {
+        if (await JS.InvokeAsync<bool>("confirm", "Are you sure you want to end this stream? This action cannot be undone."))
+        {
+            try
+            {
+                var updateDto = new UpdateLivestreamDto
+                    {
+                        StreamStatus = StreamStatus.Completed
+                    };
+
+                await LivestreamService.UpdateAsync(Id, updateDto);
+                await JS.InvokeVoidAsync("alert", "Stream has been marked as completed.");
+
+                // Refresh stream data to update UI
+                await LoadLiveStreamDataAsync();
+            }
+            catch (Exception ex)
+            {
+                await JS.InvokeVoidAsync("alert", $"Error ending stream: {ex.Message}");
+            }
+        }
+    }
 }

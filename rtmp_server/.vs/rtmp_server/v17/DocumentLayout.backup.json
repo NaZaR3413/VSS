@@ -52,7 +52,7 @@
               "RelativeDocumentMoniker": "rtmp\\nginx.conf",
               "ToolTip": "C:\\Users\\Evangelos Leros\\source\\repos\\VSS\\rtmp_server\\rtmp\\nginx.conf",
               "RelativeToolTip": "rtmp\\nginx.conf",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABcAAAABAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAACIAAAAIAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
               "WhenOpened": "2025-02-21T07:07:44.858Z",
               "EditorCaption": ""
@@ -103,8 +103,7 @@
               "RelativeToolTip": "auth\\server.js",
               "ViewState": "AgIAAAUAAAAAAAAAAAAIwCkAAABDAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
-              "WhenOpened": "2025-02-05T06:11:07.401Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-02-05T06:11:07.401Z"
             },
             {
               "$type": "Document",
