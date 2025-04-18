@@ -1,9 +1,11 @@
 ﻿@page "/admin/manage-livestreams"
+@using web_backend.Blazor.Client.Services
 @using web_backend.Livestreams
 @using web_backend.Enums
 @inject ILivestreamAppService LivestreamService
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
+@inject LivestreamStateService LivestreamState
 @attribute [Authorize(Roles = "admin")]
 
 <div class="container mt-4">
@@ -13,7 +15,7 @@
         <button class="btn btn-primary" @onclick="RefreshLivestreams">
             <i class="bi bi-arrow-clockwise"></i> Refresh List
         </button>
-        <button class="btn btn-success ms-2" @onclick="() => NavigationManager.NavigateTo('/admin/create-livestream')">
+        <button class="btn btn-success ms-2" @onclick="CreateNewLivestream">
             <i class="bi bi-plus-circle"></i> Create New Livestream
         </button>
     </div>
@@ -34,57 +36,238 @@
     }
     else
     {
-        <div class="table-responsive">
-            <table class="table table-bordered table-striped">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Home Team</th>
-                        <th>Away Team</th>
-                        <th>Score</th>
-                        <th>Event Type</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var stream in livestreams)
-                    {
-                        <tr>
-                            <td>@stream.Id.ToString().Substring(0, 8)...</td>
-                            <td>@stream.HomeTeam</td>
-                            <td>@stream.AwayTeam</td>
-                            <td>@stream.HomeScore - @stream.AwayScore</td>
-                            <td>@stream.EventType</td>
-                            <td>
-                                <span class="badge bg-@GetStatusColor(stream.StreamStatus)">
-                                    @stream.StreamStatus.ToString()
-                                </span>
-                            </td>
-                            <td>
-                                <div class="btn-group" role="group">
-                                    <button class="btn btn-sm btn-primary" @onclick="() => ViewLivestream(stream.Id)">
-                                        <i class="bi bi-eye"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-success" @onclick="() => UpdateStatus(stream.Id, StreamStatus.Live)">
-                                        <i class="bi bi-broadcast"></i> Set Live
-                                    </button>
-                                    <button class="btn btn-sm btn-danger" @onclick="() => UpdateStatus(stream.Id, StreamStatus.Completed)">
-                                        <i class="bi bi-stop-circle"></i> Set Completed
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+        <div class="mb-3">
+            <div class="btn-group" role="group">
+                <button type="button" class="btn @(currentView == "status" ? "btn-primary" : "btn-outline-primary")" @onclick='() => ChangeView("status")'>
+                    <i class="bi bi-broadcast"></i> By Status
+                </button>
+                <button type="button" class="btn @(currentView == "date" ? "btn-primary" : "btn-outline-primary")" @onclick='() => ChangeView("date")'>
+                    <i class="bi bi-calendar-date"></i> By Date
+                </button>
+            </div>
         </div>
+
+        @if (currentView == "status")
+        {
+            <div class="accordion" id="livestreamsByStatus">
+                @foreach (var statusGroup in livestreamsByStatus)
+                {
+                    var statusName = statusGroup.Key.ToString();
+                    var statusColorClass = GetStatusColor(statusGroup.Key);
+                    var headerId = $"status-header-{statusName}";
+                    var collapseId = $"status-collapse-{statusName}";
+                    var streams = statusGroup.ToList();
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="@headerId">
+                            <button class="accordion-button @(statusGroup.Key == StreamStatus.Live ? "" : "collapsed")"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#@collapseId"
+                                    aria-expanded="@(statusGroup.Key == StreamStatus.Live ? "true" : "false")"
+                                    aria-controls="@collapseId">
+                                <span class="badge bg-@statusColorClass me-2">@statusName</span>
+                                <span>@statusName Livestreams (@streams.Count)</span>
+                            </button>
+                        </h2>
+                        <div id="@collapseId" class="accordion-collapse collapse @(statusGroup.Key == StreamStatus.Live ? "show" : "")" aria-labelledby="@headerId" data-bs-parent="#livestreamsByStatus">
+                            <div class="accordion-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-bordered table-striped mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>ID</th>
+                                                <th>Teams</th>
+                                                <th>Event Date</th>
+                                                <th>Score</th>
+                                                <th>Event Type</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var stream in streams)
+                                            {
+                                                <tr>
+                                                    <td style="max-width:120px;"><span class="text-monospace small">@stream.Id</span></td>
+                                                    <td>@stream.DisplayName</td>
+                                                    <td>@stream.EventDate.ToString("MMM dd, yyyy h:mm tt")</td>
+                                                    <td>
+                                                        @if (editingScoreId == stream.Id)
+                                                        {
+                                                            <div class="input-group">
+                                                                <input type="number" class="form-control form-control-sm"
+                                                                       @bind="homeScoreEdit" min="0" />
+                                                                <span class="input-group-text">-</span>
+                                                                <input type="number" class="form-control form-control-sm"
+                                                                       @bind="awayScoreEdit" min="0" />
+                                                                <button class="btn btn-sm btn-success" @onclick="SaveScore">
+                                                                    <i class="bi bi-check"></i>
+                                                                </button>
+                                                                <button class="btn btn-sm btn-secondary" @onclick="CancelScoreEdit">
+                                                                    <i class="bi bi-x"></i>
+                                                                </button>
+                                                            </div>
+                                                        }
+                                                        else
+                                                        {
+                                                            <div class="d-flex align-items-center">
+                                                                <span>@stream.GameScore</span>
+                                                                <button class="btn btn-sm btn-outline-primary ms-2"
+                                                                        @onclick="() => EditScore(stream.Id, stream.HomeScore, stream.AwayScore)">
+                                                                    <i class="bi bi-pencil-square"></i>
+                                                                </button>
+                                                            </div>
+                                                        }
+                                                    </td>
+                                                    <td>@stream.EventType</td>
+                                                    <td>
+                                                        <div class="btn-group" role="group">
+                                                            <button class="btn btn-sm btn-primary" @onclick="() => ViewLivestream(stream.Id)">
+                                                                <i class="bi bi-eye"></i>
+                                                            </button>
+                                                            <button class="btn btn-sm btn-success" @onclick="() => UpdateStatus(stream.Id, StreamStatus.Live)">
+                                                                <i class="bi bi-broadcast"></i> Set Live
+                                                            </button>
+                                                            <button class="btn btn-sm btn-danger" @onclick="() => UpdateStatus(stream.Id, StreamStatus.Completed)">
+                                                                <i class="bi bi-stop-circle"></i> Set Completed
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="accordion" id="livestreamsByDate">
+                @foreach (var dateGroup in livestreamsByDate)
+                {
+                    var dateString = dateGroup.Key.ToString("yyyy-MM-dd");
+                    var displayDate = dateGroup.Key.ToString("MMMM dd, yyyy");
+                    var headerId = $"date-header-{dateString}";
+                    var collapseId = $"date-collapse-{dateString}";
+                    var streams = dateGroup.ToList();
+                    var isToday = dateGroup.Key.Date == DateTime.Today;
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="@headerId">
+                            <button class="accordion-button @(isToday ? "" : "collapsed")"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#@collapseId"
+                                    aria-expanded="@(isToday ? "true" : "false")"
+                                    aria-controls="@collapseId">
+                                <i class="bi bi-calendar-date me-2"></i>
+                                <span>@displayDate @(isToday ? "(Today)" : "") - @streams.Count livestreams</span>
+                            </button>
+                        </h2>
+                        <div id="@collapseId" class="accordion-collapse collapse @(isToday ? "show" : "")" aria-labelledby="@headerId" data-bs-parent="#livestreamsByDate">
+                            <div class="accordion-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-bordered table-striped mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>ID</th>
+                                                <th>Teams</th>
+                                                <th>Time</th>
+                                                <th>Score</th>
+                                                <th>Event Type</th>
+                                                <th>Status</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var stream in streams.OrderBy(s => s.EventDate.TimeOfDay))
+                                            {
+                                                <tr>
+                                                    <td style="max-width:120px;"><span class="text-monospace small">@stream.Id</span></td>
+                                                    <td>@stream.DisplayName</td>
+                                                    <td>@stream.EventDate.ToString("h:mm tt")</td>
+                                                    <td>
+                                                        @if (editingScoreId == stream.Id)
+                                                        {
+                                                            <div class="input-group">
+                                                                <input type="number" class="form-control form-control-sm"
+                                                                       @bind="homeScoreEdit" min="0" />
+                                                                <span class="input-group-text">-</span>
+                                                                <input type="number" class="form-control form-control-sm"
+                                                                       @bind="awayScoreEdit" min="0" />
+                                                                <button class="btn btn-sm btn-success" @onclick="SaveScore">
+                                                                    <i class="bi bi-check"></i>
+                                                                </button>
+                                                                <button class="btn btn-sm btn-secondary" @onclick="CancelScoreEdit">
+                                                                    <i class="bi bi-x"></i>
+                                                                </button>
+                                                            </div>
+                                                        }
+                                                        else
+                                                        {
+                                                            <div class="d-flex align-items-center">
+                                                                <span>@stream.GameScore</span>
+                                                                <button class="btn btn-sm btn-outline-primary ms-2"
+                                                                        @onclick="() => EditScore(stream.Id, stream.HomeScore, stream.AwayScore)">
+                                                                    <i class="bi bi-pencil-square"></i>
+                                                                </button>
+                                                            </div>
+                                                        }
+                                                    </td>
+                                                    <td>@stream.EventType</td>
+                                                    <td>
+                                                        <span class="badge bg-@GetStatusColor(stream.StreamStatus)">
+                                                            @stream.StreamStatus.ToString()
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <div class="btn-group" role="group">
+                                                            <button class="btn btn-sm btn-primary" @onclick="() => ViewLivestream(stream.Id)">
+                                                                <i class="bi bi-eye"></i>
+                                                            </button>
+                                                            <button class="btn btn-sm btn-success" @onclick="() => UpdateStatus(stream.Id, StreamStatus.Live)">
+                                                                <i class="bi bi-broadcast"></i> Set Live
+                                                            </button>
+                                                            <button class="btn btn-sm btn-danger" @onclick="() => UpdateStatus(stream.Id, StreamStatus.Completed)">
+                                                                <i class="bi bi-stop-circle"></i> Set Completed
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
     }
 </div>
 
 @code {
     private List<LivestreamDto> livestreams;
     private bool loading = true;
+    private string currentView = "status"; // Options: "status" or "date"
+
+    private Guid editingScoreId = Guid.Empty;
+    private int homeScoreEdit;
+    private int awayScoreEdit;
+
+    // Grouped livestreams
+    private IEnumerable<IGrouping<StreamStatus, LivestreamDto>> livestreamsByStatus =>
+        livestreams?.GroupBy(l => l.StreamStatus)
+        .OrderBy(g => g.Key == StreamStatus.Live ? 0 :
+                      g.Key == StreamStatus.PendingStart ? 1 :
+                      g.Key == StreamStatus.AwaitingConnection ? 2 : 3);
+
+    private IEnumerable<IGrouping<DateTime, LivestreamDto>> livestreamsByDate =>
+        livestreams?.GroupBy(l => l.EventDate.Date)
+        .OrderByDescending(g => g.Key);
 
     protected override async Task OnInitializedAsync()
     {
@@ -97,13 +280,6 @@
         try
         {
             livestreams = await LivestreamService.GetListAsync();
-            // Sort by status (Live first, then PendingStart, then AwaitingConnection, then Completed)
-            livestreams = livestreams.OrderBy(l =>
-                l.StreamStatus == StreamStatus.Live ? 0 :
-                l.StreamStatus == StreamStatus.PendingStart ? 1 :
-                l.StreamStatus == StreamStatus.AwaitingConnection ? 2 : 3)
-                .ThenByDescending(l => l.Id)
-                .ToList();
         }
         catch (Exception ex)
         {
@@ -113,6 +289,11 @@
         {
             loading = false;
         }
+    }
+
+    private void ChangeView(string view)
+    {
+        currentView = view;
     }
 
     private async Task RefreshLivestreams()
@@ -129,18 +310,76 @@
     {
         try
         {
+            // First, get the current livestream to preserve its scores
+            var currentLivestream = livestreams.FirstOrDefault(l => l.Id == id);
+            if (currentLivestream == null)
+            {
+                throw new Exception("Livestream not found");
+            }
+
             var updateDto = new UpdateLivestreamDto
                 {
-                    StreamStatus = status
+                    StreamStatus = status,
+                // Preserve the current scores
+                    HomeScore = currentLivestream.HomeScore,
+                    AwayScore = currentLivestream.AwayScore
                 };
 
             await LivestreamService.UpdateAsync(id, updateDto);
+
+            // Notify the application that a livestream status has changed
+            LivestreamState?.NotifyLivestreamStatusChanged();
+
             await JS.InvokeVoidAsync("alert", $"Livestream status updated to {status}");
             await RefreshLivestreams();
         }
         catch (Exception ex)
         {
             await JS.InvokeVoidAsync("alert", $"Error updating livestream status: {ex.Message}");
+        }
+    }
+
+    private void EditScore(Guid id, int homeScore, int awayScore)
+    {
+        editingScoreId = id;
+        homeScoreEdit = homeScore;
+        awayScoreEdit = awayScore;
+    }
+
+    private void CancelScoreEdit()
+    {
+        editingScoreId = Guid.Empty;
+    }
+
+    private async Task SaveScore()
+    {
+        try
+        {
+            // Get the current livestream to preserve its status
+            var currentLivestream = livestreams.FirstOrDefault(l => l.Id == editingScoreId);
+            if (currentLivestream == null)
+            {
+                throw new Exception("Livestream not found");
+            }
+
+            var updateDto = new UpdateLivestreamDto
+                {
+                    HomeScore = homeScoreEdit,
+                    AwayScore = awayScoreEdit,
+                // Preserve the current status
+                    StreamStatus = currentLivestream.StreamStatus
+                };
+
+            await LivestreamService.UpdateAsync(editingScoreId, updateDto);
+            await JS.InvokeVoidAsync("alert", "Score updated successfully");
+
+            editingScoreId = Guid.Empty;
+
+            await RefreshLivestreams();
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error updating score: {ex.Message}");
         }
     }
 
@@ -154,5 +393,10 @@
             StreamStatus.Completed => "secondary",
             _ => "dark"
         };
+    }
+
+    private void CreateNewLivestream()
+    {
+        NavigationManager.NavigateTo("/admin/create-livestream");
     }
 }

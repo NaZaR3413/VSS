@@ -101,28 +101,37 @@
     {
         base.OnInitialized();
 
-        // Set up timer to refresh the stream data every 10 seconds
+        // Set up timer to refresh the stream data less frequently (30 seconds instead of 10)
         refreshTimer = new System.Threading.Timer(async _ =>
         {
             await RefreshStreamData();
             await InvokeAsync(StateHasChanged);
-        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(10));
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(30)); // Changed from 10 to 30 seconds
     }
+
 
     private async Task RefreshStreamData()
     {
+        string previousUrl = VideoUrl;
         await LoadLiveStreamDataAsync();
 
-        if (!string.IsNullOrEmpty(VideoUrl))
+        if (!string.IsNullOrEmpty(VideoUrl) && VideoUrl != previousUrl)
         {
             try
             {
-                // Try to detect livestream URL and fix it if necessary
+                // Only try to fix and reload the stream if the URL has changed
                 string fixedUrl = await FixStreamUrlIfNeeded(VideoUrl);
-
-                // If video URL has changed or not loaded yet, reload the player
-                await JS.InvokeVoidAsync("loadHlsStream", fixedUrl);
-                hasLoadedVideo = true;
+                if (hasLoadedVideo && fixedUrl != previousUrl)
+                {
+                    // If video URL has changed, reload the player
+                    await JS.InvokeVoidAsync("loadHlsStream", fixedUrl);
+                }
+                else if (!hasLoadedVideo)
+                {
+                    // If video hasn't loaded yet, try to load it
+                    await JS.InvokeVoidAsync("loadHlsStream", fixedUrl);
+                    hasLoadedVideo = true;
+                }
 
                 // Reset error state if stream loaded successfully
                 if (await JS.InvokeAsync<bool>("isStreamLoaded"))
@@ -310,91 +319,147 @@
             {
                 // If the HLS player script doesn't exist, create it dynamically
                 await JS.InvokeVoidAsync("eval", @"
-                    let hls = null;
-                    window.streamLoaded = false;
-
-                    window.isStreamLoaded = function() {
-                        return window.streamLoaded;
-                    }
-
                     window.loadHlsStream = function(streamUrl) {
-                        console.log('Attempting to load video: ' + streamUrl);
-                        if (!streamUrl) {
-                            console.error('Stream URL is null or empty');
-                            return;
-                        }
+    console.log('Attempting to load video: ' + streamUrl);
+    if (!streamUrl) {
+        console.error('Stream URL is null or empty');
+        return;
+    }
 
-                        const video = document.getElementById('videoPlayer');
-                        if (!video) {
-                            console.error('Video element not found');
-                            return;
-                        }
+    const video = document.getElementById('videoPlayer');
+    if (!video) {
+        console.error('Video element not found');
+        return;
+    }
 
-                        // Destroy previous instance if it exists
-                        if (hls) {
+    // Destroy previous instance if it exists
+    if (hls) {
+        hls.destroy();
+        hls = null;
+    }
+
+    // Check if Hls is supported
+    if (Hls.isSupported()) {
+        hls = new Hls({
+            debug: false, // Set to false in production
+            maxBufferLength: 60, // Increase buffer length to 60 seconds (default is 30)
+            maxMaxBufferLength: 600, // Maximum buffer size in seconds (10 minutes)
+            backBufferLength: 90, // Keep 90 seconds of back buffer (prevents restarting)
+            liveSyncDuration: 3, // Live sync point buffer used when latency controller is disabled
+            liveMaxLatencyDuration: Infinity, // Don't limit latency for now
+            fragLoadingTimeOut: 20000, // Extend fragment loading timeout
+            manifestLoadingTimeOut: 10000, // Extend manifest loading timeout
+            levelLoadingTimeOut: 10000, // Extend level loading timeout
+            liveDurationInfinity: true, // Treat duration as infinity for live streams
+            startLevel: -1, // Start with auto quality selection
+            autoStartLoad: true, // Start loading automatically
+            enableWorker: true, // Enable web workers for better performance
+            lowLatencyMode: false, // Disable low latency mode which can cause issues
+            xhrSetup: function(xhr, url) {
+                // Add CORS headers
+                xhr.withCredentials = false;
+            }
+        });
+
+        hls.loadSource(streamUrl);
+        hls.attachMedia(video);
+
+        // Add event listeners for detailed monitoring
+        hls.on(Hls.Events.MANIFEST_PARSED, function() {
+            console.log('HLS Manifest parsed, attempting to play video');
+
+            // Store the current time to track playback
+            let lastTime = 0;
+            let stuckCounter = 0;
+
+            // Monitor playback to detect if stuck
+            const playbackMonitor = setInterval(() => {
+                if (video.currentTime === lastTime && !video.paused) {
+                    stuckCounter++;
+                    console.log(`Playback potentially stuck for ${stuckCounter} seconds`);
+
+                    if (stuckCounter > 5) {
+                        console.log('Attempting recovery for stuck playback');
+                        video.currentTime += 0.1; // Try to advance playback slightly
+                    }
+                } else {
+                    stuckCounter = 0;
+                }
+                lastTime = video.currentTime;
+            }, 1000);
+
+            video.play().then(() => {
+                window.streamLoaded = true;
+                console.log('Stream playback started successfully');
+            }).catch(error => {
+                console.error('Error starting playback:', error);
+                window.streamLoaded = false;
+            });
+        });
+
+        hls.on(Hls.Events.ERROR, function(event, data) {
+            console.error('HLS Error:', data);
+
+            if (data.fatal) {
+                switch(data.type) {
+                    case Hls.ErrorTypes.NETWORK_ERROR:
+                        // Try to recover network error
+                        console.log('Network error, trying to recover...');
+                        hls.startLoad();
+                        break;
+                    case Hls.ErrorTypes.MEDIA_ERROR:
+                        console.log('Media error, trying to recover...');
+                        hls.recoverMediaError();
+                        break;
+                    default:
+                        // Cannot recover
+                        console.error('Fatal error, cannot recover', data);
+                        // Wait a second before trying to reinitialize
+                        setTimeout(() => {
                             hls.destroy();
-                            hls = null;
-                        }
-
-                        // Check if Hls is supported
-                        if (Hls.isSupported()) {
-                            hls = new Hls({
-                                debug: true,
-                                xhrSetup: function(xhr, url) {
-                                    // Add CORS headers
-                                    xhr.withCredentials = false;
-                                }
-                            });
-
+                            hls = new Hls();
                             hls.loadSource(streamUrl);
                             hls.attachMedia(video);
+                        }, 1000);
+                        break;
+                }
+            }
+        });
 
-                            hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                                video.play();
-                                window.streamLoaded = true;
-                                console.log('Stream loaded successfully');
-                            });
+        // Add detailed logging for fragment loading events
+        hls.on(Hls.Events.FRAG_LOADING, function(event, data) {
+            console.debug(`Loading fragment: ${data.frag.sn}, level: ${data.frag.level}`);
+        });
 
-                            hls.on(Hls.Events.ERROR, function(event, data) {
-                                console.error('HLS Error:', data);
-                                window.streamLoaded = false;
+        hls.on(Hls.Events.FRAG_LOADED, function(event, data) {
+            console.debug(`Loaded fragment: ${data.frag.sn}, level: ${data.frag.level}`);
+        });
 
-                                if (data.fatal) {
-                                    switch(data.type) {
-                                        case Hls.ErrorTypes.NETWORK_ERROR:
-                                            // Try to recover network error
-                                            console.log('Network error, trying to recover...');
-                                            hls.startLoad();
-                                            break;
-                                        case Hls.ErrorTypes.MEDIA_ERROR:
-                                            console.log('Media error, trying to recover...');
-                                            hls.recoverMediaError();
-                                            break;
-                                        default:
-                                            // Cannot recover
-                                            hls.destroy();
-                                            console.error('Fatal error, cannot recover');
-                                            break;
-                                    }
-                                }
-                            });
-                        }
-                        // For browsers that natively support HLS
-                        else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                            video.src = streamUrl;
-                            video.addEventListener('loadedmetadata', function() {
-                                video.play();
-                                window.streamLoaded = true;
-                            });
-                            video.addEventListener('error', function() {
-                                window.streamLoaded = false;
-                                console.error('Error loading stream with native HLS support');
-                            });
-                        } else {
-                            console.error('HLS not supported in this browser');
-                            window.streamLoaded = false;
-                        }
-                    };
+        hls.on(Hls.Events.FRAG_LOAD_ERROR, function(event, data) {
+            console.error(`Failed to load fragment: ${data.frag.sn}, level: ${data.frag.level}`, data);
+        });
+    }
+    // For browsers that natively support HLS
+    else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = streamUrl;
+        video.addEventListener('loadedmetadata', function() {
+            video.play().then(() => {
+                window.streamLoaded = true;
+            }).catch(error => {
+                console.error('Error starting playback:', error);
+                window.streamLoaded = false;
+            });
+        });
+        video.addEventListener('error', function(e) {
+            window.streamLoaded = false;
+            console.error('Error loading stream with native HLS support:', e);
+        });
+    } else {
+        console.error('HLS not supported in this browser');
+        window.streamLoaded = false;
+    }
+};
+
                 ");
 
                 // Add the HLS.js library if it doesn't exist

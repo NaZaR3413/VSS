@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
+using web_backend.Blazor.Client.Services;
 
 namespace web_backend.Blazor.Client;
 
@@ -12,6 +13,8 @@ public class Program
     public async static Task Main(string[] args)
     {
         var builder = WebAssemblyHostBuilder.CreateDefault(args);
+        builder.Services.AddSingleton<LivestreamStateService>();
+
 
         builder.Services.AddScoped<HttpClient>(sp =>
             new HttpClient { BaseAddress = new Uri("https://localhost:44356/") });
