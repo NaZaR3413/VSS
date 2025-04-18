@@ -30,11 +30,13 @@ jobs:
           web_backend/src/web_backend.Blazor.Client/web_backend.Blazor.Client.csproj \
           -c Release -o publish
 
-    - name: Show head/tail of SWA token   #  <-- TEMPORARY DEBUG STEP
+    - name: Show token diagnostics             #  <-- delete after test
       shell: bash
       run: |
-          echo "Token start ➜ ${TOKEN:0:6}"
-          echo "Token end   ➜ ${TOKEN: -6}"
+        echo "first‑6 : ${TOKEN:0:6}"
+        echo "last‑6  : ${TOKEN: -6}"
+        echo "length  : ${#TOKEN}"
+        printf 'hex tail: %s\n' "$(echo -n "${TOKEN}" | tail -c 4 | hexdump -C)"
       env:
           TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_SALMON_GLACIER_08DCA301E }}
 
