@@ -1,4 +1,4 @@
-name: Build and deploy ASP.Net Core with Blazor to Azure Web App
+name: Build and deploy ABP Blazor WebAssembly to Azure Static Web Apps
 
 on:
   push:
@@ -16,7 +16,7 @@ jobs:
       - name: Set up .NET Core
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.x'
+          dotnet-version: '8.0.x'
 
       - name: Install ABP CLI
         run: |
@@ -25,7 +25,8 @@ jobs:
         shell: bash
 
       - name: Build with dotnet
-        run: dotnet build web_backend/src/web_backend.HttpApi.Host/web_backend.HttpApi.Host.csproj --configuration Release
+        run: dotnet build --configuration Release
+        working-directory: ./web_backend/src/web_backend.HttpApi.Host
 
       - name: Generate authserver.pfx
         run: dotnet dev-certs https -v -ep ./authserver.pfx -p Varsity2024
@@ -39,6 +40,7 @@ jobs:
   build-deploy-frontend:
     runs-on: ubuntu-latest
     name: Build and Deploy Job
+    needs: build-apihost
 
     steps:
       - uses: actions/checkout@v4
@@ -48,11 +50,42 @@ jobs:
       - name: Set up .NET Core
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.x'
+          dotnet-version: '8.0.x'
+
+      - name: Install ABP CLI
+        run: |
+          dotnet tool install -g Volo.Abp.Cli
+          abp install-libs
+        shell: bash
+
+      - name: Create staticwebapp.config.json
+        run: |
+          echo '{
+            "navigationFallback": {
+              "rewrite": "/index.html",
+              "exclude": ["/images/*.{png,jpg,gif,ico}", "/*.{css,js}", "/api/*"]
+            },
+            "routes": [
+              {
+                "route": "/*",
+                "serve": "/index.html",
+                "statusCode": 200
+              }
+            ],
+            "mimeTypes": {
+              ".json": "text/json",
+              ".woff": "application/font-woff",
+              ".woff2": "application/font-woff2"
+            }
+          }' > web_backend/src/web_backend.Blazor.Client/wwwroot/staticwebapp.config.json
 
       - name: Publish WASM client
         run: |
-          dotnet publish web_backend/src/web_backend.Blazor.Client/web_backend.Blazor.Client.csproj -c Release -o publish
+          dotnet publish -c Release -o publish
+        working-directory: ./web_backend/src/web_backend.Blazor.Client
+
+      - name: Verify publish directory
+        run: ls -la publish/wwwroot
 
       - name: Deploy to Azure Static Web Apps
         id: builddeploy
@@ -62,6 +95,6 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
           app_location: "publish/wwwroot"
-          output_location: "./"
+          output_location: ""
           skip_app_build: true
           api_location: ""
