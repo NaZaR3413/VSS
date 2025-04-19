@@ -1,7 +1,7 @@
 {
   "navigationFallback": {
     "rewrite": "/index.html",
-    "exclude": ["/images/*.{png,jpg,gif,ico}", "/*.{css,js}", "/api/*"]
+    "exclude": [ "/images/*.{png,jpg,gif,ico}", "/*.{css,js}", "/api/*" ]
   },
   "routes": [
     {
@@ -14,5 +14,9 @@
     ".json": "text/json",
     ".woff": "application/font-woff",
     ".woff2": "application/font-woff2"
+  },
+  "globalHeaders": {
+    "Access-Control-Allow-Origin": "*",
+    "X-Content-Type-Options": "nosniff"
   }
 }

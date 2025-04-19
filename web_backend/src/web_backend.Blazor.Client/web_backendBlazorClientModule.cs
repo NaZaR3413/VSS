@@ -83,9 +83,22 @@ public class web_backendBlazorClientModule : AbpModule
 
     private static void ConfigureHttpClient(ServiceConfigurationContext context, IWebAssemblyHostEnvironment environment)
     {
+        var configuration = context.Services.GetSingletonInstance<IConfiguration>();
+        var remoteServiceBaseUrl = configuration
+            .GetSection("RemoteServices")
+            .GetSection("Default")
+            .GetValue<string>("BaseUrl");
+
+        if (string.IsNullOrEmpty(remoteServiceBaseUrl))
+        {
+            remoteServiceBaseUrl = environment.BaseAddress;
+        }
+
+        Console.WriteLine($"Using API base address: {remoteServiceBaseUrl}");
+
         context.Services.AddTransient(sp => new HttpClient
         {
-            BaseAddress = new Uri(environment.BaseAddress)
+            BaseAddress = new Uri(remoteServiceBaseUrl)
         });
     }
 
