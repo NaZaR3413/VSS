@@ -46,9 +46,12 @@ public class Program
         // Initialize JavaScript libraries
         var jsRuntime = host.Services.GetRequiredService<IJSRuntime>();
         await jsRuntime.InvokeVoidAsync("eval", "import('https://cdn.jsdelivr.net/npm/hls.js@latest')");
-        await jsRuntime.InvokeVoidAsync("eval", "import('/hlsPlayer.js')");
+
+        // Fix the path to correctly point to the js directory
+        await jsRuntime.InvokeVoidAsync("eval", "import('/js/hlsPlayer.js')");
 
         await application.InitializeApplicationAsync(host.Services);
         await host.RunAsync();
     }
 }
+
