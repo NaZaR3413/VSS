@@ -1,51 +1,60 @@
-name: Deploy ABP Blazor WASM to Azure Static Web Apps
+# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
+# More GitHub Actions for Azure: https://github.com/Azure/actions
+
+name: Build and deploy ASP.Net Core with Blazor to Azure Web App
 
 on:
   push:
-    branches: [ Production ]        # ← adjust if your prod branch
-  pull_request:
-    branches: [ Production ]
+    branches:
+      - Production
+  workflow_dispatch:
 
 jobs:
-  deploy-frontend:
+  build-apihost:
     runs-on: ubuntu-latest
-    environment: Production
-    permissions:
-      id-token: write               # OIDC login to SWA
-      contents: read
 
     steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: true            # ABP uses submodules
+      - uses: actions/checkout@v4
 
-    - name: Set up .NET SDK
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: 8.0.x
+      - name: Set up .NET Core
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.x'
+          include-prerelease: true
+      
+      - name: Install ABP CLI
+        run: |
+          dotnet tool install -g Volo.Abp.Cli
+          abp install-libs
+        shell: bash
+    
+      - name: Build with dotnet
+        run: dotnet build --configuration Release
 
-    # 1 — *Publish* the WASM client
-    - name: Publish WASM client
-      run: |
-        dotnet publish \
-          web_backend/src/web_backend.Blazor.Client/web_backend.Blazor.Client.csproj \
-          -c Release -o publish
+      - name: Generate authserver.pfx
+        run: dotnet dev-certs https -v -ep ${{env.DOTNET_ROOT}}/apihost/authserver.pfx -p Varsity2024 # Replace with your password
+      
+      - name: Upload artifact for apihost
+        uses: actions/upload-artifact@v4
+        with:
+          name: .net-apihost
+          path: ${{env.DOTNET_ROOT}}/apihost
 
-    # 2 — Upload the static files that dotnet just generated
-    - name: Deploy to Azure Static Web Apps
-      uses: Azure/static-web-apps-deploy@v1
-      with:
-        azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_SALMON_GLACIER_08DCA301E }}
-        action: upload 
-
-        production_branch: Production
-
-        # ------------------------------------------------------------------
-        #       Paths **inside the runner’s working directory**
-        # ------------------------------------------------------------------
-        # We already built the site, so point SWA straight at it and
-        # skip Oryx’s automatic build.
-        app_location:        publish/wwwroot    # <- contains index.html
-        skip_app_build:      true               # we built it ourselves
-        api_location:        ""                 # no Functions backend
-
+  build-deploy-frontend:
+    runs-on: ubuntu-latest
+    needs: deploy-apihost
+    name: Build and Deploy Job
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Build And Deploy
+        id: builddeploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_SALMON_GLACIER_08DCA301E }} # Set your Azure Static Web App API token as a secret in your repository settings
+          repo_token: ${{ secrets.GITHUB_TOKEN }} # Used for GitHub integrations (eg: PR comments)
+          action: "upload"
+          app_location: "web_backend/src/web_backend.Blazor" # App source code path
+          api_location: "" # Api source code path - optional
+          output_location: "wwwroot" # Built app content directory - optional
