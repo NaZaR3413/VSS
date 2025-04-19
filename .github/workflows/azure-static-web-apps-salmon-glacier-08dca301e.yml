@@ -21,6 +21,9 @@ jobs:
         with:
           dotnet-version: '9.x'
           include-prerelease: true
+
+      - name: Change directory to web_backend
+        run: cd web_backend
       
       - name: Install ABP CLI
         run: |
