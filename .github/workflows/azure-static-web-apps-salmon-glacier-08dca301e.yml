@@ -45,7 +45,8 @@ jobs:
         # ------------------------------------------------------------------
         # We already built the site, so point SWA straight at it and
         # skip Oryx’s automatic build.
-        app_location:        publish/wwwroot    # <- contains index.html
-        skip_app_build:      true               # we built it ourselves
-        api_location:        ""                 # no Functions backend
+        app_location: publish/wwwroot
+        skip_app_build: true
+        api_location: ""
+        output_location: ./
 
