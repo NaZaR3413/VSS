@@ -17,23 +17,19 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.x'
-          include-prerelease: true
 
-      - name: Change directory to web_backend
-        run: cd web_backend
-      
       - name: Install ABP CLI
         run: |
           dotnet tool install -g Volo.Abp.Cli
           abp install-libs
         shell: bash
-    
+
       - name: Build with dotnet
-        run: dotnet build --configuration Release
+        run: dotnet build web_backend/src/web_backend.sln --configuration Release
 
       - name: Generate authserver.pfx
         run: dotnet dev-certs https -v -ep ${{env.DOTNET_ROOT}}/apihost/authserver.pfx -p Varsity2024
-      
+
       - name: Upload artifact for apihost
         uses: actions/upload-artifact@v4
         with:
@@ -53,7 +49,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.x'
-          include-prerelease: true
 
       - name: Publish WASM client
         run: |
@@ -61,7 +56,7 @@ jobs:
 
       - name: Deploy to Azure Static Web Apps
         id: builddeploy
-        uses: Azure/static-web-apps-deploy@v2
+        uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_SALMON_GLACIER_08DCA301E }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
