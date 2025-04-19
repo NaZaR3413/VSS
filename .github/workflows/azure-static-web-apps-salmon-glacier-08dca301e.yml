@@ -45,9 +45,6 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      # Skip ABP CLI installation since it's causing issues
-      # We'll manually create the staticwebapp.config.json file
-
       - name: Create staticwebapp.config.json
         run: |
           mkdir -p web_backend/src/web_backend.Blazor.Client/wwwroot
@@ -74,33 +71,36 @@ jobs:
 
       - name: Publish Blazor WebAssembly
         run: |
-          # First, publish the Blazor WebAssembly client
-          echo "Publishing Blazor WebAssembly client..."
           dotnet publish web_backend/src/web_backend.Blazor.Client/web_backend.Blazor.Client.csproj \
             -c Release \
             -o ./published-app
           
-          # Ensure publish directory exists and show its contents
-          echo "Contents of published-app directory:"
-          find ./published-app -type f | sort
-          
-          # Create the target directory structure for Azure Static Web Apps
           mkdir -p ./publish/wwwroot
-          
-          # Copy wwwroot contents to the expected location
-          echo "Copying wwwroot contents to publish/wwwroot..."
           cp -r ./published-app/wwwroot/* ./publish/wwwroot/
           
-          # Ensure staticwebapp.config.json is in the right place
-          if [ ! -f "./publish/wwwroot/staticwebapp.config.json" ]; then
-            echo "Copying staticwebapp.config.json to publish/wwwroot"
+          # Print debug information
+          echo "Contents of publish/wwwroot directory:"
+          find ./publish/wwwroot -type f | sort
+          
+          # Verify the staticwebapp.config.json file is present
+          if [ -f "./publish/wwwroot/staticwebapp.config.json" ]; then
+            echo "staticwebapp.config.json exists in the output directory"
+          else
+            echo "staticwebapp.config.json not found, copying it..."
             cp web_backend/src/web_backend.Blazor.Client/wwwroot/staticwebapp.config.json ./publish/wwwroot/
           fi
-          
-          # Show the final contents
-          echo "Final contents of publish/wwwroot directory:"
-          find ./publish/wwwroot -type f | sort
 
+      # Debug step to check the API token (masked for security)
+      - name: Debug API token
+        run: |
+          echo "API token length: ${#API_TOKEN}"
+          # Check if token starts with expected prefix (often gh)
+          TOKEN_PREFIX="${API_TOKEN:0:2}"
+          echo "API token prefix: $TOKEN_PREFIX"
+        env:
+          API_TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_SALMON_GLACIER_08DCA301E }}
+
+      # Deploy to Azure Static Web Apps
       - name: Deploy to Azure Static Web Apps
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
@@ -108,7 +108,7 @@ jobs:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_SALMON_GLACIER_08DCA301E }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
-          app_location: "publish/wwwroot"  # This must be the exact location
-          output_location: ""  # Leave this empty as files are already in the right place
+          app_location: "publish/wwwroot"
+          output_location: ""
           skip_app_build: true
           api_location: ""
