@@ -28,13 +28,13 @@ jobs:
         run: dotnet build web_backend/src/web_backend.HttpApi.Host/web_backend.HttpApi.Host.csproj --configuration Release
 
       - name: Generate authserver.pfx
-        run: dotnet dev-certs https -v -ep ${{env.DOTNET_ROOT}}/apihost/authserver.pfx -p Varsity2024
+        run: dotnet dev-certs https -v -ep ./authserver.pfx -p Varsity2024
 
       - name: Upload artifact for apihost
         uses: actions/upload-artifact@v4
         with:
-          name: .net-apihost
-          path: ${{env.DOTNET_ROOT}}/apihost
+          name: authserver-pfx
+          path: ./authserver.pfx
 
   build-deploy-frontend:
     runs-on: ubuntu-latest
