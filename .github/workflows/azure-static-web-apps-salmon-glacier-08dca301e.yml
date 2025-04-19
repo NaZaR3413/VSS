@@ -1,60 +1,114 @@
-name: Azure Static Web Apps CI/CD
+name: Build and deploy ABP Blazor WebAssembly to Azure Static Web Apps
 
 on:
   push:
     branches:
       - Production
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
-    branches:
-      - Production
+  workflow_dispatch:
 
 jobs:
-  build_and_deploy_job:
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+  build-apihost:
     runs-on: ubuntu-latest
-    name: Build and Deploy Job
-    permissions:
-      id-token: write
-      contents: read
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET Core
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build with dotnet
+        run: dotnet build web_backend/src/web_backend.HttpApi.Host/web_backend.HttpApi.Host.csproj --configuration Release
+
+      - name: Generate authserver.pfx
+        run: dotnet dev-certs https -v -ep ./authserver.pfx -p Varsity2024
+
+      - name: Upload artifact for apihost
+        uses: actions/upload-artifact@v4
+        with:
+          name: authserver-pfx
+          path: ./authserver.pfx
+
+  build-deploy-frontend:
+    runs-on: ubuntu-latest
+    needs: build-apihost
+    name: Build and Deploy Job
+
+    steps:
+      - uses: actions/checkout@v4
         with:
           submodules: true
-          lfs: false
 
-      - name: Install OIDC Client from Core Package
-        run: npm install @actions/core@1.6.0 @actions/http-client
-
-      - name: Get Id Token
-        uses: actions/github-script@v6
-        id: idtoken
+      - name: Set up .NET Core
+        uses: actions/setup-dotnet@v4
         with:
-          script: |
-            const coredemo = require('@actions/core')
-            return await coredemo.getIDToken()
-          result-encoding: string
+          dotnet-version: '8.0.x'
 
-      - name: Build And Deploy
+      - name: Create staticwebapp.config.json
+        run: |
+          mkdir -p web_backend/src/web_backend.Blazor.Client/wwwroot
+          cat > web_backend/src/web_backend.Blazor.Client/wwwroot/staticwebapp.config.json << 'EOF'
+          {
+            "navigationFallback": {
+              "rewrite": "/index.html",
+              "exclude": ["/images/*.{png,jpg,gif,ico}", "/*.{css,js}", "/api/*"]
+            },
+            "routes": [
+              {
+                "route": "/*",
+                "serve": "/index.html",
+                "statusCode": 200
+              }
+            ],
+            "mimeTypes": {
+              ".json": "text/json",
+              ".woff": "application/font-woff",
+              ".woff2": "application/font-woff2"
+            }
+          }
+          EOF
+
+      - name: Publish Blazor WebAssembly
+        run: |
+          dotnet publish web_backend/src/web_backend.Blazor.Client/web_backend.Blazor.Client.csproj \
+            -c Release \
+            -o ./published-app
+          
+          mkdir -p ./publish/wwwroot
+          cp -r ./published-app/wwwroot/* ./publish/wwwroot/
+          
+          # Print debug information
+          echo "Contents of publish/wwwroot directory:"
+          find ./publish/wwwroot -type f | sort
+          
+          # Verify the staticwebapp.config.json file is present
+          if [ -f "./publish/wwwroot/staticwebapp.config.json" ]; then
+            echo "staticwebapp.config.json exists in the output directory"
+          else
+            echo "staticwebapp.config.json not found, copying it..."
+            cp web_backend/src/web_backend.Blazor.Client/wwwroot/staticwebapp.config.json ./publish/wwwroot/
+          fi
+
+      # Debug step to check the API token (masked for security)
+      - name: Debug API token
+        run: |
+          echo "API token length: ${#API_TOKEN}"
+          # Check if token starts with expected prefix (often gh)
+          TOKEN_PREFIX="${API_TOKEN:0:2}"
+          echo "API token prefix: $TOKEN_PREFIX"
+        env:
+          API_TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+
+      # Deploy to Azure Static Web Apps
+      - name: Deploy to Azure Static Web Apps
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
-          app_location: "web_backend/src/web_backend.Blazor"       # App source code path
-          api_location: ""                                # API source code path - optional
-          output_location: "wwwroot"                      # Built app content directory - optional
-          github_id_token: ${{ steps.idtoken.outputs.result }}
-
-  close_pull_request_job:
-    if: github.event_name == 'pull_request' && github.event.action == 'closed'
-    runs-on: ubuntu-latest
-    name: Close Pull Request Job
-
-    steps:
-      - name: Close Pull Request
-        id: closepullrequest
-        uses: Azure/static-web-apps-deploy@v1
-        with:
-          action: "close"
+          app_location: "publish/wwwroot"
+          output_location: ""
+          skip_app_build: true
+          api_location: ""
