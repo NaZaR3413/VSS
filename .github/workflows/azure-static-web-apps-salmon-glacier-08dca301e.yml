@@ -16,12 +16,14 @@ jobs:
       - name: Set up .NET Core
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '8.0.x'  # Use .NET 8 as your project targets it
 
-      - name: Install ABP CLI
+      - name: Install ABP CLI using NuGet directly
         run: |
-          dotnet tool install -g Volo.Abp.Cli
-          abp install-libs
+          dotnet new tool-manifest --force
+          dotnet tool install Volo.Abp.Cli --version 8.3.1
+          dotnet tool restore
+          dotnet abp install-libs
         shell: bash
 
       - name: Build with dotnet
@@ -52,14 +54,17 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Install ABP CLI
+      - name: Install ABP CLI using NuGet directly
         run: |
-          dotnet tool install -g Volo.Abp.Cli
-          abp install-libs
+          dotnet new tool-manifest --force
+          dotnet tool install Volo.Abp.Cli --version 8.3.1
+          dotnet tool restore
+          dotnet abp install-libs
         shell: bash
 
       - name: Create staticwebapp.config.json
         run: |
+          mkdir -p web_backend/src/web_backend.Blazor.Client/wwwroot
           echo '{
             "navigationFallback": {
               "rewrite": "/index.html",
@@ -84,8 +89,15 @@ jobs:
           dotnet publish -c Release -o publish
         working-directory: ./web_backend/src/web_backend.Blazor.Client
 
-      - name: Verify publish directory
-        run: ls -la publish/wwwroot
+      - name: Verify publish directory contents
+        run: |
+          ls -la publish/wwwroot
+          if [ -f "publish/wwwroot/staticwebapp.config.json" ]; then
+            echo "staticwebapp.config.json exists in the output directory"
+          else
+            echo "ERROR: staticwebapp.config.json not found in output directory"
+            cp web_backend/src/web_backend.Blazor.Client/wwwroot/staticwebapp.config.json publish/wwwroot/
+          fi
 
       - name: Deploy to Azure Static Web Apps
         id: builddeploy
