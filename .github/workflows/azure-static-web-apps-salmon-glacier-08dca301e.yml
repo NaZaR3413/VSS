@@ -25,7 +25,7 @@ jobs:
         shell: bash
 
       - name: Build with dotnet
-        run: dotnet build web_backend/src/web_backend.sln --configuration Release
+        run: dotnet build web_backend/src/web_backend.HttpApi.Host/web_backend.HttpApi.Host.csproj --configuration Release
 
       - name: Generate authserver.pfx
         run: dotnet dev-certs https -v -ep ${{env.DOTNET_ROOT}}/apihost/authserver.pfx -p Varsity2024
