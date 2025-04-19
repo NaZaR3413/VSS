@@ -16,19 +16,10 @@ jobs:
       - name: Set up .NET Core
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'  # Use .NET 8 as your project targets it
-
-      - name: Install ABP CLI using NuGet directly
-        run: |
-          dotnet new tool-manifest --force
-          dotnet tool install Volo.Abp.Cli --version 8.3.1
-          dotnet tool restore
-          dotnet abp install-libs
-        shell: bash
+          dotnet-version: '8.0.x'
 
       - name: Build with dotnet
-        run: dotnet build --configuration Release
-        working-directory: ./web_backend/src/web_backend.HttpApi.Host
+        run: dotnet build web_backend/src/web_backend.HttpApi.Host/web_backend.HttpApi.Host.csproj --configuration Release
 
       - name: Generate authserver.pfx
         run: dotnet dev-certs https -v -ep ./authserver.pfx -p Varsity2024
@@ -41,8 +32,8 @@ jobs:
 
   build-deploy-frontend:
     runs-on: ubuntu-latest
-    name: Build and Deploy Job
     needs: build-apihost
+    name: Build and Deploy Job
 
     steps:
       - uses: actions/checkout@v4
@@ -54,18 +45,14 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Install ABP CLI using NuGet directly
-        run: |
-          dotnet new tool-manifest --force
-          dotnet tool install Volo.Abp.Cli --version 8.3.1
-          dotnet tool restore
-          dotnet abp install-libs
-        shell: bash
+      # Skip ABP CLI installation since it's causing issues
+      # We'll manually create the staticwebapp.config.json file
 
       - name: Create staticwebapp.config.json
         run: |
           mkdir -p web_backend/src/web_backend.Blazor.Client/wwwroot
-          echo '{
+          cat > web_backend/src/web_backend.Blazor.Client/wwwroot/staticwebapp.config.json << 'EOF'
+          {
             "navigationFallback": {
               "rewrite": "/index.html",
               "exclude": ["/images/*.{png,jpg,gif,ico}", "/*.{css,js}", "/api/*"]
@@ -82,22 +69,37 @@ jobs:
               ".woff": "application/font-woff",
               ".woff2": "application/font-woff2"
             }
-          }' > web_backend/src/web_backend.Blazor.Client/wwwroot/staticwebapp.config.json
+          }
+          EOF
 
-      - name: Publish WASM client
+      - name: Publish Blazor WebAssembly
         run: |
-          dotnet publish -c Release -o publish
-        working-directory: ./web_backend/src/web_backend.Blazor.Client
-
-      - name: Verify publish directory contents
-        run: |
-          ls -la publish/wwwroot
-          if [ -f "publish/wwwroot/staticwebapp.config.json" ]; then
-            echo "staticwebapp.config.json exists in the output directory"
-          else
-            echo "ERROR: staticwebapp.config.json not found in output directory"
-            cp web_backend/src/web_backend.Blazor.Client/wwwroot/staticwebapp.config.json publish/wwwroot/
+          # First, publish the Blazor WebAssembly client
+          echo "Publishing Blazor WebAssembly client..."
+          dotnet publish web_backend/src/web_backend.Blazor.Client/web_backend.Blazor.Client.csproj \
+            -c Release \
+            -o ./published-app
+          
+          # Ensure publish directory exists and show its contents
+          echo "Contents of published-app directory:"
+          find ./published-app -type f | sort
+          
+          # Create the target directory structure for Azure Static Web Apps
+          mkdir -p ./publish/wwwroot
+          
+          # Copy wwwroot contents to the expected location
+          echo "Copying wwwroot contents to publish/wwwroot..."
+          cp -r ./published-app/wwwroot/* ./publish/wwwroot/
+          
+          # Ensure staticwebapp.config.json is in the right place
+          if [ ! -f "./publish/wwwroot/staticwebapp.config.json" ]; then
+            echo "Copying staticwebapp.config.json to publish/wwwroot"
+            cp web_backend/src/web_backend.Blazor.Client/wwwroot/staticwebapp.config.json ./publish/wwwroot/
           fi
+          
+          # Show the final contents
+          echo "Final contents of publish/wwwroot directory:"
+          find ./publish/wwwroot -type f | sort
 
       - name: Deploy to Azure Static Web Apps
         id: builddeploy
@@ -106,7 +108,7 @@ jobs:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_SALMON_GLACIER_08DCA301E }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
-          app_location: "publish/wwwroot"
-          output_location: ""
+          app_location: "publish/wwwroot"  # This must be the exact location
+          output_location: ""  # Leave this empty as files are already in the right place
           skip_app_build: true
           api_location: ""
