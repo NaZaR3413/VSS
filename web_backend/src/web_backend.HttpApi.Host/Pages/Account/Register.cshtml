@@ -1,0 +1,117 @@
+﻿@page
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@addTagHelper *, Volo.Abp.AspNetCore.Mvc.UI
+@addTagHelper *, Volo.Abp.AspNetCore.Mvc.UI.Bootstrap
+@addTagHelper *, Volo.Abp.AspNetCore.Mvc.UI.Bundling
+
+@using Microsoft.AspNetCore.Mvc.Localization
+@using Volo.Abp.Account.Localization
+
+@model web_backend.HttpApi.Host.Pages.Account.CustomRegisterModel
+
+@inject IHtmlLocalizer<AccountResource> L
+
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@using Volo.Abp.Account.Web.Pages.Account
+@using Volo.Abp.AspNetCore.Mvc.UI.Theming;
+@inject Volo.Abp.Settings.ISettingProvider SettingProvider
+
+@{
+    Layout = "_Layout";
+}
+
+<div class="container">
+    @if (ViewData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger" role="alert">
+            @ViewData["ErrorMessage"]
+        </div>
+    }
+    <div class="row justify-content-center">        
+        <div class="card vss-register-card">
+            <div class="card-body p-5">
+                <!-- Logo -->
+                <a href="/">
+                    <img class="vss-register-img" src="/images/varsitylogoempty.jpg" alt="VSS Logo" />
+                </a>
+
+                <h4>@L["Register"]</h4>
+                <strong>
+                    @L["AlreadyRegistered"]
+                    <a href="@Url.Page("./Login", new {returnUrl = Model.ReturnUrl, returnUrlHash = Model.ReturnUrlHash})" class="text-decoration-none">@L["Login"]</a>
+                </strong>
+                <form method="post" class="mt-4">
+                    <!-- Name -->
+                    <div class="mb-3">
+                        <label class="form-label" asp-for="Input.Name">Name<span> * </span></label>
+                        <input asp-for="Input.Name" class="form-control" />
+                        <span asp-validation-for="Input.Name" class="text-danger"></span>
+                    </div>
+
+                    <!-- Phone Number -->
+                    <div class="mb-3">
+                        <label class="form-label" asp-for="Input.PhoneNumber">Phone Number <span class="text-muted">(Optional)</span></label>
+                        <input asp-for="Input.PhoneNumber" class="form-control" type="tel" maxlength="256" />
+                        <span asp-validation-for="Input.PhoneNumber" class="text-danger"></span>
+                    </div> 
+
+                    <!-- Username -->
+                    <div class="mb-3">
+                        <label class="form-label" asp-for="Input.UserName">Username<span> * </span></label>
+                        <input asp-for="Input.UserName" class="form-control" />
+                        <span asp-validation-for="Input.UserName" class="text-danger"></span>
+                    </div>
+
+                    <!-- Email Address -->
+                    <div class="mb-3">
+                        <label class="form-label" asp-for="Input.EmailAddress">Email address<span> * </span></label>
+                        <input asp-for="Input.EmailAddress" class="form-control" type="email" />
+                        <span asp-validation-for="Input.EmailAddress" class="text-danger"></span>
+                    </div>
+
+                    <!-- Password -->
+                    <div class="mb-3">
+                        <label class="form-label" asp-for="Input.Password">Password<span> * </span></label>
+                        <input asp-for="Input.Password" class="form-control" type="password" />
+                        <span asp-validation-for="Input.Password" class="text-danger"></span>
+
+                        <div>
+                            <small class="text-muted">✓ Must be at least 6 characters long.</small><br />
+                            <small class="text-muted">✓ Must have at least one special character (e.g., &#64;, #, $, etc.).</small><br />
+                            <small class="text-muted">✓ Must have at least one number (0-9).</small><br />
+                            <small class="text-muted">✓ Must have at least one lowercase letter.</small><br />
+                            <small class="text-muted">✓ Must have at least one uppercase letter.</small>
+                        </div>
+                    </div>
+
+                    <!-- Confirm Password -->
+                    <div class="mb-3">
+                        <label class="form-label" asp-for="Input.ConfirmPassword">Confirm Password</label>
+                        <input asp-for="Input.ConfirmPassword" class="form-control" type="password" />
+                        <span asp-validation-for="Input.ConfirmPassword" class="text-danger"></span>
+                    </div>
+
+                    <!-- Terms and Conditions Checkbox -->
+                    <div class="mb-3 form-check">
+                        <input asp-for="Input.AcceptTerms" class="form-check-input border-dark" type="checkbox" id="AcceptTerms" />
+                        <label class="form-check-label" asp-for="Input.AcceptTerms">
+                            I accept the <a href="/TermsConditions" target="_blank">Terms and Conditions</a>
+                        </label>
+                        <span asp-validation-for="Input.AcceptTerms" class="text-danger"></span>
+                    </div>
+
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn-lg mt-4 btn btn-primary vss-register-button" data-busy-text="Processing...">Register</button>
+                    </div>
+
+                </form>              
+            </div>
+        </div>        
+    </div>
+    <br />
+</div>
+
+
+

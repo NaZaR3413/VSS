@@ -31,7 +31,8 @@ using Volo.Abp.Security.Claims;
 using Volo.Abp.Swashbuckle;
 using Volo.Abp.UI.Navigation.Urls;
 using Volo.Abp.VirtualFileSystem;
-
+using Volo.Abp.ObjectExtending;
+using Volo.Abp.Identity;
 namespace web_backend;
 
 [DependsOn(
@@ -58,6 +59,21 @@ public class web_backendHttpApiHostModule : AbpModule
                 options.UseAspNetCore();
             });
         });
+        ObjectExtensionManager.Instance
+        .MapEfCoreProperty<IdentityUser, string>(
+            "Name",
+            (entityBuilder, propertyBuilder) =>
+            {
+                propertyBuilder.HasMaxLength(IdentityUserConsts.MaxUserNameLength);
+            });
+
+        ObjectExtensionManager.Instance
+            .MapEfCoreProperty<IdentityUser, string>(
+                "PhoneNumber",
+                (entityBuilder, propertyBuilder) =>
+                {
+                    propertyBuilder.HasMaxLength(IdentityUserConsts.MaxPhoneNumberLength);
+                });
     }
 
     public override void ConfigureServices(ServiceConfigurationContext context)
