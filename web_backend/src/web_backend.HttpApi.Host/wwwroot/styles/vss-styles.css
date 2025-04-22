@@ -1,0 +1,103 @@
+﻿/* Navigation Styling */
+.vss-header {
+    background-color: #13125F;
+}
+    .vss-header a {
+        color: white;
+        text-decoration: none;
+        
+    }
+/* Login Styling */
+.vss-login-card {
+    margin-left: 50px;
+    margin-right: 50px;
+    width: 450px;
+    margin-bottom: 50px;
+    margin-top: 50px;
+}
+.vss-img {
+    width: 175px;
+    height: 100px;
+    margin-top: 15px;
+    margin-bottom: 15px;
+    margin-right: auto;
+    margin-left: auto;
+    display: flex;
+}
+.vss-login-card h4 {
+    text-align: center;
+    font-weight: bold;
+    
+}
+.vss-submit-button {
+    background-color: #13125F;
+    width: 150px;
+    color: #FFFFFF;
+}
+    .vss-submit-button:hover
+    {
+        background-color: #FED700;
+        color: #13125F;
+    }
+.vss-login-layout {
+    text-align: left;
+    margin-left: 20px;
+    margin-right: 20px
+
+}
+
+/* Register Styling */
+.vss-register-card {
+    margin-left: 50px;
+    margin-right: 50px;
+    width: 500px;
+}
+    .vss-register-card h4 {
+        text-align: center;
+        font-weight: bold;
+        margin-bottom: 20px;
+    }
+.vss-register-img {
+    width: 175px;
+    height: 100px;
+    margin-bottom: 20px;
+    margin-right: auto;
+    margin-left: auto;
+    display: flex;
+}
+.vss-register-button {
+    background-color: #13125F;
+    color: #FFFFFF;
+    text-align: center;
+    transition: background-color 0.3s ease;
+}
+    .vss-register-button:hover {
+        background-color: #FED700;
+        color: #13125F;
+    }
+
+/* Profile Styling */
+.vss-profile-info-card {
+    padding: 30px;
+    text-align: left;
+    margin-bottom: 30px;
+}
+    .vss-profile-info-card .card-title {
+        margin-bottom: 30px;
+        font-weight: bold;
+    }
+.vss-profile-img
+{
+    width: 120px;
+    height: 120px; 
+    object-fit: cover; 
+    border-radius: 50%; 
+    border: 3px solid #ddd; 
+    margin-bottom: 15px; 
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); 
+}
+
+input.form-control,
+.abp-input input {
+    border-color: #000000; /* darker borders */
+}
