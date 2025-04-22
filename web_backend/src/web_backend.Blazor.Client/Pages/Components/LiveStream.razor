@@ -3,6 +3,7 @@
 @using web_backend.Enums
 @using System.Net.Http.Json
 @using Microsoft.AspNetCore.Components.Authorization
+@using System.Threading
 @inherits LiveStreamBase
 @implements IDisposable
 
@@ -28,6 +29,18 @@
                     </div>
                 </div>
             </section>
+
+            @if (!isAuthenticated)
+            {
+                <div class="alert alert-info">
+                    <h5><i class="bi bi-info-circle me-2"></i>Limited Access</h5>
+                    <p>Non-registered users can watch 30 seconds of each live stream. <strong>Sign in or create an account</strong> for unlimited access to all our content.</p>
+                    <div class="d-flex gap-2">
+                        <a href="/authentication/Login" class="btn btn-primary">Login</a>
+                        <a href="/Account/Register" class="btn btn-success">Register</a>
+                    </div>
+                </div>
+            }
 
             <!-- Stream Info -->
             <section class="mb-5">
@@ -94,21 +107,31 @@
     private bool HasLoadErrors = false;
     private int retryCount = 0;
     private const int MAX_RETRIES = 5;
+    private bool isAuthenticated = false;
+    private System.Threading.Timer paywallTimer;
+    private const int FREE_ACCESS_SECONDS = 30;
+    private bool isPaywallActive = false;
 
     [Inject] private IHttpClientFactory HttpClientFactory { get; set; }
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        base.OnInitialized();
+        // Get authentication state and set isAuthenticated
+        authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        isAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
+
+        // Set authentication status in DOM for JavaScript access
+        await JS.InvokeVoidAsync("eval", "document.body.setAttribute('data-authenticated', '" + (isAuthenticated ? "true" : "false") + "')");
 
         // Set up timer to refresh the stream data less frequently (30 seconds instead of 10)
         refreshTimer = new System.Threading.Timer(async _ =>
         {
             await RefreshStreamData();
             await InvokeAsync(StateHasChanged);
-        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(30)); // Changed from 10 to 30 seconds
-    }
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(30));
 
+        base.OnInitialized();
+    }
 
     private async Task RefreshStreamData()
     {
@@ -124,13 +147,19 @@
                 if (hasLoadedVideo && fixedUrl != previousUrl)
                 {
                     // If video URL has changed, reload the player
-                    await JS.InvokeVoidAsync("loadHlsStream", fixedUrl);
+                    if (!isPaywallActive)
+                    {
+                        await JS.InvokeVoidAsync("loadHlsStream", fixedUrl, "videoPlayer", Id.ToString());
+                    }
                 }
                 else if (!hasLoadedVideo)
                 {
                     // If video hasn't loaded yet, try to load it
-                    await JS.InvokeVoidAsync("loadHlsStream", fixedUrl);
-                    hasLoadedVideo = true;
+                    if (!isPaywallActive)
+                    {
+                        await JS.InvokeVoidAsync("loadHlsStream", fixedUrl, "videoPlayer", Id.ToString());
+                        hasLoadedVideo = true;
+                    }
                 }
 
                 // Reset error state if stream loaded successfully
@@ -309,157 +338,496 @@
         }
     }
 
+    private async Task InitializePaywallSystem()
+    {
+        if (isAuthenticated) return;
+
+        // First, check if we need to add the PaywallManager to the page
+        bool paywallManagerExists = await JS.InvokeAsync<bool>("eval", "typeof PaywallManager !== 'undefined'");
+
+        if (!paywallManagerExists)
+        {
+            // Add the PaywallManager JavaScript with the 30-second free access time
+            await JS.InvokeVoidAsync("eval", @"
+                // PaywallManager handles the state of livestream access for non-authenticated users
+                window.PaywallManager = {
+                    // Key prefix for localStorage to identify specific streams
+                    keyPrefix: 'vss_stream_access_',
+
+                    // Default free access time in seconds (30 seconds)
+                    defaultFreeTime: " + FREE_ACCESS_SECONDS + @",
+
+                    // Check if user has access to the stream
+                    checkAccess: function(streamId) {
+                        const key = this.keyPrefix + streamId;
+                        const accessData = localStorage.getItem(key);
+                        console.log('Checking access for stream:', streamId, 'Free time limit:', this.defaultFreeTime, 'seconds');
+
+                        if (!accessData) {
+                            // First time access, create new record
+                            const newAccessData = {
+                                streamId: streamId,
+                                startTime: new Date().toISOString(),
+                                timeWatched: 0,
+                                paywallShown: false
+                            };
+
+                            localStorage.setItem(key, JSON.stringify(newAccessData));
+                            return {
+                                hasAccess: true,
+                                remainingTime: this.defaultFreeTime,
+                                isNewSession: true
+                            };
+                        } else {
+                            // Existing access record
+                            const data = JSON.parse(accessData);
+
+                            // If paywall was previously shown, keep it shown
+                            if (data.paywallShown) {
+                                return {
+                                    hasAccess: false,
+                                    remainingTime: 0,
+                                    isNewSession: false
+                                };
+                            }
+
+                            // Check if they still have time left
+                            const remainingTime = Math.max(0, this.defaultFreeTime - data.timeWatched);
+                            return {
+                                hasAccess: remainingTime > 0,
+                                remainingTime: remainingTime,
+                                isNewSession: false
+                            };
+                        }
+                    },
+
+                    // Update watched time for a stream
+                    updateWatchTime: function(streamId, secondsWatched) {
+                        const key = this.keyPrefix + streamId;
+                        const accessData = localStorage.getItem(key);
+
+                        if (accessData) {
+                            const data = JSON.parse(accessData);
+
+                            // Update the time watched
+                            data.timeWatched += secondsWatched;
+                            console.log('Updated watch time:', data.timeWatched, 'of', this.defaultFreeTime, 'seconds allowed');
+
+                            // If they've exceeded free time, mark paywall as shown
+                            if (data.timeWatched >= this.defaultFreeTime) {
+                                data.paywallShown = true;
+                                console.log('Free time exceeded, setting paywall flag');
+                            }
+
+                            localStorage.setItem(key, JSON.stringify(data));
+
+                            return {
+                                timeWatched: data.timeWatched,
+                                remainingTime: Math.max(0, this.defaultFreeTime - data.timeWatched),
+                                hasAccess: data.timeWatched < this.defaultFreeTime && !data.paywallShown
+                            };
+                        }
+
+                        return null;
+                    },
+
+                    // Show the paywall overlay and block video
+                    showPaywall: function(streamId) {
+                        // Mark in localStorage that paywall has been shown
+                        const key = this.keyPrefix + streamId;
+                        const accessData = localStorage.getItem(key);
+
+                        if (accessData) {
+                            const data = JSON.parse(accessData);
+                            data.paywallShown = true;
+                            localStorage.setItem(key, JSON.stringify(data));
+                            console.log('Paywall shown flag set in localStorage for stream:', streamId);
+                        }
+
+                        // Create or show the paywall overlay
+                        let paywallOverlay = document.getElementById('vss-paywall-overlay');
+
+                        if (!paywallOverlay) {
+                            paywallOverlay = document.createElement('div');
+                            paywallOverlay.id = 'vss-paywall-overlay';
+                            paywallOverlay.className = 'vss-paywall-overlay';
+
+                            // Style the overlay
+                            paywallOverlay.style.position = 'absolute';
+                            paywallOverlay.style.top = '0';
+                            paywallOverlay.style.left = '0';
+                            paywallOverlay.style.width = '100%';
+                            paywallOverlay.style.height = '100%';
+                            paywallOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.85)';
+                            paywallOverlay.style.color = 'white';
+                            paywallOverlay.style.display = 'flex';
+                            paywallOverlay.style.flexDirection = 'column';
+                            paywallOverlay.style.justifyContent = 'center';
+                            paywallOverlay.style.alignItems = 'center';
+                            paywallOverlay.style.textAlign = 'center';
+                            paywallOverlay.style.padding = '20px';
+                            paywallOverlay.style.zIndex = '1000';
+
+                            // Add content
+                            paywallOverlay.innerHTML = `
+                                <h2>Free Preview Ended</h2>
+                                <p>Your free preview period has ended. Sign in or create an account to continue watching.</p>
+                                <div style='display: flex; gap: 10px; margin-top: 20px;'>
+                                    <a href='/authentication/Login' class='btn btn-primary'>Login</a>
+                                    <a href='/Account/Register' class='btn btn-success'>Register</a>
+                                </div>
+                            `;
+
+                            // Find the video container and append overlay
+                            const videoContainer = document.querySelector('.vss-video-container');
+                            if (videoContainer) {
+                                videoContainer.style.position = 'relative'; // Ensure relative positioning
+                                videoContainer.appendChild(paywallOverlay);
+
+                                // Also pause and disable the video
+                                const video = document.getElementById('videoPlayer');
+                                if (video) {
+                                    video.pause();
+                                    video.controls = false;
+                                    video.style.opacity = '0.5';
+
+                                    // Disable video playback
+                                    video.onplay = function() {
+                                        video.pause();
+                                    };
+
+                                    // Additional measure to prevent playback
+                                    if (window.hls) {
+                                        window.hls.detachMedia();
+                                        window.hls.stopLoad();
+                                    }
+                                }
+                            }
+                        } else {
+                            paywallOverlay.style.display = 'flex';
+
+                            // Make sure video stays paused
+                            const video = document.getElementById('videoPlayer');
+                            if (video) {
+                                video.pause();
+                                video.controls = false;
+                                video.style.opacity = '0.5';
+
+                                // Disable video playback
+                                video.onplay = function() {
+                                    video.pause();
+                                };
+
+                                // Additional measure to prevent playback
+                                if (window.hls) {
+                                    window.hls.detachMedia();
+                                    window.hls.stopLoad();
+                                }
+                            }
+                        }
+
+                        console.log('Paywall overlay shown for stream:', streamId);
+                        return true; // Return success
+                    },
+
+                    // Check if paywall is currently shown
+                    isPaywallShown: function(streamId) {
+                        const key = this.keyPrefix + streamId;
+                        const accessData = localStorage.getItem(key);
+
+                        if (accessData) {
+                            const data = JSON.parse(accessData);
+                            console.log('Checking paywall status for stream:', streamId, 'Status:', data.paywallShown);
+                            return data.paywallShown;
+                        }
+
+                        return false;
+                    },
+
+                    // For testing - reset paywall status
+                    resetAccess: function(streamId) {
+                        const key = this.keyPrefix + streamId;
+                        localStorage.removeItem(key);
+                        console.log('Reset access for stream:', streamId);
+                    }
+                };
+
+                // Function to create and update the timer display
+                window.createFreeAccessTimer = function(streamId, initialSeconds) {
+                    let timerElement = document.getElementById('vss-free-preview-timer');
+                    if (!timerElement) {
+                        timerElement = document.createElement('div');
+                        timerElement.id = 'vss-free-preview-timer';
+                        timerElement.style.position = 'absolute';
+                        timerElement.style.top = '10px';
+                        timerElement.style.right = '10px';
+                        timerElement.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+                        timerElement.style.color = 'white';
+                        timerElement.style.padding = '5px 10px';
+                        timerElement.style.borderRadius = '4px';
+                        timerElement.style.fontSize = '14px';
+                        timerElement.style.zIndex = '999';
+
+                        // Add it to the video container
+                        const videoContainer = document.querySelector('.vss-video-container');
+                        if (videoContainer) {
+                            videoContainer.appendChild(timerElement);
+                        }
+                    }
+
+                    // Set the initial text
+                    const minutes = Math.floor(initialSeconds / 60);
+                    const seconds = initialSeconds % 60;
+                    timerElement.textContent = `Free preview: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+
+                    return timerElement;
+                }
+
+                // Function to immediately check paywall status on page load
+                window.checkPaywallOnLoad = function(streamId) {
+                    if (PaywallManager.isPaywallShown(streamId)) {
+                        console.log('checkPaywallOnLoad: Paywall is shown, displaying overlay');
+                        setTimeout(() => {
+                            PaywallManager.showPaywall(streamId);
+                        }, 100); // Short delay to ensure DOM is ready
+                        return true;
+                    }
+                    console.log('checkPaywallOnLoad: Paywall is not shown');
+                    return false;
+                }
+            ");
+        }
+        else
+        {
+            // If PaywallManager already exists, make sure the free time is set correctly
+            await JS.InvokeVoidAsync("eval", $"if(PaywallManager) {{ PaywallManager.defaultFreeTime = {FREE_ACCESS_SECONDS}; console.log('Updated PaywallManager free time to {FREE_ACCESS_SECONDS} seconds'); }}");
+        }
+
+        // Check access for this stream - IMPORTANT: Check BEFORE loading the video
+        var access = await JS.InvokeAsync<PaywallAccessResult>("PaywallManager.checkAccess", Id.ToString());
+
+        // Check if paywall should be shown immediately on page load
+        isPaywallActive = !access.HasAccess;
+
+        if (isPaywallActive)
+        {
+            // No access, show paywall immediately
+            await JS.InvokeVoidAsync("PaywallManager.showPaywall", Id.ToString());
+            Console.WriteLine("Paywall shown immediately on page load");
+        }
+        else
+        {
+            // Still has access - create timer display
+            await JS.InvokeVoidAsync("createFreeAccessTimer", Id.ToString(), access.RemainingTime);
+
+            // Start a timer to update the watch time
+            paywallTimer = new System.Threading.Timer(async _ =>
+            {
+                try
+                {
+                    var result = await JS.InvokeAsync<PaywallUpdateResult>("PaywallManager.updateWatchTime", Id.ToString(), 1);
+
+                    if (!result.HasAccess && !isPaywallActive)
+                    {
+                        // Access expired, show paywall
+                        isPaywallActive = await JS.InvokeAsync<bool>("PaywallManager.showPaywall", Id.ToString());
+
+                        // Stop the timer once paywall is shown
+                        paywallTimer?.Change(-1, -1); // Using -1 instead of Timeout.Infinite
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error updating paywall time: {ex.Message}");
+                }
+            }, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
+        }
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
+            // Get authentication state and set isAuthenticated (just to be sure)
+            authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            isAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
+
+            // Initialize the paywall system BEFORE loading the video
+            if (!isAuthenticated)
+            {
+                await InitializePaywallSystem();
+            }
+
+            await LoadLiveStreamDataAsync();
+
             // Check if HLS player script exists
             bool scriptExists = await JS.InvokeAsync<bool>("eval", "typeof loadHlsStream === 'function'");
             if (!scriptExists)
             {
-                // If the HLS player script doesn't exist, create it dynamically
+                // Reuse the HLS player code you already have
                 await JS.InvokeVoidAsync("eval", @"
-                    window.loadHlsStream = function(streamUrl) {
-    console.log('Attempting to load video: ' + streamUrl);
-    if (!streamUrl) {
-        console.error('Stream URL is null or empty');
-        return;
-    }
+                    window.loadHlsStream = function(streamUrl, videoElementId = 'videoPlayer', streamId = null) {
+                        console.log('Attempting to load video: ' + streamUrl);
+                        if (!streamUrl) {
+                            console.error('Stream URL is null or empty');
+                            return;
+                        }
 
-    const video = document.getElementById('videoPlayer');
-    if (!video) {
-        console.error('Video element not found');
-        return;
-    }
+                        const video = document.getElementById(videoElementId);
+                        if (!video) {
+                            console.error('Video element not found');
+                            return;
+                        }
 
-    // Destroy previous instance if it exists
-    if (hls) {
-        hls.destroy();
-        hls = null;
-    }
+                        // Check if user is authenticated from data attribute on body
+                        let isAuthenticated = document.body.hasAttribute('data-authenticated') &&
+                                              document.body.getAttribute('data-authenticated') === 'true';
 
-    // Check if Hls is supported
-    if (Hls.isSupported()) {
-        hls = new Hls({
-            debug: false, // Set to false in production
-            maxBufferLength: 60, // Increase buffer length to 60 seconds (default is 30)
-            maxMaxBufferLength: 600, // Maximum buffer size in seconds (10 minutes)
-            backBufferLength: 90, // Keep 90 seconds of back buffer (prevents restarting)
-            liveSyncDuration: 3, // Live sync point buffer used when latency controller is disabled
-            liveMaxLatencyDuration: Infinity, // Don't limit latency for now
-            fragLoadingTimeOut: 20000, // Extend fragment loading timeout
-            manifestLoadingTimeOut: 10000, // Extend manifest loading timeout
-            levelLoadingTimeOut: 10000, // Extend level loading timeout
-            liveDurationInfinity: true, // Treat duration as infinity for live streams
-            startLevel: -1, // Start with auto quality selection
-            autoStartLoad: true, // Start loading automatically
-            enableWorker: true, // Enable web workers for better performance
-            lowLatencyMode: false, // Disable low latency mode which can cause issues
-            xhrSetup: function(xhr, url) {
-                // Add CORS headers
-                xhr.withCredentials = false;
-            }
-        });
+                        // For non-authenticated users, check paywall status BEFORE loading the stream
+                        if (streamId && !isAuthenticated && typeof PaywallManager !== 'undefined') {
+                            // Check if paywall is already shown
+                            if (window.checkPaywallOnLoad(streamId)) {
+                                console.log('Paywall active - not loading video content');
+                                return; // Don't load the video if paywall is active
+                            }
+                        }
 
-        hls.loadSource(streamUrl);
-        hls.attachMedia(video);
+                        // Destroy previous instance if it exists
+                        if (window.hls) {
+                            window.hls.destroy();
+                            window.hls = null;
+                        }
 
-        // Add event listeners for detailed monitoring
-        hls.on(Hls.Events.MANIFEST_PARSED, function() {
-            console.log('HLS Manifest parsed, attempting to play video');
+                        // Check if Hls is supported
+                        if (Hls.isSupported()) {
+                            window.hls = new Hls({
+                                debug: false,
+                                maxBufferLength: 60,
+                                maxMaxBufferLength: 600,
+                                backBufferLength: 90,
+                                liveSyncDuration: 3,
+                                liveMaxLatencyDuration: Infinity,
+                                fragLoadingTimeOut: 20000,
+                                manifestLoadingTimeOut: 10000,
+                                levelLoadingTimeOut: 10000,
+                                liveDurationInfinity: true,
+                                startLevel: -1,
+                                autoStartLoad: true,
+                                enableWorker: true,
+                                lowLatencyMode: false,
+                                xhrSetup: function(xhr, url) {
+                                    xhr.withCredentials = false;
+                                }
+                            });
 
-            // Store the current time to track playback
-            let lastTime = 0;
-            let stuckCounter = 0;
+                            window.hls.loadSource(streamUrl);
+                            window.hls.attachMedia(video);
 
-            // Monitor playback to detect if stuck
-            const playbackMonitor = setInterval(() => {
-                if (video.currentTime === lastTime && !video.paused) {
-                    stuckCounter++;
-                    console.log(`Playback potentially stuck for ${stuckCounter} seconds`);
+                            // Add event listeners for detailed monitoring
+                            window.hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                                console.log('HLS Manifest parsed, attempting to play video');
 
-                    if (stuckCounter > 5) {
-                        console.log('Attempting recovery for stuck playback');
-                        video.currentTime += 0.1; // Try to advance playback slightly
-                    }
-                } else {
-                    stuckCounter = 0;
-                }
-                lastTime = video.currentTime;
-            }, 1000);
+                                // Extra check: If paywall is active, don't play
+                                if (!isAuthenticated && streamId && typeof PaywallManager !== 'undefined') {
+                                    if (PaywallManager.isPaywallShown(streamId)) {
+                                        console.log('Paywall detected during manifest parsing, stopping playback');
+                                        PaywallManager.showPaywall(streamId);
+                                        return;
+                                    }
+                                }
 
-            video.play().then(() => {
-                window.streamLoaded = true;
-                console.log('Stream playback started successfully');
-            }).catch(error => {
-                console.error('Error starting playback:', error);
-                window.streamLoaded = false;
-            });
-        });
+                                // Store the current time to track playback
+                                let lastTime = 0;
+                                let stuckCounter = 0;
 
-        hls.on(Hls.Events.ERROR, function(event, data) {
-            console.error('HLS Error:', data);
+                                // Monitor playback to detect if stuck
+                                const playbackMonitor = setInterval(() => {
+                                    if (video.currentTime === lastTime && !video.paused) {
+                                        stuckCounter++;
+                                        console.log(`Playback potentially stuck for ${stuckCounter} seconds`);
 
-            if (data.fatal) {
-                switch(data.type) {
-                    case Hls.ErrorTypes.NETWORK_ERROR:
-                        // Try to recover network error
-                        console.log('Network error, trying to recover...');
-                        hls.startLoad();
-                        break;
-                    case Hls.ErrorTypes.MEDIA_ERROR:
-                        console.log('Media error, trying to recover...');
-                        hls.recoverMediaError();
-                        break;
-                    default:
-                        // Cannot recover
-                        console.error('Fatal error, cannot recover', data);
-                        // Wait a second before trying to reinitialize
-                        setTimeout(() => {
-                            hls.destroy();
-                            hls = new Hls();
-                            hls.loadSource(streamUrl);
-                            hls.attachMedia(video);
-                        }, 1000);
-                        break;
-                }
-            }
-        });
+                                        if (stuckCounter > 5) {
+                                            console.log('Attempting recovery for stuck playback');
+                                            video.currentTime += 0.1; // Try to advance playback slightly
+                                        }
+                                    } else {
+                                        stuckCounter = 0;
+                                    }
+                                    lastTime = video.currentTime;
+                                }, 1000);
 
-        // Add detailed logging for fragment loading events
-        hls.on(Hls.Events.FRAG_LOADING, function(event, data) {
-            console.debug(`Loading fragment: ${data.frag.sn}, level: ${data.frag.level}`);
-        });
+                                video.play().then(() => {
+                                    window.streamLoaded = true;
+                                    console.log('Stream playback started successfully');
+                                }).catch(error => {
+                                    console.error('Error starting playback:', error);
+                                    window.streamLoaded = false;
+                                });
+                            });
 
-        hls.on(Hls.Events.FRAG_LOADED, function(event, data) {
-            console.debug(`Loaded fragment: ${data.frag.sn}, level: ${data.frag.level}`);
-        });
+                            window.hls.on(Hls.Events.ERROR, function(event, data) {
+                                console.error('HLS Error:', data);
 
-        hls.on(Hls.Events.FRAG_LOAD_ERROR, function(event, data) {
-            console.error(`Failed to load fragment: ${data.frag.sn}, level: ${data.frag.level}`, data);
-        });
-    }
-    // For browsers that natively support HLS
-    else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = streamUrl;
-        video.addEventListener('loadedmetadata', function() {
-            video.play().then(() => {
-                window.streamLoaded = true;
-            }).catch(error => {
-                console.error('Error starting playback:', error);
-                window.streamLoaded = false;
-            });
-        });
-        video.addEventListener('error', function(e) {
-            window.streamLoaded = false;
-            console.error('Error loading stream with native HLS support:', e);
-        });
-    } else {
-        console.error('HLS not supported in this browser');
-        window.streamLoaded = false;
-    }
-};
+                                if (data.fatal) {
+                                    switch(data.type) {
+                                        case Hls.ErrorTypes.NETWORK_ERROR:
+                                            // Try to recover network error
+                                            console.log('Network error, trying to recover...');
+                                            window.hls.startLoad();
+                                            break;
+                                        case Hls.ErrorTypes.MEDIA_ERROR:
+                                            console.log('Media error, trying to recover...');
+                                            window.hls.recoverMediaError();
+                                            break;
+                                        default:
+                                            // Cannot recover
+                                            console.error('Fatal error, cannot recover', data);
+                                            // Wait a second before trying to reinitialize
+                                            setTimeout(() => {
+                                                window.hls.destroy();
+                                                window.hls = new Hls();
+                                                window.hls.loadSource(streamUrl);
+                                                window.hls.attachMedia(video);
+                                            }, 1000);
+                                            break;
+                                    }
+                                }
+                            });
+                        }
+                        // For browsers that natively support HLS
+                        else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                            video.src = streamUrl;
+                            video.addEventListener('loadedmetadata', function() {
+                                // Extra check for paywall before playing
+                                if (!isAuthenticated && streamId && typeof PaywallManager !== 'undefined') {
+                                    if (PaywallManager.isPaywallShown(streamId)) {
+                                        console.log('Paywall detected before native playback, stopping');
+                                        video.pause();
+                                        PaywallManager.showPaywall(streamId);
+                                        return;
+                                    }
+                                }
 
+                                video.play().then(() => {
+                                    window.streamLoaded = true;
+                                }).catch(error => {
+                                    console.error('Error starting playback:', error);
+                                    window.streamLoaded = false;
+                                });
+                            });
+                            video.addEventListener('error', function(e) {
+                                window.streamLoaded = false;
+                                console.error('Error loading stream with native HLS support:', e);
+                            });
+                        } else {
+                            console.error('HLS not supported in this browser');
+                            window.streamLoaded = false;
+                        }
+                    };
+
+                    window.isStreamLoaded = function() {
+                        return window.streamLoaded === true;
+                    };
                 ");
 
                 // Add the HLS.js library if it doesn't exist
@@ -470,29 +838,40 @@
                         script.onload = function() {
                             console.log('HLS.js loaded successfully');
                             if (typeof loadHlsStream === 'function' && '" + VideoUrl + @"') {
-                                loadHlsStream('" + VideoUrl + @"');
+                                // Check paywall status before attempting to load the video
+                                if (typeof PaywallManager !== 'undefined') {
+                                    if (!PaywallManager.isPaywallShown('" + Id.ToString() + @"')) {
+                                        loadHlsStream('" + VideoUrl + @"', 'videoPlayer', '" + Id.ToString() + @"');
+                                    } else {
+                                        console.log('Paywall already active, not loading stream');
+                                        setTimeout(() => {
+                                            PaywallManager.showPaywall('" + Id.ToString() + @"');
+                                        }, 300);
+                                    }
+                                } else {
+                                    loadHlsStream('" + VideoUrl + @"', 'videoPlayer', '" + Id.ToString() + @"');
+                                }
                             }
                         };
                         document.head.appendChild(script);
                     }
                 ");
             }
-
-            await LoadLiveStreamDataAsync();
         }
 
-        if (!string.IsNullOrEmpty(VideoUrl) && !hasLoadedVideo)
+        if (!string.IsNullOrEmpty(VideoUrl) && !hasLoadedVideo && !isPaywallActive)
         {
             string fixedUrl = await FixStreamUrlIfNeeded(VideoUrl);
-            await JS.InvokeVoidAsync("loadHlsStream", fixedUrl);
+            await JS.InvokeVoidAsync("loadHlsStream", fixedUrl, "videoPlayer", Id.ToString());
             hasLoadedVideo = true;
         }
     }
 
     public void Dispose()
     {
-        // Clean up timer when component is disposed
+        // Clean up timers when component is disposed
         refreshTimer?.Dispose();
+        paywallTimer?.Dispose();
     }
 
     private async Task EndStream()
@@ -517,5 +896,20 @@
                 await JS.InvokeVoidAsync("alert", $"Error ending stream: {ex.Message}");
             }
         }
+    }
+
+    // Classes to deserialize JSON from JavaScript
+    private class PaywallAccessResult
+    {
+        public bool HasAccess { get; set; }
+        public bool IsNewSession { get; set; }
+        public int RemainingTime { get; set; }
+    }
+
+    private class PaywallUpdateResult
+    {
+        public int TimeWatched { get; set; }
+        public int RemainingTime { get; set; }
+        public bool HasAccess { get; set; }
     }
 }

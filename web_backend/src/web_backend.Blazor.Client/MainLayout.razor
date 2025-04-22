@@ -116,7 +116,9 @@
                 }
                 else if (authState.User.Identity?.IsAuthenticated ?? false)
                 {
-                    <span class="vss-auth__username navbar-text me-3">Hello, @authState.User.Identity.Name</span>
+                    <span class="vss-auth__username navbar-text me-3">
+                        Hello, @GetUserDisplayName(authState.User)
+                    </span>
                     <a class="vss-auth__link nav-link" href="/Account/Logout">Logout</a>
                 }
                 else
@@ -160,13 +162,11 @@
     {
         authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
 
-        // Listen for status change events if the state service is available
         if (LivestreamState != null)
         {
             LivestreamState.OnLivestreamStatusChanged += HandleLivestreamStatusChanged;
         }
 
-        // Set up timer to periodically refresh active livestreams - checking more frequently (every 15 seconds)
         refreshTimer = new System.Threading.Timer(async _ =>
         {
             await RefreshLivestreams(force: false);
@@ -174,6 +174,7 @@
         }, null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
 
         await RefreshLivestreams(force: true);
+
     }
 
     private async void HandleLivestreamStatusChanged(object sender, EventArgs e)
@@ -186,7 +187,6 @@
     {
         try
         {
-            // Only refresh if forced or enough time has passed since last refresh
             var now = DateTimeOffset.UtcNow;
             if (!force && (now - lastRefreshTime).TotalSeconds < 5)
             {
@@ -195,17 +195,14 @@
 
             await JS.InvokeVoidAsync("console.log", "Refreshing livestreams list...");
 
-            // Clear cache to ensure getting latest data
             if (force)
             {
                 await JS.InvokeVoidAsync("console.log", "Forced refresh - skipping cache");
-                // If you have access to ABP's IDistributedCache<LivestreamDto> injection, you could clear it here
             }
 
             var allStreams = await LivestreamService.GetListAsync();
             lastRefreshTime = DateTimeOffset.UtcNow;
 
-            // Debug output to see what's happening with the data
             await JS.InvokeVoidAsync("console.log", $"Total streams: {allStreams.Count}");
 
             foreach (var stream in allStreams)
@@ -215,13 +212,11 @@
                     $"Teams: '{stream.HomeTeam ?? "null"}' vs '{stream.AwayTeam ?? "null"}'");
             }
 
-            // ONLY include streams that have status EXACTLY equal to StreamStatus.Live (value 2)
             var newLiveStreams = allStreams
                 .Where(l => l.StreamStatus == StreamStatus.Live)
                 .OrderByDescending(l => l.Id)
                 .ToList();
 
-            // Check if there's any difference in the live streams list
             bool hasChanged = newLiveStreams.Count != activeLivestreams.Count ||
                               newLiveStreams.Any(newStream => !activeLivestreams.Any(oldStream => oldStream.Id == newStream.Id));
 
@@ -229,7 +224,6 @@
             {
                 await JS.InvokeVoidAsync("console.log", $"Livestream list has changed, updating UI");
                 activeLivestreams = newLiveStreams;
-                // Force state has changed since the list has changed
                 await InvokeAsync(StateHasChanged);
             }
 
@@ -252,19 +246,52 @@
     {
         await JS.InvokeVoidAsync("console.log", "No active livestreams to navigate to");
 
-        // Show banner notification using direct DOM method
         await JS.InvokeVoidAsync("showBannerNotification", "No active livestreams available at the moment. Please check back later.");
     }
 
     public void Dispose()
     {
-        // Clean up timer when component is disposed
         refreshTimer?.Dispose();
 
-        // Unsubscribe from events
         if (LivestreamState != null)
         {
             LivestreamState.OnLivestreamStatusChanged -= HandleLivestreamStatusChanged;
         }
+    }
+
+    private string GetUserDisplayName(System.Security.Claims.ClaimsPrincipal user)
+    {
+
+        var name = user.FindFirst("name")?.Value;
+
+        if (string.IsNullOrEmpty(name))
+            name = user.Identity?.Name;
+
+        if (string.IsNullOrEmpty(name))
+            name = user.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
+
+        if (string.IsNullOrEmpty(name))
+        {
+            var firstName = user.FindFirst(System.Security.Claims.ClaimTypes.GivenName)?.Value;
+            var lastName = user.FindFirst(System.Security.Claims.ClaimTypes.Surname)?.Value;
+
+            if (!string.IsNullOrEmpty(firstName))
+            {
+                name = !string.IsNullOrEmpty(lastName)
+                    ? $"{firstName} {lastName}"
+                    : firstName;
+            }
+        }
+
+        if (string.IsNullOrEmpty(name))
+            name = user.FindFirst("given_name")?.Value;
+
+        if (string.IsNullOrEmpty(name))
+            name = user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
+
+        if (string.IsNullOrEmpty(name))
+            name = user.FindFirst("preferred_username")?.Value;
+
+        return !string.IsNullOrEmpty(name) ? name : "User";
     }
 }
