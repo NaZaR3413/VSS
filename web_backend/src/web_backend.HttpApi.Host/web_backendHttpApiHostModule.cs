@@ -33,6 +33,8 @@ using Volo.Abp.UI.Navigation.Urls;
 using Volo.Abp.VirtualFileSystem;
 using Stripe;
 using web_backend.Stripe;
+using Stripe.Checkout;
+
 
 namespace web_backend;
 
@@ -85,6 +87,8 @@ public class web_backendHttpApiHostModule : AbpModule
         context.Services.Configure<StripeOptions>(
             configuration.GetSection("Stripe")
         );
+
+        context.Services.AddSingleton<SessionService>();
 
         // Set the Stripe API key at startup
         StripeConfiguration.ApiKey = configuration["Stripe:SecretKey"];
