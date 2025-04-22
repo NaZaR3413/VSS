@@ -19,7 +19,12 @@ namespace web_backend.Stripe
     {
         public async Task<string> CreateCheckoutSessionAsync()
         {
+            // verify user is logged in
             var userId = CurrentUser.Id?.ToString();
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                throw new UserFriendlyException("You must be logged in to subscribe.");
+            }
 
             // verify the user isn't already a subscriber. return an error if they are
             var userManager = LazyServiceProvider.LazyGetRequiredService<IdentityUserManager>();
@@ -47,8 +52,10 @@ namespace web_backend.Stripe
                     Quantity = 1,
                 }
             },
-                SuccessUrl = "https://localhost:44320/payment-success?session_id={CHECKOUT_SESSION_ID}",
-                CancelUrl = "https://localhost:44320/payment-cancel"
+                //SuccessUrl = "https://localhost:44320/payment-success?session_id={CHECKOUT_SESSION_ID}",
+                //CancelUrl = "https://localhost:44320/payment-cancel"
+                SuccessUrl = "https://localhost:44320",
+                CancelUrl = "https://localhost:44320/subscribe"
             };
 
             var sessionService = LazyServiceProvider.LazyGetRequiredService<SessionService>();
