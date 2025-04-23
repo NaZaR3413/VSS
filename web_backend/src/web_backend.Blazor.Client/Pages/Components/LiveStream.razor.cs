@@ -1,15 +1,18 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.JSInterop;
+using System;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
+using web_backend.Enums;
 using web_backend.Livestreams;
-using System;
 
 namespace web_backend.Blazor.Client.Pages
 {
     [Authorize]
-    public class LiveStreamBase : MainLayout
+    public class LiveStreamBase : ComponentBase
     {
         [Inject]
         protected HttpClient HttpClient { get; set; }
@@ -17,16 +20,21 @@ namespace web_backend.Blazor.Client.Pages
         [Inject]
         protected NavigationManager NavigationManager { get; set; }
 
+        [Inject]
+        protected ILivestreamAppService LivestreamService { get; set; }
+
+        [Inject]
+        protected AuthenticationStateProvider AuthenticationStateProvider { get; set; }
+
+        [Inject]
+        protected IJSRuntime JS { get; set; }
+
         [Parameter]
         public Guid Id { get; set; }
 
         protected string VideoUrl { get; set; } = string.Empty;
         protected string StreamTitle { get; set; } = string.Empty;
-
-        protected override void OnParametersSet()
-        {
-            Console.WriteLine($"Video URL in Blazor: {VideoUrl}");
-        }
+        protected AuthenticationState authState;
 
         protected override async Task OnInitializedAsync()
         {
@@ -36,46 +44,8 @@ namespace web_backend.Blazor.Client.Pages
                 return;
             }
 
-            await LoadLiveStreamAsync();
+            // Get the authentication state for admin role checks
+            authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         }
-        private async Task LoadLiveStreamAsync()
-        {
-            try
-            {
-                HttpClient.BaseAddress = new Uri("https://localhost:44356/");
-                var fullUrl = $"{HttpClient.BaseAddress}api/livestreams/{Id}";
-                Console.WriteLine($"Fetching livestream from: {fullUrl}");
-
-                var response = await HttpClient.GetAsync($"api/livestreams/{Id}");
-                Console.WriteLine($"API Response Status: {response.StatusCode}");
-
-                if (response.IsSuccessStatusCode)
-                {
-                    var liveStream = await response.Content.ReadFromJsonAsync<LivestreamDto>();
-                    if (liveStream != null)
-                    {
-                        Console.WriteLine($"API Data Received: {liveStream.HlsUrl}");
-                        VideoUrl = liveStream.HlsUrl;
-                        StreamTitle = $"{liveStream.HomeTeam} {liveStream.HomeScore} - {liveStream.AwayScore} {liveStream.AwayTeam}";
-                    }
-                    else
-                    {
-                        Console.WriteLine("API returned null.");
-                        StreamTitle = "Live stream not found.";
-                    }
-                }
-                else
-                {
-                    Console.WriteLine($"API Error: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}");
-                    StreamTitle = "Error loading live stream.";
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Exception: {ex.Message}");
-                StreamTitle = "Error loading live stream.";
-            }
-        }
-
     }
 }

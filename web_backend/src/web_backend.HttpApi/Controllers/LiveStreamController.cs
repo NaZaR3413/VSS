@@ -7,7 +7,7 @@ using Volo.Abp.AspNetCore.Mvc;
 
 namespace web_backend.Controllers
 {
-    [Route("api/livestreams")]
+    [Route("livestream")]
     [ApiController]
     public class LivestreamController : AbpController  // Required for ABP-based APIs
     {
