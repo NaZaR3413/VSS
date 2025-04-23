@@ -1,7 +1,244 @@
 ﻿@page "/"
-@layout MainLayout
+@using System.Net.Http.Json
+@using web_backend.Livestreams
+@using web_backend.Enums
+@inject ILivestreamAppService LivestreamService
+@inject IJSRuntime JS
+@inject HttpClient HttpClient
+@inject NavigationManager NavigationManager
 
-<div class="landing-page-container text-center py-5">
-    <h1>Varsity Sports Show</h1>
-    <p>Placeholder Text</p>
+<div class="vss-page vss-page-layout--default">
+    <main class="vss-main">
+        <div class="container">
+            <!-- HERO SECTION -->
+            <section class="vss-hero text-center mb-5">
+                <h1 class="display-4 fw-bold">Varsity Sports Show</h1>
+                <p class="lead">Your home for Arizona high school sports – live, on-demand, and in-depth.</p>
+            </section>
+
+            @if (!string.IsNullOrEmpty(VideoUrl))
+            {
+                <!-- FEATURED GAME -->
+                <section class="vss-featured mb-5 p-4 bg-white rounded shadow-sm">
+                    <h2 class="text-start mb-4 border-bottom pb-2">Featured Game</h2>
+                    <div class="row align-items-center g-4">
+                        <div class="col-lg-7">
+                            <div class="vss-video-container position-relative">
+                                @if (IsLive)
+                                {
+                                    <span class="badge bg-danger position-absolute top-0 start-0 m-2">LIVE</span>
+                                }
+                                <video id="videoPlayer" class="vss-video-player" controls autoplay></video>
+
+                                @if (ShowPreviewOverlay)
+                                {
+                                    <div class="vss-preview-overlay d-flex flex-column justify-content-center align-items-center">
+                                        <h4>Subscribe to Watch the Full Stream</h4>
+                                        <p class="mb-3">You've reached the end of the preview.</p>
+                                        <a class="vss-auth__button" href="/account/login">Log In / Subscribe</a>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                        <div class="col-lg-5">
+                            <h3 class="fw-bold">@StreamTitle</h3>
+                            <p class="text-muted">@StreamStatusText</p>
+                            <a class="vss-auth__button" href="/livestream/@FeaturedStreamId">Watch Full Stream</a>
+                        </div>
+                    </div>
+                </section>
+            }
+
+            <!-- UPCOMING GAMES -->
+            <section id="livestreams" class="mb-5">
+                <h2 class="text-start mb-3">Upcoming Live Streams</h2>
+                <div class="row row-cols-1 row-cols-md-2 g-4">
+                    <div class="col">
+                        <div class="vss-livestream-item">
+                            <h2>Chandler Wolves vs. Hamilton Huskies</h2>
+                            <p>Sat, 4/10 @@ 6:00 PM</p>
+                            <a class="vss-auth__button" href="/livestreams/chandler-vs-hamilton">Watch Live</a>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="vss-livestream-item">
+                            <h2>Saguaro Sabercats vs. Basha Bears</h2>
+                            <p>Sun, 4/11 @@ 5:30 PM</p>
+                            <a class="vss-auth__button" href="/livestreams/saguaro-vs-basha">Watch Live</a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SCORES SECTION -->
+            <section class="mb-5">
+                <h2 class="text-start mb-3">Recent Scores</h2>
+                <div class="row row-cols-1 row-cols-md-2 g-3">
+                    <div class="col">
+                        <div class="vss-score-card">
+                            <p class="mb-1"><strong>Mesquite 35</strong> - 27 Higley</p>
+                            <p class="text-muted mb-0">Final - April 5</p>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="vss-score-card">
+                            <p class="mb-1"><strong>Centennial 24</strong> - 30 Liberty</p>
+                            <p class="text-muted mb-0">Final - April 5</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- NEWS + ARTICLES -->
+            <section class="mb-5">
+                <h2 class="text-start mb-3">Latest News</h2>
+                <div class="row row-cols-1 row-cols-md-2 g-4">
+                    <div class="col">
+                        <div class="vss-news-card">
+                            <h5>Top 10 Plays of the Week</h5>
+                            <p class="text-muted">April 6, 2025</p>
+                            <p>Relive the best touchdowns, buzzer-beaters, and highlight reels from this week's action across Arizona high school sports.</p>
+                            <a class="vss-auth__link" href="/news/top-plays">Read More →</a>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="vss-news-card">
+                            <h5>Power Rankings: Week 4</h5>
+                            <p class="text-muted">April 6, 2025</p>
+                            <p>Who's rising, who's falling? See where your team stands in the latest rankings from our VSS analysts.</p>
+                            <a class="vss-auth__link" href="/news/power-rankings">Read More →</a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
 </div>
+
+@code {
+    protected string VideoUrl { get; set; } = string.Empty;
+    protected string StreamTitle { get; set; } = string.Empty;
+    protected string StreamStatusText { get; set; } = "Streaming Now";
+    protected Guid FeaturedStreamId { get; set; }
+    protected StreamStatus? FeaturedStreamStatus { get; set; }
+
+    private bool shouldInitializeVideoPlayer = false;
+    private bool ShowPreviewOverlay = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("Initializing landing page...");
+        await LoadFeaturedStreamAsync();
+        Console.WriteLine($"Finished loading stream. URL: {VideoUrl}");
+
+        if (!string.IsNullOrEmpty(VideoUrl))
+        {
+            shouldInitializeVideoPlayer = true;
+            StateHasChanged();
+        }
+    }
+
+    [JSInvokable("showPreviewOverlay")]
+    public async Task ShowPreviewOverlayFromJs()
+    {
+        ShowPreviewOverlay = true;
+        await JS.InvokeVoidAsync("pauseAndDisableVideo", "videoPlayer");
+        StateHasChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (shouldInitializeVideoPlayer && !string.IsNullOrEmpty(VideoUrl))
+        {
+            shouldInitializeVideoPlayer = false;
+            await JS.InvokeVoidAsync("console.log", $"Initializing video player with URL: {VideoUrl}");
+            await JS.InvokeVoidAsync("loadHlsStream", VideoUrl, "videoPlayer");
+
+            // Show preview overlay after 30 seconds for non-subscribed users
+            await JS.InvokeVoidAsync("invokeDotNetAfterDelay", DotNetObjectReference.Create(this), "showPreviewOverlay", 30000);
+        }
+    }
+
+    private async Task LoadFeaturedStreamAsync()
+    {
+        try
+        {
+            List<LivestreamDto> allStreams = null;
+            LivestreamDto featuredStream = null;
+
+            // First try using the LivestreamService
+            if (LivestreamService != null)
+            {
+                allStreams = await LivestreamService.GetListAsync();
+
+                featuredStream = allStreams?
+                    .Where(s => s.StreamStatus == StreamStatus.Live && !string.IsNullOrWhiteSpace(s.HlsUrl))
+                    .OrderByDescending(s => s.Id)
+                    .FirstOrDefault();
+
+                if (featuredStream != null)
+                {
+                    SetFeaturedStream(featuredStream);
+                    return;
+                }
+            }
+
+            // Fallback to direct HTTP request if service approach fails
+            await JS.InvokeVoidAsync("console.log", "Using HTTP client fallback for livestreams");
+
+            // Make sure we're using the right base address
+            var baseAddress = NavigationManager.BaseUri;
+            if (baseAddress.EndsWith("/"))
+                baseAddress = baseAddress.Substring(0, baseAddress.Length - 1);
+
+            var apiUrl = $"{baseAddress}/api/app/livestream";
+            await JS.InvokeVoidAsync("console.log", $"Requesting livestreams from: {apiUrl}");
+
+            allStreams = await HttpClient.GetFromJsonAsync<List<LivestreamDto>>(apiUrl);
+
+            featuredStream = allStreams?
+                .Where(s => s.StreamStatus == StreamStatus.Live && !string.IsNullOrWhiteSpace(s.HlsUrl))
+                .OrderByDescending(s => s.Id)
+                .FirstOrDefault();
+
+            if (featuredStream != null)
+            {
+                SetFeaturedStream(featuredStream);
+            }
+            else
+            {
+                // If no live streams, try to get a recent one that's completed
+                var recentStream = allStreams?
+                    .Where(s => !string.IsNullOrWhiteSpace(s.HlsUrl))
+                    .OrderByDescending(s => s.Id)
+                    .FirstOrDefault();
+
+                if (recentStream != null)
+                {
+                    SetFeaturedStream(recentStream);
+                    StreamStatusText = "Recently Completed";
+                }
+                else
+                {
+                    StreamTitle = "No live stream currently available.";
+                    await JS.InvokeVoidAsync("console.log", "No livestreams found");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("console.error", $"Error loading featured stream: {ex.Message}");
+            StreamTitle = "Error loading featured stream.";
+        }
+    }
+
+    private void SetFeaturedStream(LivestreamDto stream)
+    {
+        VideoUrl = stream.HlsUrl;
+        FeaturedStreamId = stream.Id;
+        FeaturedStreamStatus = stream.StreamStatus;
+        StreamTitle = $"{stream.HomeTeam} {stream.HomeScore} - {stream.AwayScore} {stream.AwayTeam}";
+    }
+
+    protected bool IsLive => FeaturedStreamStatus == StreamStatus.Live;
+}

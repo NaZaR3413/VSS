@@ -1,10 +1,15 @@
 using System;
 using System.Net.Http;
+using System;
+using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.JSInterop;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.JSInterop;
+using web_backend.Blazor.Client.Services;
 
 namespace web_backend.Blazor.Client;
 
@@ -43,12 +48,9 @@ public class Program
 
         var host = builder.Build();
 
-        // Initialize JavaScript libraries
         var jsRuntime = host.Services.GetRequiredService<IJSRuntime>();
         await jsRuntime.InvokeVoidAsync("eval", "import('https://cdn.jsdelivr.net/npm/hls.js@latest')");
-
-        // Fix the path to correctly point to the js directory
-        await jsRuntime.InvokeVoidAsync("eval", "import('/js/hlsPlayer.js')");
+        await jsRuntime.InvokeVoidAsync("eval", "import('/hlsPlayer.js')");
 
         await application.InitializeApplicationAsync(host.Services);
         await host.RunAsync();

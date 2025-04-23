@@ -1,0 +1,496 @@
+﻿@page "/schedule"
+@using System.IO
+@using System.Text
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Authorization
+@using web_backend.Livestreams
+@using web_backend.Enums
+@inject ILivestreamAppService LivestreamService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+
+<div class="vss-page vss-page-layout--default">
+    <main class="vss-main">
+        <div class="container py-5">
+            <section class="text-center mb-5">
+                <h1 class="display-5 fw-bold">Upcoming Broadcast Schedule</h1>
+                <p class="vss-subheading-schedules">Stay tuned for our live and on-demand high school sports coverage</p>
+            </section>
+
+            <AuthorizeView Roles="admin">
+                <Authorized>
+                    <div class="card mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h4 class="mb-0">Admin Controls: Upload Schedule</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <InputFile OnChange="@LoadScheduleFile" class="form-control" accept=".csv" />
+                                    <small class="form-text text-muted">Upload a CSV file containing the schedule information. Format: Date, Sport, Teams playing</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <button class="btn btn-success w-100" @onclick="ProcessScheduleUpload" disabled="@(!isFileSelected)">
+                                        <i class="bi bi-upload me-2"></i>Process Schedule
+                                    </button>
+                                </div>
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(uploadMessage))
+                            {
+                                <div class="alert @(uploadSuccess ? "alert-success" : "alert-danger") mt-3">
+                                    @uploadMessage
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </Authorized>
+            </AuthorizeView>
+
+            @if (loading)
+            {
+                <div class="d-flex justify-content-center my-5">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            }
+            else if (scheduleItems == null || !scheduleItems.Any())
+            {
+                <div class="alert alert-info text-center">
+                    No upcoming games scheduled at this time. Check back soon for updates.
+                </div>
+            }
+            else
+            {
+                <div class="mb-4">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" placeholder="Filter by team name or sport..."
+                               @bind-value="searchFilter" @bind-value:event="oninput" />
+                    </div>
+                </div>
+
+                <div class="accordion" id="scheduleAccordion">
+                    @foreach (var monthGroup in filteredScheduleItems.GroupBy(s => new DateTime(s.EventDate.Year, s.EventDate.Month, 1))
+                   .OrderBy(g => g.Key))
+                    {
+                        var monthName = monthGroup.Key.ToString("MMMM yyyy");
+                        var monthId = monthGroup.Key.ToString("yyyy-MM");
+                        var isCurrentMonth = monthGroup.Key.Month == DateTime.Now.Month &&
+                        monthGroup.Key.Year == DateTime.Now.Year;
+
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="heading-@monthId">
+                                <button class="accordion-button @(isCurrentMonth ? "" : "collapsed")"
+                                        type="button"
+                                        data-bs-toggle="collapse"
+                                        data-bs-target="#collapse-@monthId"
+                                        aria-expanded="@(isCurrentMonth ? "true" : "false")"
+                                        aria-controls="collapse-@monthId">
+                                    <i class="bi bi-calendar-month me-2"></i> @monthName
+                                </button>
+                            </h2>
+                            <div id="collapse-@monthId" class="accordion-collapse collapse @(isCurrentMonth ? "show" : "")"
+                                 aria-labelledby="heading-@monthId" data-bs-parent="#scheduleAccordion">
+                                <div class="accordion-body p-0">
+                                    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 p-3">
+                                        @foreach (var game in monthGroup.OrderBy(s => s.EventDate))
+                                        {
+                                            <div class="col">
+                                                <div class="vss-schedule-card">
+                                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                                        <span class="badge @GetSportBadgeClass(game.EventType)">@game.EventType</span>
+                                                        <small class="text-muted">@game.EventDate.ToString("dddd, MMMM d")</small>
+                                                    </div>
+                                                    <h5>@game.DisplayName</h5>
+                                                    <p class="vss-game-meta">@game.EventDate.ToString("h:mm tt")</p>
+                                                    <AuthorizeView Roles="admin">
+                                                        <Authorized>
+                                                            <div class="mt-2">
+                                                                <a href="/admin/manage-livestreams" class="btn btn-sm btn-outline-primary">
+                                                                    <i class="bi bi-pencil"></i> Manage
+                                                                </a>
+                                                            </div>
+                                                        </Authorized>
+                                                    </AuthorizeView>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+
+            <section class="text-center mt-5">
+                <p class="lead">Don't miss a moment — check back often as new games are added weekly.</p>
+                <a class="vss-auth__button" href="/account/login">Subscribe for Full Access</a>
+            </section>
+        </div>
+    </main>
+</div>
+
+@code {
+    private List<LivestreamDto> scheduleItems = new List<LivestreamDto>();
+    private bool loading = true;
+    private string searchFilter = "";
+    private IBrowserFile uploadedFile;
+    private bool isFileSelected = false;
+    private string uploadMessage = "";
+    private bool uploadSuccess = false;
+
+    private IEnumerable<LivestreamDto> filteredScheduleItems =>
+        scheduleItems.Where(item =>
+            string.IsNullOrWhiteSpace(searchFilter) ||
+            item.DisplayName.Contains(searchFilter, StringComparison.OrdinalIgnoreCase) ||
+            item.EventType.ToString().Contains(searchFilter, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSchedule();
+    }
+
+    private async Task LoadSchedule()
+    {
+        loading = true;
+
+        try
+        {
+            // Load all livestreams from the database
+            var allLivestreams = await LivestreamService.GetListAsync();
+
+            // Filter them to only show the upcoming ones (PendingStart status)
+            scheduleItems = allLivestreams
+                .Where(l => l.StreamStatus == StreamStatus.PendingStart)
+                .OrderBy(l => l.EventDate)
+                .ToList();
+
+            if (!scheduleItems.Any())
+            {
+                await JS.InvokeVoidAsync("console.log", "No scheduled livestreams found in database");
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("console.error", $"Error loading schedule: {ex.Message}");
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task LoadScheduleFile(InputFileChangeEventArgs e)
+    {
+        uploadedFile = e.File;
+        isFileSelected = true;
+        uploadMessage = "";
+        uploadSuccess = false;
+    }
+
+    private async Task ProcessScheduleUpload()
+    {
+        if (uploadedFile == null)
+        {
+            uploadMessage = "Please select a file to upload.";
+            uploadSuccess = false;
+            return;
+        }
+
+        try
+        {
+            loading = true;
+            uploadMessage = "";
+
+            // Read the file
+            using var stream = uploadedFile.OpenReadStream(maxAllowedSize: 1024 * 1024 * 5); // Max 5MB
+            using var reader = new StreamReader(stream);
+
+            var csvContent = await reader.ReadToEndAsync();
+            var newScheduleItems = new List<CreateLivestreamDto>();
+
+            // Parse CSV manually since the format is unusual
+            using (var csvReader = new StringReader(csvContent))
+            {
+                // Read header line
+                var headerLine = await csvReader.ReadLineAsync();
+                var headers = headerLine?.Split(',');
+                if (headers == null || headers.Length < 3)
+                {
+                    uploadMessage = "CSV file doesn't have enough columns";
+                    uploadSuccess = false;
+                    return;
+                }
+
+                // Find column indices
+                int? teamNameIndex = null;
+                int? sportIndex = null;
+                int? opponentIndex = null;
+                int? locationIndex = null;
+
+                for (int i = 0; i < headers.Length; i++)
+                {
+                    var header = headers[i]?.Trim();
+                    if (string.IsNullOrEmpty(header)) continue;
+
+                    if (i == 0) teamNameIndex = i; // First column is usually team name
+                    if (header.Equals("Sport", StringComparison.OrdinalIgnoreCase)) sportIndex = i;
+                    if (header.Equals("Opponent", StringComparison.OrdinalIgnoreCase)) opponentIndex = i;
+                    if (header.Equals("Location", StringComparison.OrdinalIgnoreCase)) locationIndex = i;
+                }
+
+                // Read data lines
+                string line;
+                string currentMonth = null;
+                int lineNumber = 1;
+
+                while ((line = await csvReader.ReadLineAsync()) != null)
+                {
+                    lineNumber++;
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+
+                    try
+                    {
+                        // Split the CSV line, respecting quoted fields
+                        var fields = SplitCsvLine(line);
+
+                        if (fields.Length < Math.Max(
+                            Math.Max(teamNameIndex ?? 0, sportIndex ?? 0),
+                            Math.Max(opponentIndex ?? 0, locationIndex ?? 0)) + 1)
+                        {
+                            await JS.InvokeVoidAsync("console.warn", $"Line {lineNumber} has fewer fields than expected: {line}");
+                            continue;
+                        }
+
+                        // Check if this is a month row
+                        var firstField = fields[0]?.Trim();
+                        if (IsMonth(firstField))
+                        {
+                            currentMonth = firstField;
+                            continue;
+                        }
+
+                        // Check if this is a day row (first field is numeric or has a day number)
+                        int day;
+                        if (int.TryParse(firstField, out day) || TryExtractDay(firstField, out day))
+                        {
+                            if (string.IsNullOrEmpty(currentMonth))
+                            {
+                                await JS.InvokeVoidAsync("console.warn", $"Found day {day} but no month on line {lineNumber}");
+                                continue;
+                            }
+
+                            // We have a valid day and month, so extract game info
+                            string teamName = "Saguaro Sabercats"; // Default team name
+                            string opponent = opponentIndex.HasValue && opponentIndex.Value < fields.Length
+                                ? fields[opponentIndex.Value]?.Trim()
+                                : null;
+
+                            // Parse the EventType from the Sport column
+                            EventType eventType = EventType.Football; // Default
+                            if (sportIndex.HasValue && sportIndex.Value < fields.Length)
+                            {
+                                var sportName = fields[sportIndex.Value]?.Trim();
+                                if (!string.IsNullOrEmpty(sportName))
+                                {
+                                    if (Enum.TryParse<EventType>(sportName, true, out var parsedType))
+                                    {
+                                        eventType = parsedType;
+                                    }
+                                }
+                            }
+
+                            // Skip if no opponent is found
+                            if (string.IsNullOrEmpty(opponent))
+                            {
+                                continue;
+                            }
+
+                            // Calculate date
+                            int year = GetYearForMonth(currentMonth);
+                            int monthNum = GetMonthNumber(currentMonth);
+
+                            // Create date with default time of 6 PM
+                            var gameDate = new DateTime(year, monthNum, day, 18, 0, 0);
+
+                            // Create a livestream DTO to be saved to the database
+                            newScheduleItems.Add(new CreateLivestreamDto
+                                {
+                                    HomeTeam = teamName,
+                                    AwayTeam = opponent,
+                                    EventType = eventType,
+                                    EventDate = gameDate,
+                                    StreamStatus = StreamStatus.PendingStart, // Mark as upcoming
+                                    HomeScore = 0,
+                                    AwayScore = 0,
+                                    HlsUrl = "" // This will be updated when the stream goes live
+                                });
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        await JS.InvokeVoidAsync("console.error", $"Error processing line {lineNumber}: {ex.Message}");
+                    }
+                }
+            }
+
+            if (newScheduleItems.Any())
+            {
+                int successCount = 0;
+                foreach (var item in newScheduleItems)
+                {
+                    try
+                    {
+                        // Create each livestream in the database
+                        await LivestreamService.CreateAsync(item);
+                        successCount++;
+                    }
+                    catch (Exception ex)
+                    {
+                        await JS.InvokeVoidAsync("console.error", $"Failed to create livestream: {ex.Message}");
+                    }
+                }
+
+                uploadMessage = $"Successfully added {successCount} of {newScheduleItems.Count} schedule items to the database.";
+                uploadSuccess = true;
+
+                // Refresh the schedule from the database
+                await LoadSchedule();
+            }
+            else
+            {
+                uploadMessage = "No valid schedule data found in the CSV file.";
+                uploadSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            uploadMessage = $"Error processing the file: {ex.Message}";
+            uploadSuccess = false;
+            await JS.InvokeVoidAsync("console.error", $"CSV processing error: {ex.Message}");
+        }
+        finally
+        {
+            loading = false;
+            isFileSelected = false;
+        }
+    }
+
+    private static string[] SplitCsvLine(string line)
+    {
+        if (string.IsNullOrEmpty(line)) return Array.Empty<string>();
+
+        var result = new List<string>();
+        var sb = new StringBuilder();
+        bool inQuotes = false;
+
+        for (int i = 0; i < line.Length; i++)
+        {
+            char c = line[i];
+
+            if (c == '"')
+            {
+                // Toggle the quotes flag
+                inQuotes = !inQuotes;
+            }
+            else if (c == ',' && !inQuotes)
+            {
+                // If we hit a comma and we're not in quotes, end the field
+                result.Add(sb.ToString());
+                sb.Clear();
+            }
+            else
+            {
+                // Otherwise append the character to the field
+                sb.Append(c);
+            }
+        }
+
+        // Add the last field
+        result.Add(sb.ToString());
+
+        return result.ToArray();
+    }
+
+    private bool IsMonth(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return false;
+
+        string[] months = { "January", "February", "March", "April", "May", "June", "July",
+                           "August", "September", "October", "November", "December" };
+
+        return months.Any(m => text.Trim().Equals(m, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private bool TryExtractDay(string text, out int day)
+    {
+        day = 0;
+        if (string.IsNullOrEmpty(text)) return false;
+
+        // Check if the text starts with "day X" or similar pattern
+        var match = System.Text.RegularExpressions.Regex.Match(text, @"\b(\d{1,2})\b");
+        if (match.Success && int.TryParse(match.Groups[1].Value, out day))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private int GetMonthNumber(string monthName)
+    {
+        return monthName?.ToLower() switch
+        {
+            "january" => 1,
+            "february" => 2,
+            "march" => 3,
+            "april" => 4,
+            "may" => 5,
+            "june" => 6,
+            "july" => 7,
+            "august" => 8,
+            "september" => 9,
+            "october" => 10,
+            "november" => 11,
+            "december" => 12,
+            _ => DateTime.Now.Month
+        };
+    }
+
+    private int GetYearForMonth(string monthName)
+    {
+        int currentYear = DateTime.Now.Year;
+
+        // For a school schedule, usually things from August-December are in the current year,
+        // while January-July are in the next year
+        return monthName?.ToLower() switch
+        {
+            "january" => currentYear + 1,
+            "february" => currentYear + 1,
+            "march" => currentYear + 1,
+            "april" => currentYear + 1,
+            "may" => currentYear + 1,
+            "june" => currentYear + 1,
+            "july" => currentYear + 1,
+            _ => currentYear
+        };
+    }
+
+    private string GetSportBadgeClass(EventType eventType)
+    {
+        return eventType switch
+        {
+            EventType.Football => "bg-success",
+            EventType.Basketball => "bg-primary",
+            EventType.Baseball => "bg-info",
+            EventType.Soccer => "bg-warning text-dark",
+            EventType.Volleyball => "bg-danger",
+            EventType.Softball => "bg-info",
+            _ => "bg-secondary"
+        };
+    }
+}

@@ -34,6 +34,8 @@ using Volo.Abp.VirtualFileSystem;
 using Volo.Abp.OpenIddict;
 using System.Security.Cryptography.X509Certificates;
 
+using Volo.Abp.ObjectExtending;
+using Volo.Abp.Identity;
 namespace web_backend;
 
 [DependsOn(
@@ -119,6 +121,21 @@ public class web_backendHttpApiHostModule : AbpModule
                 Console.WriteLine("OpenIddict validation configured.");
             });
         });
+        ObjectExtensionManager.Instance
+        .MapEfCoreProperty<IdentityUser, string>(
+            "Name",
+            (entityBuilder, propertyBuilder) =>
+            {
+                propertyBuilder.HasMaxLength(IdentityUserConsts.MaxUserNameLength);
+            });
+
+        ObjectExtensionManager.Instance
+            .MapEfCoreProperty<IdentityUser, string>(
+                "PhoneNumber",
+                (entityBuilder, propertyBuilder) =>
+                {
+                    propertyBuilder.HasMaxLength(IdentityUserConsts.MaxPhoneNumberLength);
+                });
     }
 
 

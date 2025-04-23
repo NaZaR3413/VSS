@@ -1,0 +1,193 @@
+﻿@page "/admin/create-livestream"
+@using web_backend.Livestreams
+@using web_backend.Enums
+@inject ILivestreamAppService LivestreamService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+@attribute [Authorize(Roles = "admin")]
+
+<div class="container mt-4">
+    <h2>Create Livestream</h2>
+
+    <EditForm Model="@newLivestream" OnValidSubmit="GenerateLivestreamKey">
+        <DataAnnotationsValidator />
+        <Microsoft.AspNetCore.Components.Forms.ValidationSummary />
+
+        <div class="card mb-4">
+            <div class="card-header">Event Details</div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="homeTeam" class="form-label">Home Team</label>
+                        <InputText id="homeTeam" class="form-control" @bind-Value="newLivestream.HomeTeam" required />
+                    </div>
+                    <div class="col-md-6">
+                        <label for="awayTeam" class="form-label">Away Team</label>
+                        <InputText id="awayTeam" class="form-control" @bind-Value="newLivestream.AwayTeam" required />
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="eventType" class="form-label">Event Type</label>
+                        <InputSelect id="eventType" class="form-control" @bind-Value="newLivestream.EventType">
+                            @foreach (var eventType in Enum.GetValues(typeof(EventType)))
+                            {
+                                <option value="@eventType">@eventType</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="eventDate" class="form-label">Event Date & Time</label>
+                        <InputDate id="eventDate" class="form-control" @bind-Value="newLivestream.EventDate" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end mb-4">
+            <button type="submit" class="btn btn-primary">Generate Livestream Key</button>
+        </div>
+    </EditForm>
+
+    @if (livestreamCreated)
+    {
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">Livestream Generated Successfully</div>
+            <div class="card-body">
+                <h5 class="card-title">Livestream Details</h5>
+                <div class="mb-3">
+                    <label class="form-label">Stream Key (Copy this to input into OBS Stream Key):</label>
+                    <div class="input-group">
+                        <input type="text" readonly class="form-control" value="@streamKey" id="streamKeyInput">
+                        <button class="btn btn-outline-secondary" type="button" @onclick="CopyStreamKey">Copy</button>
+                    </div>
+                    <small class="form-text text-muted">Use this key in OBS to start streaming.</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Livestream URL (Copy this to share with other people):</label>
+                    <div class="input-group">
+                        <input type="text" readonly class="form-control" value="@livestreamUrl" id="livestreamUrlInput">
+                        <button class="btn btn-outline-secondary" type="button" @onclick="CopyLivestreamUrl">Copy</button>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="streamActiveSwitch" @bind="isStreamActive" />
+                            <label class="form-check-label" for="streamActiveSwitch">Stream Active</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <span class="badge bg-@statusColor">@currentStatus</span>
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                    <button class="btn btn-success" @onclick="ViewLivestream">View Livestream</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+
+@code {
+    private CreateLivestreamDto newLivestream = new()
+        {
+            EventDate = DateTime.Now,
+            StreamStatus = StreamStatus.AwaitingConnection,
+            HomeScore = 0,
+            AwayScore = 0
+        };
+
+    private bool livestreamCreated = false;
+    private string streamKey = "";
+    private string livestreamUrl = "";
+    private Guid livestreamId;
+    private bool _isStreamActive = false;
+    private string currentStatus = "Awaiting Connection";
+    private string statusColor = "warning";
+
+    private bool isStreamActive
+    {
+        get => _isStreamActive;
+        set
+        {
+            if (_isStreamActive != value)
+            {
+                _isStreamActive = value;
+                _ = UpdateStreamStatus();
+            }
+        }
+    }
+
+    private async Task GenerateLivestreamKey()
+    {
+        try
+        {
+            // Create a new ID that will be used both as the stream key and the livestream ID
+            Guid id = Guid.NewGuid();
+            streamKey = id.ToString().ToUpper(); // Match the uppercase format in your example
+
+            // Set the HLS URL with the exact format from your database example
+            newLivestream.HlsUrl = $"http://localhost:8080/hls/{streamKey}.m3u8";
+
+            // Create the livestream in the database
+            var result = await LivestreamService.CreateAsync(newLivestream);
+
+            // Store the ID for future updates
+            livestreamId = result.Id;
+
+            // Build the livestream URL for viewing
+            livestreamUrl = $"{NavigationManager.BaseUri}livestream/{livestreamId}";
+
+            livestreamCreated = true;
+
+            await JS.InvokeVoidAsync("alert", "Livestream created successfully!");
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error creating livestream: {ex.Message}");
+        }
+    }
+
+
+    private async Task CopyStreamKey()
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", streamKey);
+        await JS.InvokeVoidAsync("alert", "Stream key copied to clipboard!");
+    }
+
+    private async Task CopyRtmpUrl()
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", "rtmp://localhost:1935/live");
+        await JS.InvokeVoidAsync("alert", "RTMP server URL copied to clipboard!");
+    }
+
+    private async Task CopyLivestreamUrl()
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", livestreamUrl);
+        await JS.InvokeVoidAsync("alert", "Livestream URL copied to clipboard!");
+    }
+
+    private void ViewLivestream()
+    {
+        NavigationManager.NavigateTo($"/livestream/{livestreamId}");
+    }
+
+    private async Task UpdateStreamStatus()
+    {
+        var updateDto = new UpdateLivestreamDto
+            {
+                StreamStatus = isStreamActive ? StreamStatus.Live : StreamStatus.AwaitingConnection
+            };
+
+        await LivestreamService.UpdateAsync(livestreamId, updateDto);
+
+        currentStatus = isStreamActive ? "Live" : "Awaiting Connection";
+        statusColor = isStreamActive ? "success" : "warning";
+    }
+}

@@ -1,0 +1,89 @@
+﻿@page "/admin/livestreams"
+@using System.Net.Http.Json
+@using web_backend.Domain.Shared.Dtos
+@inject HttpClient HttpClient
+@inject IJSRuntime JS
+
+<AuthorizeView Roles="admin" Context="auth">
+    <Authorized>
+        <h3 class="text-center my-4">Create New Livestream</h3>
+
+        <EditForm Model="newLivestream" OnValidSubmit="CreateLivestream">
+            <DataAnnotationsValidator />
+            <Microsoft.AspNetCore.Components.Forms.ValidationSummary />
+
+            <div class="mb-3">
+                <label for="homeTeam">Home Team</label>
+                <InputText id="homeTeam" class="form-control" @bind-Value="newLivestream.HomeTeam" />
+            </div>
+
+            <div class="mb-3">
+                <label for="awayTeam">Away Team</label>
+                <InputText id="awayTeam" class="form-control" @bind-Value="newLivestream.AwayTeam" />
+            </div>
+
+            <div class="mb-3">
+                <label for="eventDate">Event Date & Time</label>
+                <InputDate id="eventDate" class="form-control" @bind-Value="newLivestream.EventDate" />
+            </div>
+
+            <div class="mb-3">
+                <label for="hlsUrl">HLS Stream URL</label>
+                <InputText id="hlsUrl" class="form-control" @bind-Value="newLivestream.HlsUrl" />
+            </div>
+
+            <div class="mb-3">
+                <label for="status">Stream Status</label>
+                <InputSelect id="status" class="form-control" @bind-Value="newLivestream.StreamStatus">
+                    <option value="0">Upcoming</option>
+                    <option value="1">Live</option>
+                    <option value="2">Ended</option>
+                </InputSelect>
+            </div>
+
+            <div class="mb-3">
+                <label for="scoreA">Home Score</label>
+                <InputNumber id="scoreA" class="form-control" @bind-Value="newLivestream.HomeScore" />
+            </div>
+
+            <div class="mb-3">
+                <label for="scoreB">Away Score</label>
+                <InputNumber id="scoreB" class="form-control" @bind-Value="newLivestream.AwayScore" />
+            </div>
+
+            <button type="submit" class="btn btn-primary">Create Livestream</button>
+        </EditForm>
+    </Authorized>
+
+    <NotAuthorized>
+        <p>You do not have permission to view this page.</p>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private List<TeamDto> teams = new();
+    private CreateLivestreamDto newLivestream = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        teams = await HttpClient.GetFromJsonAsync<List<TeamDto>>("/api/teams");
+    }
+
+    private async Task CreateLivestream()
+    {
+        await HttpClient.PostAsJsonAsync("/api/livestreams", newLivestream);
+        await JS.InvokeVoidAsync("alert", "Livestream created successfully!");
+        newLivestream = new();
+    }
+
+    public class CreateLivestreamDto
+    {
+        public string HomeTeam { get; set; }
+        public string AwayTeam { get; set; }
+        public string HlsUrl { get; set; }
+        public DateTime EventDate { get; set; }
+        public int StreamStatus { get; set; }
+        public int HomeScore { get; set; }
+        public int AwayScore { get; set; }
+    }
+}

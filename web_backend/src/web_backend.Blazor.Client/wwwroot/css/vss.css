@@ -1,25 +1,74 @@
 ﻿:root {
-    --navbar-bg-color: #13125F;
-    --navbar-text-color: #FFFFFF;
+    --navbar-bg-color: #13125F; /* Changed from #FED700 */
+    --navbar-text-color: #F2F2F2; /* Changed from #002868 */
+    --navbar-hover-text-color: #F2F2F2; /* Changed from #ccc */
+    --dropdown-text-color: #000000; /* Changed from #000 */
+    --dropdown-hover-bg-color: #f8f9fa;
+    --auth-button-text-color: #fff;
+    --page-bg-color: #F2F2F2; /* Changed from #13125F */
+    --main-text-color: #000000; /* Changed from #F2F2F2 */
+    --primary-btn-color: #13125F;
+    --filter-btn-color: #FED700;
+    --filter-btn-text-color: #000000; /* Changed from #002868 */
 }
 
 /* Header Styling */
 .vss-header {
     background-color: var(--navbar-bg-color);
     padding: 0 20px;
+    color: var(--navbar-text-color);
+    width: 100%;
+    text-align: center;
 }
 
 .vss-header__logo img {
     max-height: 60px;
 }
 
-/* Navigation Styling */
 .vss-nav .nav-link {
+    position: relative;
+    display: inline-block;
+    padding: 10px 15px;
     color: var(--navbar-text-color);
+    text-decoration: none;
+    font-size: 20px;
+    font-weight: 600;
+    transition: all 0.35s ease;
+    overflow: hidden;
 }
 
+    .vss-nav .nav-link svg {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+    }
+
+    .vss-nav .nav-link rect {
+        fill: none;
+        stroke: transparent;
+        stroke-width: 2;
+        stroke-dasharray: 422, 0;
+        transition: all 0.35s linear;
+    }
+
     .vss-nav .nav-link:hover {
-        color: #ccc;
+        font-weight: 700;
+        letter-spacing: 1px;
+        color: var(--navbar-hover-text-color); /* Ensure hover text color remains F2F2F2 */
+    }
+
+        .vss-nav .nav-link:hover rect {
+            stroke: #BF0A30;
+            stroke-width: 5;
+            stroke-dasharray: 15, 310;
+            stroke-dashoffset: 48;
+            transition: all 1.35s cubic-bezier(0.19, 1, 0.22, 1);
+        }
+
+    .vss-nav .nav-link:active {
+        color: var(--navbar-hover-text-color); /* Ensure active text color remains F2F2F2 */
     }
 
 /* Navbar Toggler Icon */
@@ -33,11 +82,58 @@
 
 /* Dropdown Menu Styling */
 .vss-dropdown .dropdown-item {
-    color: #000;
+    color: var(--dropdown-text-color);
+    font-size: 20px;
+    font-weight: 700;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.35s ease;
 }
 
+    .vss-dropdown .dropdown-item svg {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+    }
+
+    .vss-dropdown .dropdown-item rect {
+        fill: none;
+        stroke: transparent;
+        stroke-width: 2;
+        stroke-dasharray: 422, 0;
+        transition: all 0.35s linear;
+    }
+
     .vss-dropdown .dropdown-item:hover {
-        background-color: #f8f9fa;
+        background-color: var(--dropdown-hover-bg-color);
+        color: var(--dropdown-text-color); /* Ensure hover text color remains F2F2F2 */
+    }
+
+    .vss-dropdown .dropdown-item:active {
+        color: var(--dropdown-text-color); /* Ensure active text color remains F2F2F2 */
+    }
+
+    .vss-dropdown .dropdown-item:hover rect {
+        stroke: #BF0A30;
+        stroke-width: 5;
+        stroke-dasharray: 15, 310;
+        stroke-dashoffset: 48;
+        transition: all 1.35s cubic-bezier(0.19, 1, 0.22, 1);
+    }
+
+/* Dropdown Header Styling */
+.vss-dropdown-header {
+    color: var(--navbar-text-color); /* Ensure dropdown header text color remains F2F2F2 */
+}
+
+    .vss-dropdown-header:hover {
+        color: var(--navbar-text-color); /* Ensure hover text color remains F2F2F2 */
+    }
+
+    .vss-dropdown-header:active {
+        color: var(--navbar-text-color); /* Ensure active text color remains F2F2F2 */
     }
 
 /* Authentication Links */
@@ -48,17 +144,675 @@
 
 .vss-auth__link {
     color: var(--navbar-text-color);
+    position: relative;
+    display: inline-block;
+    padding: 10px 15px;
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.5;
+    height: 100%;
+    align-self: center;
+    text-decoration: none;
+    transition: all 0.35s ease;
 }
 
     .vss-auth__link:hover {
-        color: #ccc;
+        color: var(--navbar-hover-text-color);
+        font-weight: 700;
     }
 
+
 .vss-auth__button {
-    color: #fff;
+    position: relative;
+    display: inline-block;
+    padding: 10px 20px;
+    color: var(--navbar-text-color);
+    background-color: var(--primary-btn-color);
+    font-size: 20px;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+    overflow: hidden;
+    border: 1px solid transparent;
+    transition: all 0.35s ease;
 }
+
+    .vss-auth__button svg {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+    }
+
+    .vss-auth__button rect {
+        fill: none;
+        stroke: transparent;
+        stroke-width: 2;
+        stroke-dasharray: 422, 0;
+        transition: all 0.35s linear;
+    }
+
+    .vss-auth__button:hover {
+        background-color: transparent;
+        font-weight: 700;
+        letter-spacing: 1px;
+        border: 1px solid var(--navbar-bg-color);
+    }
+
+        .vss-auth__button:hover rect {
+            stroke: #BF0A30;
+            stroke-width: 5;
+            stroke-dasharray: 15, 310;
+            stroke-dashoffset: 48;
+            transition: all 1.35s cubic-bezier(0.19, 1, 0.22, 1);
+        }
+
+.vss-filter__button {
+    position: relative;
+    display: inline-block;
+    padding: 10px 20px;
+    color: var(--filter-btn-text-color);
+    background-color: var(--filter-btn-color);
+    font-size: 20px;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+    overflow: hidden;
+    border: 1px solid transparent;
+    transition: all 0.35s ease;
+}
+
+    .vss-filter__button svg {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+    }
+
+    .vss-filter__button rect {
+        fill: none;
+        stroke: transparent;
+        stroke-width: 2;
+        stroke-dasharray: 422, 0;
+        transition: all 0.35s linear;
+    }
+
+    .vss-filter__button:hover {
+        background-color: transparent;
+        font-weight: 700;
+        letter-spacing: 1px;
+        border: 1px solid var(--navbar-bg-color);
+        color: var(--main-text-color);
+    }
+
+        .vss-filter__button:hover rect {
+            stroke: #BF0A30;
+            stroke-width: 5;
+            stroke-dasharray: 15, 310;
+            stroke-dashoffset: 48;
+            transition: all 1.35s cubic-bezier(0.19, 1, 0.22, 1);
+        }
 
 /* Main Content Styling */
 .vss-main-content {
     padding: 20px;
+}
+
+/* Page Layout Styling */
+.vss-page-layout {
+    background-color: var(--page-bg-color);
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center center;
+    height: 100vh;
+    width: 100vw;
+}
+
+/* Responsive Background Images */
+.vss-page-layout--football {
+    background-image: url('/images/football.jpg');
+}
+
+.vss-page-layout--baseball {
+    background-image: url('/images/baseball.jpg');
+}
+
+.vss-page-layout--soccer {
+    background-image: url('/images/soccer.jpg');
+}
+
+.vss-page-layout--basketball {
+    background-image: url('/images/basketball.jpg');
+}
+
+.vss-page-layout--default {
+    background-image: none;
+}
+
+/* Ensure the entire page has the purple background */
+.vss-page {
+    background-color: var(--page-bg-color);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Main content area */
+.vss-main {
+    flex-grow: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    color: var(--main-text-color);
+    width: 100%;
+}
+
+    .vss-main > * {
+        max-width: 2400px;
+        width: 100%;
+        text-align: center;
+    }
+
+.vss-livestream-item {
+    background-color: var(--card-bg-color);
+    border: 2px solid var(--card-border-color);
+    padding: 1.5rem;
+    margin: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    text-align: left;
+}
+
+    .vss-livestream-item h2 {
+        font-size: 24px;
+        margin-bottom: 0.5rem;
+        color: var(--navbar-text-color);
+    }
+
+    .vss-livestream-item p {
+        font-size: 16px;
+        color: var (--navbar-text-color);
+    }
+
+    .vss-livestream-item .btn {
+        background-color: var(--primary-btn-bg-color);
+        color: var(--main-text-color);
+        padding: 0.5rem 1rem;
+        font-size: 16px;
+        border: none;
+        border-radius: 4px;
+        transition: background-color 0.3s ease;
+    }
+
+        .vss-livestream-item .btn:hover {
+            background-color: var(--primary-btn-hover-color);
+        }
+
+.vss-no-streams {
+    font-size: 20px;
+    color: var(--main-text-color);
+    margin-top: 2rem;
+    text-align: center;
+}
+
+.vss-filters {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 2rem;
+}
+
+    .vss-filters .dropdown-submenu {
+        position: relative;
+    }
+
+        .vss-filters .dropdown-submenu .dropdown-menu {
+            top: 0;
+            left: 100%;
+            margin-left: 0.1rem;
+            margin-top: -0.5rem;
+        }
+
+.vss-video-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 20px;
+}
+
+.vss-video-player {
+    width: 100%;
+    max-width: 1600px;
+    height: auto;
+    border: 4px solid var(--navbar-bg-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.vss-video-title {
+    margin-top: 20px;
+    color: var(--main-text-color);
+    text-align: center;
+}
+
+    .vss-video-title h2 {
+        font-size: 28px;
+        font-weight: bold;
+    }
+
+.vss-header__title {
+    font-size: 36px;
+    font-weight: bold;
+    margin: 0;
+    padding: 20px 0;
+}
+
+.vss-hero {
+    padding: 60px 20px;
+    background-color: var(--primary-btn-color);
+    color: var(--navbar-text-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+    .vss-hero h1 {
+        font-size: 48px;
+        margin-bottom: 20px;
+    }
+
+    .vss-hero p {
+        font-size: 20px;
+        margin-bottom: 30px;
+    }
+
+.vss-featured {
+    padding: 30px 0;
+}
+
+    .vss-featured h2 {
+        font-size: 32px;
+        color: var(--main-text-color);
+    }
+
+    .vss-featured h3 {
+        font-size: 24px;
+        margin-bottom: 10px;
+        color: var(--main-text-color);
+    }
+
+.vss-news-card {
+    background-color: #ffffff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    text-align: left;
+    transition: transform 0.3s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+
+    .vss-news-card:hover {
+        transform: translateY(-4px);
+    }
+
+    .vss-news-card h5 {
+        font-size: 20px;
+        margin-bottom: 10px;
+        color: var(--main-text-color);
+    }
+
+    .vss-news-card p {
+        font-size: 16px;
+        color: var(--main-text-color);
+    }
+
+.vss-score-card {
+    background-color: #ffffff;
+    padding: 15px;
+    border-radius: 6px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+    .vss-score-card p {
+        margin: 0;
+        color: var(--main-text-color);
+    }
+
+.vss-auth__button,
+.vss-filter__button {
+    text-transform: uppercase;
+}
+
+@media (max-width: 768px) {
+    .vss-hero h1 {
+        font-size: 36px;
+    }
+
+    .vss-hero p {
+        font-size: 18px;
+    }
+
+    .vss-featured h2 {
+        font-size: 28px;
+    }
+}
+
+.vss-preview-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(15, 15, 15, 0.85);
+    color: white;
+    z-index: 10;
+    padding: 20px;
+    text-align: center;
+}
+
+.vss-video-container video {
+    transition: filter 0.5s ease;
+}
+
+.vss-preview-overlay ~ video {
+    filter: blur(4px) brightness(0.6);
+}
+
+
+.vss-main h2 {
+    font-size: 28px;
+    font-weight: 700;
+    border-bottom: 3px solid var(--primary-btn-color);
+    padding-bottom: 10px;
+    margin-bottom: 25px;
+}
+
+.vss-featured {
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+    padding: 40px 30px;
+}
+
+.badge.bg-danger {
+    font-size: 14px;
+    padding: 6px 12px;
+    border-radius: 4px;
+}
+
+.vss-livestream-item {
+    background-color: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-left: 4px solid var(--primary-btn-color);
+    padding: 20px;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    transition: transform 0.3s ease;
+}
+
+    .vss-livestream-item:hover {
+        transform: translateY(-2px);
+    }
+
+    .vss-livestream-item a.vss-auth__button {
+        margin-top: 10px;
+        font-size: 16px;
+    }
+
+.vss-score-card {
+    background-color: #ffffff;
+    padding: 20px;
+    border-radius: 6px;
+    border-left: 4px solid var(--primary-btn-color);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+section {
+    background-color: #fdfdfd;
+    border-radius: 6px;
+    padding: 30px 20px;
+}
+
+    section + section {
+        margin-top: 40px;
+    }
+
+.vss-livestream-item h2,
+.vss-livestream-item p {
+    color: #222222;
+}
+
+.vss-score-card p,
+.vss-news-card p,
+.vss-news-card h5 {
+    color: #222222;
+}
+
+.vss-livestream-item,
+.vss-score-card,
+.vss-news-card {
+    background-color: #ffffff;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.vss-auth__link {
+    color: #1a1a1a;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+    .vss-auth__link:hover {
+        color: #BF0A30;
+        text-decoration: underline;
+    }
+
+.vss-news-card,
+.vss-score-card,
+.vss-livestream-item,
+.vss-featured {
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e4e4e4;
+    background-color: #fff;
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+    .vss-news-card:hover,
+    .vss-livestream-item:hover,
+    .vss-featured:hover {
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        transform: translateY(-3px);
+    }
+
+section {
+    background-color: #f6f6f9;
+    border-radius: 8px;
+    padding: 30px 25px;
+}
+
+.vss-news-card p,
+.vss-score-card p,
+.vss-livestream-item p {
+    color: #333333;
+    line-height: 1.6;
+}
+
+.vss-news-card h5,
+.vss-livestream-item h2 {
+    color: #111111;
+    font-weight: 700;
+}
+
+
+.vss-main h2 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #111;
+    border-bottom: 3px solid var(--primary-btn-color);
+    padding-bottom: 10px;
+    margin-bottom: 25px;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.05);
+}
+
+
+.vss-auth__link {
+    color: #212121;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+    .vss-auth__link:hover {
+        color: var(--primary-btn-color);
+        text-decoration: underline;
+    }
+
+.vss-subheading {
+    color: #cccccc;
+    font-size: 18px;
+    margin-top: 10px;
+}
+
+.vss-subheading-schedules {
+    font-size: 18px;
+    color: #333333;
+    font-weight: 500;
+    margin-top: 10px;
+}
+
+.vss-schedule-card {
+    background-color: #ffffff;
+    padding: 20px;
+    border-radius: 6px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+    text-align: left;
+    transition: transform 0.3s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+    .vss-schedule-card h5 {
+        font-size: 20px;
+        font-weight: bold;
+        color: #222222;
+        margin-bottom: 10px;
+    }
+
+.vss-game-meta {
+    color: #555555;
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+
+.vss-game-desc {
+    color: #333333;
+    font-size: 16px;
+}
+
+.vss-nav__link.dropdown-toggle:hover,
+.vss-nav__link.dropdown-toggle:focus,
+.vss-nav__link.dropdown-toggle:active {
+    color: white !important;
+    background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.vss-auth__username.navbar-text {
+    color: white !important;
+    position: relative;
+    display: inline-block;
+    padding: 10px 15px;
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.5;
+    height: 100%;
+    align-self: center;
+    margin-bottom: 0;
+    margin-right: 0 !important;
+}
+
+.vss-dropdown.dropdown-menu {
+    background-color: #212529;
+    border-color: #343a40;
+}
+
+.vss-dropdown__link.dropdown-item {
+    color: #f8f9fa;
+}
+
+    .vss-dropdown__link.dropdown-item:hover,
+    .vss-dropdown__link.dropdown-item:focus {
+        background-color: #343a40;
+        color: white;
+    }
+
+.vss-auth__username.navbar-text span,
+.vss-auth__username.navbar-text * {
+    color: white !important;
+}
+
+.vss-auth .navbar-text a,
+.vss-auth .navbar-text a:hover,
+.vss-auth .navbar-text a:focus {
+    color: white !important;
+}
+
+.vss-header .vss-auth .navbar-text {
+    color: white !important;
+}
+
+.vss-header .vss-auth .vss-auth__username {
+    color: white !important;
+}
+
+.vss-auth__username.navbar-text * {
+    color: white !important;
+}
+
+.vss-auth__link.nav-link {
+    color: white !important;
+}
+
+    .vss-auth__link.nav-link:hover {
+        color: white !important;
+        text-decoration: underline;
+    }
+
+.vss-paywall-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.85);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 20px;
+    z-index: 1000;
+    border-radius: 8px;
+}
+
+.vss-free-preview-timer {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 14px;
+    z-index: 999;
 }
