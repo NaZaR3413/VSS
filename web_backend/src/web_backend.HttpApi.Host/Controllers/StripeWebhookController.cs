@@ -46,7 +46,7 @@ namespace web_backend.Controllers
             if (stripeEvent.Type == "checkout.session.completed")
             {
                 var session = stripeEvent.Data.Object as Session;
-                await _stripeSubscriptionAppService.HandleSubscriptionAsync(session.Id);
+                await _stripeSubscriptionAppService.HandleSubscriptionAsync(session.Id, session.Subscription.Id);
             }
             if (stripeEvent.Type == "customer.subscription.deleted")
             {

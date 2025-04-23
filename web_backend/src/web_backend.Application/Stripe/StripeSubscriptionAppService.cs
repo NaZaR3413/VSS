@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Identity;
 using static Volo.Abp.Identity.Settings.IdentitySettingNames;
 using Volo.Abp;
 using Volo.Abp.Users;
+using Stripe;
 
 
 namespace web_backend.Stripe
@@ -63,10 +64,13 @@ namespace web_backend.Stripe
             return session.Url;
         }
 
-        public async Task HandleSubscriptionAsync(string sessionId)
+        public async Task HandleSubscriptionAsync(string sessionId, string subscriptionID)
         {
             var sessionService = LazyServiceProvider.LazyGetRequiredService<SessionService>();
+            var subscriptionService = LazyServiceProvider.LazyGetRequiredService<SubscriptionService>();
+
             var session = await sessionService.GetAsync(sessionId);
+            var subscription = await subscriptionService.GetAsync(subscriptionID);
 
             if (!session.Metadata.TryGetValue("userId", out var userId) || string.IsNullOrWhiteSpace(userId))
             {
@@ -119,11 +123,28 @@ namespace web_backend.Stripe
             }
 
             // save customer's customerId under extra propertes in the user's table, {StripeCustomerID: customerID)
+            // subscriptionID also saved, {StripeSubscriptionId: subscriptionID}
             // This way you can retrieve the same customer instance later to cancel billing
-            if (!string.IsNullOrEmpty(session.CustomerId))
+            try
             {
-                user.SetProperty("StripeCustomerId", session.CustomerId);
-                await userManager.UpdateAsync(user);
+                if (!string.IsNullOrEmpty(session.CustomerId))
+                {
+                    user.SetProperty("StripeCustomerId", session.CustomerId);
+                }
+                if (!string.IsNullOrEmpty(subscription.Id))
+                {
+                    user.SetProperty("StripeSubscriptionId", subscription.Id);
+                }
+
+                var updateResult = await userManager.UpdateAsync(user);
+                if (!updateResult.Succeeded)
+                {
+                    Logger.LogWarning($"Failed to update user {user.UserName}: {string.Join(", ", updateResult.Errors.Select(e => e.Description))}");
+                }
+            }
+            catch(Exception ex) 
+            {
+                Logger.LogError(ex, $"Exception occurred while updating user {user.UserName} with Stripe subscription info.");
             }
 
         }
