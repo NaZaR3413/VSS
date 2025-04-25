@@ -10,7 +10,6 @@ using Volo.Abp.Data;
 using Microsoft.AspNetCore.Identity;
 using static Volo.Abp.Identity.Settings.IdentitySettingNames;
 using Volo.Abp;
-using Volo.Abp.Users;
 using Stripe;
 
 
@@ -41,18 +40,25 @@ namespace web_backend.Stripe
                 Mode = "subscription",
                 PaymentMethodTypes = new List<string> { "card" },
                 Metadata = new Dictionary<string, string>
-            {
-                { "userId", userId }
-            },
-                LineItems = new List<SessionLineItemOptions>
-            {
-                new SessionLineItemOptions
                 {
-                    Price = "price_1RGSSk01dSxu5ypyTJawUqwN",
+                    { "userId", userId }
+                },
+                SubscriptionData = new SessionSubscriptionDataOptions
+                {
+                    Metadata = new Dictionary<string, string>
+                    {
+                        { "userId", userId }
+                    }
+                },
+                LineItems = new List<SessionLineItemOptions>
+                {
+                    new SessionLineItemOptions
+                    {
+                        Price = "price_1RGSSk01dSxu5ypyTJawUqwN",
 
-                    Quantity = 1,
-                }
-            },
+                        Quantity = 1,
+                    }
+                },
                 //SuccessUrl = "https://localhost:44320/payment-success?session_id={CHECKOUT_SESSION_ID}",
                 //CancelUrl = "https://localhost:44320/payment-cancel"
                 SuccessUrl = "https://localhost:44320",
@@ -67,7 +73,7 @@ namespace web_backend.Stripe
         public async Task HandleSubscriptionAsync(string sessionId, string subscriptionID)
         {
             var sessionService = LazyServiceProvider.LazyGetRequiredService<SessionService>();
-            var subscriptionService = LazyServiceProvider.LazyGetRequiredService<SubscriptionService>();
+            var subscriptionService = new SubscriptionService();
 
             var session = await sessionService.GetAsync(sessionId);
             var subscription = await subscriptionService.GetAsync(subscriptionID);
