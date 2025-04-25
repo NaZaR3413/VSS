@@ -5,6 +5,11 @@
   },
   "routes": [
     {
+      "route": "/authentication/*",
+      "serve": "/index.html",
+      "statusCode": 200
+    },
+    {
       "route": "/*",
       "serve": "/index.html",
       "statusCode": 200
@@ -16,8 +21,8 @@
     ".woff2": "application/font-woff2"
   },
   "globalHeaders": {
+    "Content-Security-Policy": "frame-ancestors 'self' https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net",
     "Access-Control-Allow-Origin": "*",
     "X-Content-Type-Options": "nosniff"
   }
 }
-
