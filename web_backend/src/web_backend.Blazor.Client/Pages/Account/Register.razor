@@ -3,6 +3,7 @@
 @using web_backend
 @using Microsoft.AspNetCore.Components.WebAssembly.Authentication
 @using OpenIddict.Abstractions
+@using System.Net.Http.Json
 @inject NavigationManager Navigation
 @inject IHttpClientFactory HttpClientFactory
 @inject IJSRuntime JSRuntime
@@ -21,7 +22,7 @@
 
             <EditForm Model="@registerModel" OnValidSubmit="RegisterUser">
                 <DataAnnotationsValidator />
-                <ValidationSummary />
+                <Microsoft.AspNetCore.Components.Forms.ValidationSummary />
 
                 <div class="mb-3">
                     <label for="username" class="form-label">Username</label>
