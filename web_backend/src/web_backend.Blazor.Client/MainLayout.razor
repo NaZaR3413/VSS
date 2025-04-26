@@ -4,10 +4,12 @@
 @using web_backend.Livestreams
 @using System.Linq
 @using Microsoft.AspNetCore.Components.Web
+@using web_backend.Blazor.Client.Pages.Components
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
 @inject ILivestreamAppService LivestreamService
 @inject IJSRuntime JS
+@inject DebugService DebugService
 @using web_backend.Enums
 @implements IDisposable
 
@@ -147,6 +149,9 @@
     <main class="vss-main">
         @Body
     </main>
+    
+    <!-- Startup Status Indicator -->
+    <StartupStatus />
 </div>
 
 @code {
@@ -160,21 +165,33 @@
 
     protected override async Task OnInitializedAsync()
     {
-        authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-
-        if (LivestreamState != null)
+        await DebugService.Initialize();
+        await DebugService.LogAsync("MainLayout initialized");
+        
+        try
         {
-            LivestreamState.OnLivestreamStatusChanged += HandleLivestreamStatusChanged;
+            authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            await DebugService.LogAsync($"Authentication state loaded: {authState.User.Identity?.IsAuthenticated}");
+
+            if (LivestreamState != null)
+            {
+                LivestreamState.OnLivestreamStatusChanged += HandleLivestreamStatusChanged;
+                await DebugService.LogAsync("Registered livestream state handler");
+            }
+
+            refreshTimer = new System.Threading.Timer(async _ =>
+            {
+                await RefreshLivestreams(force: false);
+                await InvokeAsync(StateHasChanged);
+            }, null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
+
+            await RefreshLivestreams(force: true);
+            await DebugService.LogAsync("Initial livestream refresh completed");
         }
-
-        refreshTimer = new System.Threading.Timer(async _ =>
+        catch (Exception ex)
         {
-            await RefreshLivestreams(force: false);
-            await InvokeAsync(StateHasChanged);
-        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
-
-        await RefreshLivestreams(force: true);
-
+            await DebugService.LogAsync($"Error in MainLayout initialization: {ex.Message}");
+        }
     }
 
     private async void HandleLivestreamStatusChanged(object sender, EventArgs e)

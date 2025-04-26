@@ -1,4 +1,158 @@
-@page "/index"
+@page "/"
+@using System.Threading
+@using Microsoft.AspNetCore.Components.Authorization
+@using web_backend.Blazor.Client.Services
+@using web_backend.Livestreams
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@using Microsoft.Extensions.Configuration
+@inject IConfiguration Configuration
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
 
-<h1>Welcome to Your Sports Livestream</h1>
-<p>This is the home page of your high school sports livestream application.</p>
+<div class="landing-page">
+    @if (isLoading)
+    {
+        <div class="loading-container">
+            <div class="loading-spinner"></div>
+            <p>Loading VSS streaming platform...</p>
+            @if (loadingTimeout)
+            {
+                <div class="mt-3 alert alert-warning">
+                    <p>Loading is taking longer than expected. You can try:</p>
+                    <ul>
+                        <li><a href="javascript:void(0)" @onclick="ReloadPage">Refreshing the page</a></li>
+                        <li><a href="javascript:void(0)" @onclick="BypassAuth">Continue without authentication</a></li>
+                    </ul>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="landing-hero">
+            <h1>Welcome to Varsity Sports Streaming</h1>
+            <p>Live sports streaming for high schools and colleges</p>
+            
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger">
+                    @errorMessage
+                </div>
+            }
+            
+            <div class="cta-buttons">
+                <a href="/livestreams" class="btn btn-primary btn-lg">Browse Livestreams</a>
+                <a href="/schedule" class="btn btn-outline-primary btn-lg">View Schedule</a>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .landing-page {
+        min-height: 80vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        padding: 2rem;
+    }
+    
+    .landing-hero {
+        max-width: 800px;
+    }
+    
+    .cta-buttons {
+        margin-top: 2rem;
+    }
+    
+    .cta-buttons .btn {
+        margin: 0 0.5rem;
+    }
+    
+    .loading-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 50vh;
+    }
+    
+    .loading-spinner {
+        border: 5px solid rgba(0, 0, 0, 0.1);
+        border-radius: 50%;
+        border-top: 5px solid #3498db;
+        width: 50px;
+        height: 50px;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+    }
+    
+    @@keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+</style>
+
+@code {
+    private bool isLoading = true;
+    private bool loadingTimeout = false;
+    private string errorMessage = "";
+    private Timer loadingTimeoutTimer;
+    
+    protected override void OnInitialized()
+    {
+        // Start a timer to detect a loading timeout
+        loadingTimeoutTimer = new Timer(_ =>
+        {
+            loadingTimeout = true;
+            InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.FromSeconds(10), Timeout.InfiniteTimeSpan);
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                // Simulate a delay for testing
+                await Task.Delay(500);
+                
+                // Stop loading after 500ms no matter what
+                isLoading = false;
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Error initializing the application: {ex.Message}";
+                isLoading = false;
+                await InvokeAsync(StateHasChanged);
+            }
+            finally
+            {
+                loadingTimeoutTimer?.Dispose();
+            }
+        }
+    }
+    
+    private void ReloadPage()
+    {
+        JSRuntime.InvokeVoidAsync("location.reload");
+    }
+    
+    private void BypassAuth()
+    {
+        // Simply set loading to false to show content
+        isLoading = false;
+        
+        // Navigate to a non-authenticated page
+        NavigationManager.NavigateTo("/", forceLoad: true);
+    }
+    
+    public void Dispose()
+    {
+        loadingTimeoutTimer?.Dispose();
+    }
+}
