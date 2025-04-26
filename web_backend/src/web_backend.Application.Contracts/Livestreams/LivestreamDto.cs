@@ -1,29 +1,32 @@
 ﻿using System;
 using web_backend.Enums;
 
-public class LivestreamDto
+namespace web_backend.Livestreams
 {
-    public Guid Id { get; set; }
-    public string HlsUrl { get; set; }
-    public string HomeTeam { get; set; }
-    public string AwayTeam { get; set; }
-    public int HomeScore { get; set; } = 0;
-    public int AwayScore { get; set; } = 0;
-    public string GameScore
+    public class LivestreamDto
     {
-        get
+        public Guid Id { get; set; }
+        public string HlsUrl { get; set; }
+        public string HomeTeam { get; set; }
+        public string AwayTeam { get; set; }
+        public int HomeScore { get; set; } = 0;
+        public int AwayScore { get; set; } = 0;
+        public string GameScore
         {
-            return $"{HomeScore} - {AwayScore}";
+            get
+            {
+                return $"{HomeScore} - {AwayScore}";
+            }
         }
-    }
-    public string DisplayName
-    {
-        get
+        public string DisplayName
         {
-            return $"{HomeTeam} vs. {AwayTeam}";
+            get
+            {
+                return $"{HomeTeam} vs. {AwayTeam}";
+            }
         }
+        public EventType EventType { get; set; }
+        public StreamStatus StreamStatus { get; set; }
+        public DateTime EventDate { get; set; }
     }
-    public EventType EventType { get; set; }
-    public StreamStatus StreamStatus { get; set; }
-    public DateTime EventDate { get; set; }
 }
