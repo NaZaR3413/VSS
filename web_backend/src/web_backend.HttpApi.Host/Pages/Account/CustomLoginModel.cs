@@ -29,13 +29,33 @@ namespace web_backend.HttpApi.Host.Pages.Account
     [Dependency(ReplaceServices = true)]
     public class CustomLoginModel : LoginModel
     {
+        private readonly ILogger<CustomLoginModel> _logger;
+
         public CustomLoginModel(
             IAuthenticationSchemeProvider schemeProvider,
             IOptions<AbpAccountOptions> accountOptions,
             IOptions<IdentityOptions> identityOptions,
-            IdentityDynamicClaimsPrincipalContributorCache identityDynamicClaimsPrincipalContributorCache
+            IdentityDynamicClaimsPrincipalContributorCache identityDynamicClaimsPrincipalContributorCache,
+            ILogger<CustomLoginModel> logger
         ) : base(schemeProvider, accountOptions, identityOptions, identityDynamicClaimsPrincipalContributorCache)
-        { }
+        {
+            _logger = logger;
+        }
+
+        public override async Task<IActionResult> OnGetAsync()
+        {
+            try
+            {
+                // Handle GET requests for the login page
+                return await base.OnGetAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in OnGetAsync: {Message}", ex.Message);
+                Alerts.Danger("An error occurred while loading the login page. Please try again.");
+                return Page();
+            }
+        }
 
         public override async Task<IActionResult> OnPostAsync(string action)
         {
@@ -100,32 +120,56 @@ namespace web_backend.HttpApi.Host.Pages.Account
 
                 if (result.Succeeded)
                 {
-                    // Use plain Redirect for external URLs to avoid the "localhost cannot be accessed" issues
-                    if (!string.IsNullOrEmpty(ReturnUrl))
+                    try
                     {
-                        // Check if ReturnUrl is a valid URL
-                        if (Uri.TryCreate(ReturnUrl, UriKind.Absolute, out var uri))
+                        // Check if ReturnUrl is provided
+                        if (!string.IsNullOrEmpty(ReturnUrl))
                         {
-                            // Check if it's in the allowed redirects list before using it
-                            var redirectAllowedUrls = await SettingProvider.GetOrNullAsync("App.RedirectAllowedUrls");
-                            var allowedUrls = redirectAllowedUrls?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
+                            _logger.LogInformation("Processing return URL: {ReturnUrl}", ReturnUrl);
                             
-                            if (allowedUrls.Any(url => uri.AbsoluteUri.StartsWith(url, StringComparison.OrdinalIgnoreCase)))
+                            // Check if ReturnUrl is a valid absolute URL
+                            if (Uri.TryCreate(ReturnUrl, UriKind.Absolute, out var uri))
                             {
-                                // If it's an absolute URL and it's in the allowed list, use plain Redirect
-                                return Redirect(ReturnUrl);
+                                // Get allowed redirect URLs from settings
+                                var redirectAllowedUrls = await SettingProvider.GetOrNullAsync("App.RedirectAllowedUrls");
+                                var allowedUrls = !string.IsNullOrEmpty(redirectAllowedUrls)
+                                    ? redirectAllowedUrls.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                                    : Array.Empty<string>();
+
+                                // Add at least one default allowed URL if none are configured
+                                if (allowedUrls.Length == 0)
+                                {
+                                    allowedUrls = new[] { "https://salmon-glacier-08dca301e.6.azurestaticapps.net" };
+                                }
+
+                                // Check if the URL is in the allowed list
+                                if (allowedUrls.Any(url => uri.AbsoluteUri.StartsWith(url, StringComparison.OrdinalIgnoreCase)))
+                                {
+                                    _logger.LogInformation("Redirecting to allowed external URL: {Url}", uri.AbsoluteUri);
+                                    return Redirect(ReturnUrl);
+                                }
+                                else
+                                {
+                                    _logger.LogWarning("External URL not in allowed list: {Url}", uri.AbsoluteUri);
+                                }
                             }
                         }
+                        
+                        // If ReturnUrl is not valid or not in allowed list, redirect to home
+                        return LocalRedirect(Url.Content("~/") ?? "/");
                     }
-                    
-                    // For local URLs, use LocalRedirect which validates the URL is local
-                    return LocalRedirect(ReturnUrl ?? "~/");
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error processing return URL: {Message}", ex.Message);
+                        return LocalRedirect(Url.Content("~/") ?? "/");
+                    }
                 }
                 
                 return Page();
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error in login process: {Message}", ex.Message);
                 Alerts.Danger("An error occurred while processing your login. Please try again.");
                 return Page();
             }
