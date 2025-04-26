@@ -39,8 +39,8 @@ public class web_backendBlazorClientModule : AbpModule
         var environment = context.Services.GetSingletonInstance<IWebAssemblyHostEnvironment>();
         var builder = context.Services.GetSingletonInstance<WebAssemblyHostBuilder>();
 
-        // Ensure our root components are registered first for clarity
-        ConfigureRootComponents(builder);
+        // Skip explicit root component registration - we'll let Program.cs handle this
+        // ConfigureRootComponents(builder);
         
         ConfigureAuthentication(builder);
         ConfigureHttpClient(context, environment);
@@ -53,12 +53,11 @@ public class web_backendBlazorClientModule : AbpModule
         context.Services.AddSingleton<LivestreamStateService>();
     }
 
-    private void ConfigureRootComponents(WebAssemblyHostBuilder builder)
-    {
-        // This might be redundant if already added in Program.cs,
-        // but making it explicit here to ensure it's properly configured
-        builder.RootComponents.Add<App>("#app");
-    }
+    // We're commenting out this method to avoid duplicate root component registration
+    // private void ConfigureRootComponents(WebAssemblyHostBuilder builder)
+    // {
+    //     builder.RootComponents.Add<App>("#app");
+    // }
 
     private void ConfigureRouter(ServiceConfigurationContext context)
     {
