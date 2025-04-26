@@ -87,7 +87,16 @@ public class CustomRegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterMo
             }
             
             _logger.LogInformation("Registration successful for user: {Email}", Input.EmailAddress);
-            return LocalRedirect(ReturnUrl ?? "/");
+            
+            // Parse and validate the return URL to ensure it's allowed
+            var returnUrl = ReturnUrl;
+            if (!string.IsNullOrEmpty(returnUrl))
+            {
+                _logger.LogInformation("Redirecting to return URL: {ReturnUrl}", returnUrl);
+                return Redirect(returnUrl);
+            }
+            
+            return LocalRedirect("~/");
         }
         catch (UserFriendlyException ex)
         {

@@ -39,69 +39,89 @@ namespace web_backend.HttpApi.Host.Pages.Account
 
         public override async Task<IActionResult> OnPostAsync(string action)
         {
-
-            await CheckLocalLoginAsync();
-            ValidateModel();
-
-            // External login providers
-            ExternalProviders = await GetExternalProviders();
-            EnableLocalLogin = await SettingProvider.IsTrueAsync(AccountSettingNames.EnableLocalLogin);
-
-            await ReplaceEmailToUsernameOfInputIfNeeds();
-
-            await IdentityOptions.SetAsync();
-
-            var result = await SignInManager.PasswordSignInAsync(
-                LoginInput.UserNameOrEmailAddress,
-                LoginInput.Password,
-                LoginInput.RememberMe,
-                true
-            );
-
-            await IdentitySecurityLogManager.SaveAsync(new IdentitySecurityLogContext()
+            try
             {
-                Identity = IdentitySecurityLogIdentityConsts.Identity,
-                Action = result.ToIdentitySecurityLogAction(),
-                UserName = LoginInput.UserNameOrEmailAddress
-            });
+                await CheckLocalLoginAsync();
+                ValidateModel();
 
-            if (result.RequiresTwoFactor)
-            {
-                return await TwoFactorLoginResultAsync();
-            }
+                // External login providers
+                ExternalProviders = await GetExternalProviders();
+                EnableLocalLogin = await SettingProvider.IsTrueAsync(AccountSettingNames.EnableLocalLogin);
 
-            if (result.IsLockedOut)
-            {
-                Alerts.Warning(L["UserLockedOutMessage"]);
+                await ReplaceEmailToUsernameOfInputIfNeeds();
+
+                await IdentityOptions.SetAsync();
+
+                var result = await SignInManager.PasswordSignInAsync(
+                    LoginInput.UserNameOrEmailAddress,
+                    LoginInput.Password,
+                    LoginInput.RememberMe,
+                    true
+                );
+
+                await IdentitySecurityLogManager.SaveAsync(new IdentitySecurityLogContext()
+                {
+                    Identity = IdentitySecurityLogIdentityConsts.Identity,
+                    Action = result.ToIdentitySecurityLogAction(),
+                    UserName = LoginInput.UserNameOrEmailAddress
+                });
+
+                if (result.RequiresTwoFactor)
+                {
+                    return await TwoFactorLoginResultAsync();
+                }
+
+                if (result.IsLockedOut)
+                {
+                    Alerts.Warning(L["UserLockedOutMessage"]);
+                    return Page();
+                }
+
+                if (result.IsNotAllowed)
+                {
+                    Alerts.Warning(L["LoginIsNotAllowed"]);
+                    return Page();
+                }
+
+                if (!result.Succeeded)
+                {
+                    Alerts.Danger(L["InvalidUserNameOrPassword"]);
+                    return Page();
+                }
+
+                var user = await UserManager.FindByNameAsync(LoginInput.UserNameOrEmailAddress) ??
+                           await UserManager.FindByEmailAsync(LoginInput.UserNameOrEmailAddress);
+
+                if (user == null)
+                {
+                    Alerts.Danger(L["InvalidUserNameOrPassword"]);
+                    return Page();
+                }
+
+                if (result.Succeeded)
+                {
+                    // Use plain Redirect for external URLs to avoid the "localhost cannot be accessed" issues
+                    if (!string.IsNullOrEmpty(ReturnUrl))
+                    {
+                        // Check if ReturnUrl is a valid URL
+                        if (Uri.TryCreate(ReturnUrl, UriKind.Absolute, out var uri))
+                        {
+                            // If it's an absolute URL, use plain Redirect
+                            return Redirect(ReturnUrl);
+                        }
+                    }
+                    
+                    // For local URLs, use LocalRedirect which validates the URL is local
+                    return LocalRedirect(ReturnUrl ?? "~/");
+                }
+                
                 return Page();
             }
-
-            if (result.IsNotAllowed)
+            catch (Exception ex)
             {
-                Alerts.Warning(L["LoginIsNotAllowed"]);
+                Alerts.Danger("An error occurred while processing your login. Please try again.");
                 return Page();
             }
-
-            if (!result.Succeeded)
-            {
-                Alerts.Danger(L["InvalidUserNameOrPassword"]);
-                return Page();
-            }
-
-            var user = await UserManager.FindByNameAsync(LoginInput.UserNameOrEmailAddress) ??
-                       await UserManager.FindByEmailAsync(LoginInput.UserNameOrEmailAddress);
-
-            if (user == null)
-            {
-                Alerts.Danger(L["InvalidUserNameOrPassword"]);
-                return Page();
-            }
-
-            if(result.Succeeded)
-            {                
-                return LocalRedirect(ReturnUrl ?? "/");
-            }
-            return Page();
         }
     }
 }
