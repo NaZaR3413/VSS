@@ -1,0 +1,23 @@
+@using Volo.Abp.AspNetCore.Components.Web.BasicTheme.Themes.Basic
+@using web_backend.Blazor.Client.Services
+
+<Router AppAssembly="@typeof(Program).Assembly" 
+        AdditionalAssemblies="@AdditionalAssemblies">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+    </Found>
+    <NotFound>
+        <LayoutView Layout="@typeof(MainLayout)">
+            <div class="alert alert-warning">
+                <h3>Page Not Found</h3>
+                <p>Sorry, there's nothing at this address.</p>
+            </div>
+        </LayoutView>
+    </NotFound>
+</Router>
+
+@code {
+    private System.Reflection.Assembly[] AdditionalAssemblies { get; } = new[] {
+        typeof(BasicThemeOptions).Assembly,
+    };
+}

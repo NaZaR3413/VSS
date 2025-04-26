@@ -1,13 +1,9 @@
 using System;
 using System.Net.Http;
-using System;
-using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
-using Microsoft.JSInterop;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
 using web_backend.Blazor.Client.Services;
 
@@ -18,6 +14,8 @@ public class Program
     public async static Task Main(string[] args)
     {
         var builder = WebAssemblyHostBuilder.CreateDefault(args);
+        
+        builder.RootComponents.Add<App>("#app");
 
         // Get API URL from configuration
         var configuration = builder.Configuration;
@@ -34,6 +32,9 @@ public class Program
             BaseAddress = new Uri(remoteServiceBaseUrl ?? builder.HostEnvironment.BaseAddress)
         });
 
+        // Register Debug Service first
+        builder.Services.AddSingleton<DebugService>();
+
         // Configure the application
         var application = await builder.AddApplicationAsync<web_backendBlazorClientModule>(options =>
         {
@@ -48,12 +49,36 @@ public class Program
 
         var host = builder.Build();
 
-        var jsRuntime = host.Services.GetRequiredService<IJSRuntime>();
-        await jsRuntime.InvokeVoidAsync("eval", "import('https://cdn.jsdelivr.net/npm/hls.js@latest')");
-        await jsRuntime.InvokeVoidAsync("eval", "import('/hlsPlayer.js')");
+        // Try to get debug service and log startup
+        var debugService = host.Services.GetService<DebugService>();
+        if (debugService != null)
+        {
+            await debugService.Initialize();
+            await debugService.LogAsync("Host built, starting application");
+        }
 
-        await application.InitializeApplicationAsync(host.Services);
-        await host.RunAsync();
+        var jsRuntime = host.Services.GetRequiredService<IJSRuntime>();
+        await jsRuntime.InvokeVoidAsync("console.log", "About to initialize application...");
+        
+        try
+        {
+            await application.InitializeApplicationAsync(host.Services);
+            await jsRuntime.InvokeVoidAsync("console.log", "Application initialized successfully");
+        }
+        catch (Exception ex)
+        {
+            await jsRuntime.InvokeVoidAsync("console.error", $"Error initializing application: {ex.Message}");
+        }
+
+        try
+        {
+            await jsRuntime.InvokeVoidAsync("console.log", "Running host...");
+            await host.RunAsync();
+        }
+        catch (Exception ex)
+        {
+            await jsRuntime.InvokeVoidAsync("console.error", $"Error running host: {ex.Message}");
+        }
     }
 }
 
