@@ -69,7 +69,8 @@ namespace web_backend.Livestreams
                     AwayScore = input.AwayScore,
                     EventDate = input.EventDate,
                     EventType = input.EventType,
-                    StreamStatus = input.StreamStatus
+                    StreamStatus = input.StreamStatus,
+                    FreeLivestream = input.FreeLivestream,
                 };
 
                 var created = await _livestreamRepository.CreateAsync(livestream);
@@ -112,7 +113,8 @@ namespace web_backend.Livestreams
                 input.EventType,
                 input.StreamStatus,
                 input.HomeTeam,
-                input.AwayTeam
+                input.AwayTeam,
+                input.FreeLivestream
              );
 
                 // map the resulting list and return

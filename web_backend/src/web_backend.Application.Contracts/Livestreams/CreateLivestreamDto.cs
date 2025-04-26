@@ -17,6 +17,7 @@ namespace web_backend.Livestreams
         public DateTime EventDate { get; set; }
         public string HomeTeam { get; set; }
         public string AwayTeam { get; set; }
+        public bool FreeLivestream { get; set; }
     }
 
 
