@@ -3,6 +3,7 @@
 @code {
     protected override void OnInitialized()
     {
-        Navigation.NavigateTo($"authentication/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}", forceLoad: false);
+        // Update the redirect to use the correct Account/Login path
+        Navigation.NavigateTo($"/Account/Login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}", forceLoad: true);
     }
 }
