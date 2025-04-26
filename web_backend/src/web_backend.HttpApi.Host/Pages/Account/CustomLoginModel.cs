@@ -106,8 +106,15 @@ namespace web_backend.HttpApi.Host.Pages.Account
                         // Check if ReturnUrl is a valid URL
                         if (Uri.TryCreate(ReturnUrl, UriKind.Absolute, out var uri))
                         {
-                            // If it's an absolute URL, use plain Redirect
-                            return Redirect(ReturnUrl);
+                            // Check if it's in the allowed redirects list before using it
+                            var redirectAllowedUrls = await SettingProvider.GetOrNullAsync("App.RedirectAllowedUrls");
+                            var allowedUrls = redirectAllowedUrls?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
+                            
+                            if (allowedUrls.Any(url => uri.AbsoluteUri.StartsWith(url, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                // If it's an absolute URL and it's in the allowed list, use plain Redirect
+                                return Redirect(ReturnUrl);
+                            }
                         }
                     }
                     

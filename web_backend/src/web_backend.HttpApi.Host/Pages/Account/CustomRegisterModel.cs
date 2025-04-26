@@ -93,7 +93,25 @@ public class CustomRegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterMo
             if (!string.IsNullOrEmpty(returnUrl))
             {
                 _logger.LogInformation("Redirecting to return URL: {ReturnUrl}", returnUrl);
-                return Redirect(returnUrl);
+                
+                if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var uri))
+                {
+                    // Check if it's in the allowed redirects list
+                    var redirectAllowedUrls = await SettingProvider.GetOrNullAsync("App.RedirectAllowedUrls");
+                    var allowedUrls = redirectAllowedUrls?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
+                    
+                    if (allowedUrls.Any(url => uri.AbsoluteUri.StartsWith(url, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        // If it's allowed, use plain Redirect
+                        return Redirect(returnUrl);
+                    }
+                    
+                    _logger.LogWarning("Attempted redirect to non-allowed URL: {ReturnUrl}", returnUrl);
+                    // If not allowed, redirect to home
+                    return LocalRedirect("~/");
+                }
+                
+                return LocalRedirect(returnUrl);
             }
             
             return LocalRedirect("~/");

@@ -1,5 +1,3 @@
-using Volo.Abp.AspNetCore.Mvc.UI.Theme.Basic.Bundling;
-using Volo.Abp.AspNetCore.Mvc.UI.Theme.Basic;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -33,9 +31,11 @@ using Volo.Abp.UI.Navigation.Urls;
 using Volo.Abp.VirtualFileSystem;
 using Volo.Abp.OpenIddict;
 using System.Security.Cryptography.X509Certificates;
-
 using Volo.Abp.ObjectExtending;
 using Volo.Abp.Identity;
+using Volo.Abp.Account.Localization;
+using Localization.Resources.AbpUi;
+
 namespace web_backend;
 
 [DependsOn(
@@ -57,59 +57,52 @@ public class web_backendHttpApiHostModule : AbpModule
 
         Console.WriteLine($"Hosting Environment: {hostingEnvironment.EnvironmentName}");
 
-        // Only run production config in a non-Development environment
-        if (true)
+        // Configure production OpenIddict settings for all environments
+        Console.WriteLine("Running production OpenIddict configuration...");
+
+        PreConfigure<AbpOpenIddictAspNetCoreOptions>(options =>
         {
-            Console.WriteLine("Running production OpenIddict configuration...");
+            // Disable automatic development certificates individually.
+            options.AddDevelopmentEncryptionAndSigningCertificate = false;
+            Console.WriteLine("Disabled development signing/encryption certificates.");
+        });
 
-            PreConfigure<AbpOpenIddictAspNetCoreOptions>(options =>
-            {
-                // Disable automatic development certificates individually.
-                options.AddDevelopmentEncryptionAndSigningCertificate = false;
-                Console.WriteLine("Disabled development signing/encryption certificates.");
-            });
-
-            PreConfigure<OpenIddictServerBuilder>(serverBuilder =>
-            {
-                try
-                {
-                    var configuration = context.Services.GetConfiguration();
-                    var pfxPassword = configuration["OpenIddict:Certificates:Default:Password"];
-
-                    Console.WriteLine("Retrieved PFX password from configuration.");
-                    var certPath = Path.Combine(AppContext.BaseDirectory, "openiddict.pfx");
-
-                    Console.WriteLine($"Looking for certificate at: {certPath}");
-                    if (!File.Exists(certPath))
-                    {
-                        Console.WriteLine("Certificate file not found!");
-                        throw new FileNotFoundException("openiddict.pfx not found in expected location.", certPath);
-                    }
-
-                    var certificate = new X509Certificate2(
-                        certPath,
-                        "Varsity2024",
-                        X509KeyStorageFlags.MachineKeySet
-                    );
-
-                    Console.WriteLine("Certificate loaded successfully.");
-
-                    serverBuilder.AddEncryptionCertificate(certificate);
-                    serverBuilder.AddSigningCertificate(certificate);
-                    Console.WriteLine("Added encryption and signing certificates.");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("Exception while loading certificate:");
-                    Console.WriteLine(ex.ToString());
-                    throw;
-                }
-            });
-        }
-        else
+        PreConfigure<OpenIddictServerBuilder>(serverBuilder =>
         {
-            Console.WriteLine("Development environment detected. Skipping production certificate configuration.");
-        }
+            try
+            {
+                var configuration = context.Services.GetConfiguration();
+                var pfxPassword = configuration["OpenIddict:Certificates:Default:Password"];
+
+                Console.WriteLine("Retrieved PFX password from configuration.");
+                var certPath = Path.Combine(AppContext.BaseDirectory, "openiddict.pfx");
+
+                Console.WriteLine($"Looking for certificate at: {certPath}");
+                if (!File.Exists(certPath))
+                {
+                    Console.WriteLine("Certificate file not found!");
+                    throw new FileNotFoundException("openiddict.pfx not found in expected location.", certPath);
+                }
+
+                var certificate = new X509Certificate2(
+                    certPath,
+                    "Varsity2024",
+                    X509KeyStorageFlags.MachineKeySet
+                );
+
+                Console.WriteLine("Certificate loaded successfully.");
+
+                serverBuilder.AddEncryptionCertificate(certificate);
+                serverBuilder.AddSigningCertificate(certificate);
+                Console.WriteLine("Added encryption and signing certificates.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Exception while loading certificate:");
+                Console.WriteLine(ex.ToString());
+                throw;
+            }
+        });
 
         PreConfigure<OpenIddictBuilder>(builder =>
         {
@@ -151,6 +144,7 @@ public class web_backendHttpApiHostModule : AbpModule
         ConfigureConventionalControllers();
         ConfigureVirtualFileSystem(context);
         ConfigureCors(context, configuration);
+        ConfigureLocalization();
         ConfigureSwaggerServices(context, configuration);
     }
 
@@ -218,6 +212,18 @@ public class web_backendHttpApiHostModule : AbpModule
         Configure<AbpAspNetCoreMvcOptions>(options =>
         {
             options.ConventionalControllers.Create(typeof(web_backendApplicationModule).Assembly);
+        });
+    }
+
+    private void ConfigureLocalization()
+    {
+        Configure<AbpLocalizationOptions>(options =>
+        {
+            options.Resources
+                .Get<AccountResource>()
+                .AddBaseTypes(typeof(AbpUiResource));
+                
+            options.Languages.Add(new LanguageInfo("en", "en", "English"));
         });
     }
 
