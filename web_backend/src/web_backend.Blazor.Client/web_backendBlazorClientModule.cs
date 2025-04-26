@@ -12,7 +12,9 @@ using Volo.Abp.AspNetCore.Components.Web.Theming.Routing;
 using Volo.Abp.AspNetCore.Components.WebAssembly.BasicTheme;
 using Volo.Abp.Autofac.WebAssembly;
 using Volo.Abp.AutoMapper;
+using Volo.Abp.Http.Client;
 using Volo.Abp.Identity.Blazor.WebAssembly;
+using Volo.Abp.IdentityModel;
 using Volo.Abp.Modularity;
 using Volo.Abp.SettingManagement.Blazor.WebAssembly;
 using Volo.Abp.TenantManagement.Blazor.WebAssembly;
@@ -99,6 +101,41 @@ public class web_backendBlazorClientModule : AbpModule
         context.Services.AddTransient(sp => new HttpClient
         {
             BaseAddress = new Uri(remoteServiceBaseUrl)
+        });
+        
+        // Configure named HttpClient for the API
+        context.Services.AddHttpClient("API", client =>
+        {
+            client.BaseAddress = new Uri(remoteServiceBaseUrl);
+        });
+        
+        // Register the AbpMvcClient named HttpClient
+        context.Services.AddHttpClient("AbpMvcClient", client =>
+        {
+            client.BaseAddress = new Uri(remoteServiceBaseUrl);
+        });
+        
+        // Configure the remote services
+        context.Services.Configure<AbpRemoteServiceOptions>(options =>
+        {
+            // Set Default remote service
+            if (options.RemoteServices.ContainsKey("Default"))
+            {
+                options.RemoteServices["Default"].BaseUrl = remoteServiceBaseUrl;
+            }
+            else
+            {
+                options.RemoteServices["Default"] = new RemoteServiceConfiguration
+                {
+                    BaseUrl = remoteServiceBaseUrl
+                };
+            }
+            
+            // Add AbpMvcClient remote service
+            options.RemoteServices["AbpMvcClient"] = new RemoteServiceConfiguration
+            {
+                BaseUrl = remoteServiceBaseUrl
+            };
         });
     }
 
