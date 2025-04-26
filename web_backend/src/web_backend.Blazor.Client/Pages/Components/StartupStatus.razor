@@ -1,7 +1,7 @@
 @inject IJSRuntime JSRuntime
 @inject web_backend.Blazor.Client.Services.DebugService DebugService
 
-@if (!string.IsNullOrEmpty(status))
+@if (!string.IsNullOrEmpty(status) && isVisible)
 {
     <div class="startup-status-container @(isComplete ? "complete" : "")">
         <div class="status-indicator">

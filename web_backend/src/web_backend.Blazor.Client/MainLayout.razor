@@ -155,13 +155,13 @@
 </div>
 
 @code {
-    private AuthenticationState authState;
+    private AuthenticationState? authState;
     private List<LivestreamDto> activeLivestreams = new List<LivestreamDto>();
-    private System.Threading.Timer refreshTimer;
+    private System.Threading.Timer? refreshTimer;
     private DateTimeOffset lastRefreshTime = DateTimeOffset.MinValue;
 
     [CascadingParameter]
-    public LivestreamStateService LivestreamState { get; set; }
+    public LivestreamStateService? LivestreamState { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
@@ -194,7 +194,7 @@
         }
     }
 
-    private async void HandleLivestreamStatusChanged(object sender, EventArgs e)
+    private async void HandleLivestreamStatusChanged(object? sender, EventArgs e)
     {
         await RefreshLivestreams(force: true);
         await InvokeAsync(StateHasChanged);

@@ -1,8 +1,7 @@
 @using Volo.Abp.AspNetCore.Components.Web.BasicTheme.Themes.Basic
 @using web_backend.Blazor.Client.Services
 
-<Router AppAssembly="@typeof(Program).Assembly" 
-        AdditionalAssemblies="@AdditionalAssemblies">
+<Router AppAssembly="@typeof(Program).Assembly">
     <Found Context="routeData">
         <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
     </Found>
@@ -15,9 +14,3 @@
         </LayoutView>
     </NotFound>
 </Router>
-
-@code {
-    private System.Reflection.Assembly[] AdditionalAssemblies { get; } = new[] {
-        typeof(BasicThemeOptions).Assembly,
-    };
-}
