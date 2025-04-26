@@ -3,7 +3,20 @@
 @code {
     protected override void OnInitialized()
     {
-        // Update the redirect to use the correct Account/Login path
-        Navigation.NavigateTo($"/Account/Login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}", forceLoad: true);
+        var currentUri = Navigation.Uri;
+        var baseUri = Navigation.BaseUri;
+        
+        // Get the full URL for the login page on the server
+        var apiBaseUrl = Navigation.BaseUri.TrimEnd('/');
+        if (apiBaseUrl.EndsWith("/blazor"))
+        {
+            apiBaseUrl = apiBaseUrl.Substring(0, apiBaseUrl.Length - 7);
+        }
+        
+        var loginUrl = $"{apiBaseUrl}/Account/Login";
+        var returnUrl = Uri.EscapeDataString(currentUri);
+        
+        // Redirect with forceLoad:true to ensure a full page load to the server-side page
+        Navigation.NavigateTo($"{loginUrl}?returnUrl={returnUrl}", forceLoad: true);
     }
 }
