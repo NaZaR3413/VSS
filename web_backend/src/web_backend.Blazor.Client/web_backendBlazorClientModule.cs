@@ -108,35 +108,6 @@ public class web_backendBlazorClientModule : AbpModule
         {
             client.BaseAddress = new Uri(remoteServiceBaseUrl);
         });
-        
-        // Register the AbpMvcClient named HttpClient
-        context.Services.AddHttpClient("AbpMvcClient", client =>
-        {
-            client.BaseAddress = new Uri(remoteServiceBaseUrl);
-        });
-        
-        // Configure the remote services
-        context.Services.Configure<AbpRemoteServiceOptions>(options =>
-        {
-            // Set Default remote service
-            if (options.RemoteServices.ContainsKey("Default"))
-            {
-                options.RemoteServices["Default"].BaseUrl = remoteServiceBaseUrl;
-            }
-            else
-            {
-                options.RemoteServices["Default"] = new RemoteServiceConfiguration
-                {
-                    BaseUrl = remoteServiceBaseUrl
-                };
-            }
-            
-            // Add AbpMvcClient remote service
-            options.RemoteServices["AbpMvcClient"] = new RemoteServiceConfiguration
-            {
-                BaseUrl = remoteServiceBaseUrl
-            };
-        });
     }
 
     private void ConfigureAutoMapper(ServiceConfigurationContext context)
