@@ -6,7 +6,9 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using web_backend.Blazor.Client.Menus;
+using web_backend.Blazor.Client.Services;
 using OpenIddict.Abstractions;
 using Volo.Abp.AspNetCore.Components.Web.Theming.Routing;
 using Volo.Abp.AspNetCore.Components.WebAssembly.BasicTheme;
@@ -103,11 +105,21 @@ public class web_backendBlazorClientModule : AbpModule
             BaseAddress = new Uri(remoteServiceBaseUrl)
         });
         
-        // Configure named HttpClient for the API
+        // Register the AbpMvcClient explicitly
+        context.Services.AddHttpClient("AbpMvcClient", client =>
+        {
+            client.BaseAddress = new Uri(remoteServiceBaseUrl);
+        });
+        
+        // Register API client
         context.Services.AddHttpClient("API", client =>
         {
             client.BaseAddress = new Uri(remoteServiceBaseUrl);
         });
+        
+        // Disable the IdentityModelAuthenticationService that's trying to use authorization_code
+        context.Services.RemoveAll<IIdentityModelAuthenticationService>();
+        context.Services.AddSingleton<IIdentityModelAuthenticationService, NullIdentityModelAuthenticationService>();
     }
 
     private void ConfigureAutoMapper(ServiceConfigurationContext context)
