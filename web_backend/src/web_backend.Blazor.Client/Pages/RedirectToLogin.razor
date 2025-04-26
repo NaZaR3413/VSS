@@ -1,22 +1,26 @@
 @inject NavigationManager Navigation
+@inject HttpClient HttpClient
+@using System.Configuration
 
 @code {
     protected override void OnInitialized()
     {
+        // Determine the API base URL
+        var apiBaseUrl = DetermineApiBaseUrl();
+        
         var currentUri = Navigation.Uri;
-        var baseUri = Navigation.BaseUri;
-        
-        // Get the full URL for the login page on the server
-        var apiBaseUrl = Navigation.BaseUri.TrimEnd('/');
-        if (apiBaseUrl.EndsWith("/blazor"))
-        {
-            apiBaseUrl = apiBaseUrl.Substring(0, apiBaseUrl.Length - 7);
-        }
-        
-        var loginUrl = $"{apiBaseUrl}/Account/Login";
         var returnUrl = Uri.EscapeDataString(currentUri);
         
-        // Redirect with forceLoad:true to ensure a full page load to the server-side page
-        Navigation.NavigateTo($"{loginUrl}?returnUrl={returnUrl}", forceLoad: true);
+        // Navigate to the login page on the API server
+        var loginUrl = $"{apiBaseUrl}/Account/Login?returnUrl={returnUrl}";
+        
+        // Use forceLoad to ensure browser navigation
+        Navigation.NavigateTo(loginUrl, forceLoad: true);
+    }
+    
+    private string DetermineApiBaseUrl()
+    {
+        // This should be the URL of your HttpApi.Host project where the authentication pages are hosted
+        return "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
     }
 }

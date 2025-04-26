@@ -268,17 +268,25 @@
 
     private void LoginClick()
     {
-        NavigationManager.NavigateTo("/Account/Login", forceLoad: true);
+        // Direct to the authentication pages on the API server
+        var apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
+        var returnUrl = Uri.EscapeDataString(NavigationManager.Uri);
+        NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Login?returnUrl={returnUrl}", forceLoad: true);
     }
 
     private void RegisterClick()
     {
-        NavigationManager.NavigateTo("/Account/Register", forceLoad: true);
+        // Direct to the authentication pages on the API server
+        var apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
+        var returnUrl = Uri.EscapeDataString(NavigationManager.Uri);
+        NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Register?returnUrl={returnUrl}", forceLoad: true);
     }
 
     private void LogoutClick()
     {
-        NavigationManager.NavigateTo("/Account/Logout", forceLoad: true);
+        // Direct to the authentication pages on the API server
+        var apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
+        NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Logout", forceLoad: true);
     }
 
     public void Dispose()
