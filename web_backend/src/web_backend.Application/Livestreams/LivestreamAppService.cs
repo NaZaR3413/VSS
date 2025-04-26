@@ -55,6 +55,7 @@ namespace web_backend.Livestreams
         }
 
         // create livestream instance 
+
         public async Task<LivestreamDto> CreateAsync(CreateLivestreamDto input)
         {
             using (_dataFilter.Disable<IMultiTenant>())
@@ -62,8 +63,8 @@ namespace web_backend.Livestreams
                 var livestream = new Livestream
                 {
                     HlsUrl = input.HlsUrl,
-                    HomeTeamId = input.HomeTeamId,
-                    AwayTeamId = input.AwayTeamId,
+                    HomeTeam = input.HomeTeam,
+                    AwayTeam = input.AwayTeam,
                     HomeScore = input.HomeScore,
                     AwayScore = input.AwayScore,
                     EventDate = input.EventDate,

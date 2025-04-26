@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
+using web_backend.Blazor.Client.Services;
 
 namespace web_backend.Blazor.Client;
 
@@ -12,8 +13,9 @@ public class Program
     public async static Task Main(string[] args)
     {
         var builder = WebAssemblyHostBuilder.CreateDefault(args);
+        builder.Services.AddSingleton<LivestreamStateService>();
 
-        // Set API base URL (Ensure this is before AddApplicationAsync)
+
         builder.Services.AddScoped<HttpClient>(sp =>
             new HttpClient { BaseAddress = new Uri("https://localhost:44356/") });
 
@@ -22,9 +24,13 @@ public class Program
             options.UseAutofac();
         });
 
+        builder.Services.AddHttpClient("API", client =>
+        {
+            client.BaseAddress = new Uri("https://localhost:44356/");
+        });
+
         var host = builder.Build();
 
-        // Load JavaScript files when the Blazor app starts
         var jsRuntime = host.Services.GetRequiredService<IJSRuntime>();
         await jsRuntime.InvokeVoidAsync("eval", "import('https://cdn.jsdelivr.net/npm/hls.js@latest')");
         await jsRuntime.InvokeVoidAsync("eval", "import('/hlsPlayer.js')");
