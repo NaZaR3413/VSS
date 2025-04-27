@@ -22,6 +22,9 @@ using Volo.Abp.Validation;
 using Volo.Abp.Account.Web.Pages.Account;
 using Volo.Abp.Account.Web;
 using Volo.Abp.DependencyInjection;
+using OpenIddict.Abstractions;
+using System.Security.Principal;
+using OpenIddict.Server.AspNetCore;
 
 namespace web_backend.HttpApi.Host.Pages.Account
 {
@@ -30,16 +33,19 @@ namespace web_backend.HttpApi.Host.Pages.Account
     public class CustomLoginModel : LoginModel
     {
         private readonly ILogger<CustomLoginModel> _logger;
+        private readonly IOpenIddictApplicationManager _applicationManager;
 
         public CustomLoginModel(
             IAuthenticationSchemeProvider schemeProvider,
             IOptions<AbpAccountOptions> accountOptions,
             IOptions<IdentityOptions> identityOptions,
             IdentityDynamicClaimsPrincipalContributorCache identityDynamicClaimsPrincipalContributorCache,
-            ILoggerFactory loggerFactory
+            ILoggerFactory loggerFactory,
+            IOpenIddictApplicationManager applicationManager
         ) : base(schemeProvider, accountOptions, identityOptions, identityDynamicClaimsPrincipalContributorCache)
         {
             _logger = loggerFactory.CreateLogger<CustomLoginModel>();
+            _applicationManager = applicationManager;
         }
 
         public override async Task<IActionResult> OnPostAsync(string action)
@@ -117,6 +123,24 @@ namespace web_backend.HttpApi.Host.Pages.Account
                     Alerts.Danger(L["InvalidUserNameOrPassword"]);
                     return Page();
                 }
+
+                // Additionally sign the user in with OpenIddict to establish proper OIDC authentication
+                _logger.LogInformation("Establishing OpenID Connect authentication for user: {UserName}", user.UserName);
+                
+                var principal = await SignInManager.CreateUserPrincipalAsync(user);
+                
+                // Add OpenID Connect specific claims
+                principal.SetScopes(new[]
+                {
+                    OpenIddictConstants.Scopes.OpenId,
+                    OpenIddictConstants.Scopes.Email,
+                    OpenIddictConstants.Scopes.Profile,
+                    OpenIddictConstants.Scopes.Roles,
+                    "web_backend"
+                });
+                
+                await HttpContext.SignInAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme, principal);
+                _logger.LogInformation("OpenID Connect authentication established successfully");
 
                 _logger.LogInformation("Login succeeded for user: {UserName}, redirecting to: {ReturnUrl}", 
                     LoginInput.UserNameOrEmailAddress, ReturnUrl ?? "/");
