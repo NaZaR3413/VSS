@@ -157,58 +157,7 @@
             // Get the base address for the API
             var apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
             
-            // First try the token endpoint directly for OpenID Connect flow
-            var tokenRequest = new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                ["grant_type"] = "password",
-                ["client_id"] = "web_backend_Blazor",
-                ["client_secret"] = "1q2w3e*",
-                ["username"] = loginModel.UserNameOrEmailAddress,
-                ["password"] = loginModel.Password,
-                ["scope"] = "openid profile email web_backend"
-            });
-            
-            var tokenResponse = await HttpClient.PostAsync($"{apiBaseUrl}/connect/token", tokenRequest);
-            
-            if (tokenResponse.IsSuccessStatusCode)
-            {
-                // Parse the token response
-                var tokenContent = await tokenResponse.Content.ReadFromJsonAsync<TokenResponse>();
-                if (tokenContent != null)
-                {
-                    // Store the tokens in local storage
-                    await JSRuntime.InvokeVoidAsync("localStorage.setItem", "access_token", tokenContent.AccessToken);
-                    await JSRuntime.InvokeVoidAsync("localStorage.setItem", "refresh_token", tokenContent.RefreshToken);
-                    await JSRuntime.InvokeVoidAsync("localStorage.setItem", "token_expiry", DateTime.UtcNow.AddSeconds(tokenContent.ExpiresIn).ToString("o"));
-                    
-                    // Set the Authorization header for subsequent requests
-                    await JSRuntime.InvokeVoidAsync("eval", 
-                        $"window.TokenInterceptor = {{ accessToken: '{tokenContent.AccessToken}' }}");
-                    
-                    // Notify the auth state provider that the state has changed
-                    if (AuthenticationStateProvider is TokenAuthenticationStateProvider tokenAuthProvider)
-                    {
-                        tokenAuthProvider.NotifyAuthenticationStateChanged();
-                    }
-                    
-                    // Log success
-                    await JSRuntime.InvokeVoidAsync("console.log", "Login successful via token endpoint");
-                    
-                    // Reload the page to refresh authentication state
-                    var redirectUrl = string.IsNullOrEmpty(ReturnUrl) ? "/landing" : ReturnUrl;
-                    if (!string.IsNullOrEmpty(ReturnUrlHash))
-                    {
-                        redirectUrl += "#" + ReturnUrlHash;
-                    }
-                    
-                    // Force reload to ensure authentication state is refreshed
-                    await JSRuntime.InvokeVoidAsync("console.log", "Redirecting to: " + redirectUrl);
-                    Navigation.NavigateTo(redirectUrl, forceLoad: true);
-                    return;
-                }
-            }
-            
-            // Fallback to the regular login endpoint if token endpoint fails
+            // Skip the direct token endpoint approach and use the account login endpoint
             var loginRequest = new
             {
                 userNameOrEmailAddress = loginModel.UserNameOrEmailAddress,
@@ -218,6 +167,9 @@
                 returnUrlHash = ReturnUrlHash
             };
             
+            // Log the request for debugging
+            await JSRuntime.InvokeVoidAsync("console.log", "Sending login request to account endpoint");
+            
             var response = await HttpClient.PostAsJsonAsync($"{apiBaseUrl}/api/account/login", loginRequest);
             
             if (response.IsSuccessStatusCode)
@@ -225,22 +177,18 @@
                 // Try to extract authentication info from response
                 try
                 {
+                    var responseText = await response.Content.ReadAsStringAsync();
+                    await JSRuntime.InvokeVoidAsync("console.log", "Login response:", responseText);
+                    
                     var loginResponse = await response.Content.ReadFromJsonAsync<LoginResult>();
                     if (loginResponse != null && !string.IsNullOrEmpty(loginResponse.Token))
                     {
-                        // Store the token
-                        await JSRuntime.InvokeVoidAsync("localStorage.setItem", "access_token", loginResponse.Token);
+                        // Store the token using our auth.js manager
+                        await JSRuntime.InvokeVoidAsync("authTokenManager.storeAuthData", 
+                            loginResponse.Token, // access token 
+                            "", // No refresh token from this endpoint
+                            86400); // Default to 24 hours if no expiry provided
                         
-                        // Set the Authorization header for subsequent requests
-                        await JSRuntime.InvokeVoidAsync("eval", 
-                            $"window.TokenInterceptor = {{ accessToken: '{loginResponse.Token}' }}");
-                        
-                        // Notify the auth state provider that the state has changed
-                        if (AuthenticationStateProvider is TokenAuthenticationStateProvider tokenAuthProvider)
-                        {
-                            tokenAuthProvider.NotifyAuthenticationStateChanged();
-                        }
-                            
                         await JSRuntime.InvokeVoidAsync("console.log", "Login successful via account endpoint");
                     }
                 }
@@ -262,10 +210,30 @@
             }
             else
             {
-                // Handle login failure
-                var content = await response.Content.ReadAsStringAsync();
-                await JSRuntime.InvokeVoidAsync("console.error", "Login failed: " + content);
+                // Handle login failure with detailed error information
+                var responseContent = await response.Content.ReadAsStringAsync();
+                await JSRuntime.InvokeVoidAsync("console.error", "Login failed with status: " + response.StatusCode);
+                await JSRuntime.InvokeVoidAsync("console.error", "Response content: " + responseContent);
+                
+                // Set user-friendly error message
                 errorMessage = "Invalid username or password. Please try again.";
+                
+                // If we have a specific error message in the response, display it
+                if (!string.IsNullOrEmpty(responseContent))
+                {
+                    try 
+                    {
+                        var errorResponse = System.Text.Json.JsonSerializer.Deserialize<ErrorResponse>(responseContent);
+                        if (errorResponse != null && !string.IsNullOrEmpty(errorResponse.Error?.Message))
+                        {
+                            errorMessage = errorResponse.Error.Message;
+                        }
+                    }
+                    catch 
+                    {
+                        // If we can't parse the error, just use the generic message
+                    }
+                }
             }
         }
         catch (Exception ex)
@@ -302,5 +270,23 @@
         
         [System.Text.Json.Serialization.JsonPropertyName("userId")]
         public string UserId { get; set; } = string.Empty;
+    }
+    
+    private class ErrorResponse
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("error")]
+        public ErrorDetails? Error { get; set; }
+        
+        public class ErrorDetails
+        {
+            [System.Text.Json.Serialization.JsonPropertyName("message")]
+            public string? Message { get; set; }
+            
+            [System.Text.Json.Serialization.JsonPropertyName("details")]
+            public string? Details { get; set; }
+            
+            [System.Text.Json.Serialization.JsonPropertyName("code")]
+            public string? Code { get; set; }
+        }
     }
 }

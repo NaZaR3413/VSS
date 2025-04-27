@@ -1,0 +1,110 @@
+@page "/login"
+@using web_backend.Blazor.Client.Services
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+
+<h1>Login</h1>
+
+<div class="card">
+    <div class="card-body">
+        <h5 class="card-title">Sign In</h5>
+        <EditForm Model="@loginModel" OnValidSubmit="HandleValidSubmit">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="form-group mt-3">
+                <label for="username">Username</label>
+                <InputText id="username" @bind-Value="loginModel.UserName" class="form-control" />
+                <ValidationMessage For="@(() => loginModel.UserName)" />
+            </div>
+
+            <div class="form-group mt-3">
+                <label for="password">Password</label>
+                <InputText id="password" type="password" @bind-Value="loginModel.Password" class="form-control" />
+                <ValidationMessage For="@(() => loginModel.Password)" />
+            </div>
+
+            <div class="form-group mt-3">
+                <div class="form-check">
+                    <InputCheckbox id="rememberMe" @bind-Value="loginModel.RememberMe" class="form-check-input" />
+                    <label class="form-check-label" for="rememberMe">Remember me</label>
+                </div>
+            </div>
+
+            <div class="form-group mt-3">
+                <button type="submit" class="btn btn-primary" disabled="@isLoading">
+                    @if (isLoading)
+                    {
+                        <span class="spinner-border spinner-border-sm mr-1" role="status" aria-hidden="true"></span>
+                        <span>Loading...</span>
+                    }
+                    else
+                    {
+                        <span>Login</span>
+                    }
+                </button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger mt-3">
+                    @errorMessage
+                </div>
+            }
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private class LoginModel
+    {
+        [Required]
+        public string UserName { get; set; }
+
+        [Required]
+        public string Password { get; set; }
+
+        public bool RememberMe { get; set; }
+    }
+
+    private LoginModel loginModel = new LoginModel();
+    private bool isLoading = false;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check if user is already authenticated
+        if (await AuthService.IsAuthenticatedAsync())
+        {
+            NavigationManager.NavigateTo("/");
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = string.Empty;
+
+            var result = await AuthService.LoginAsync(loginModel.UserName, loginModel.Password);
+
+            if (result)
+            {
+                NavigationManager.NavigateTo("/");
+            }
+            else
+            {
+                errorMessage = "Login failed. Please check your username and password.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

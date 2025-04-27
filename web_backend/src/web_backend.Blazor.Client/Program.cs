@@ -31,70 +31,38 @@ public class Program
 
         Console.WriteLine($"API URL from config: {remoteServiceBaseUrl}");
 
-        // Configure HttpClient with the remote service URL and optimized settings
-        builder.Services.AddScoped(sp => new HttpClient
-        {
-            BaseAddress = new Uri(remoteServiceBaseUrl ?? builder.HostEnvironment.BaseAddress),
-            DefaultRequestVersion = new Version(2, 0)  // Use HTTP/2 for better performance
-        });
-
-        // Add OIDC authentication services
-        builder.Services.AddOidcAuthentication(options =>
-        {
-            builder.Configuration.Bind("AuthServer", options.ProviderOptions);
-            options.ProviderOptions.ResponseType = "code";
-            options.ProviderOptions.DefaultScopes.Add("openid");
-            options.ProviderOptions.DefaultScopes.Add("profile");
-            options.ProviderOptions.DefaultScopes.Add("email");
-            options.ProviderOptions.DefaultScopes.Add("web_backend");
-            
-            // Add a HTTP client with authentication capability
-            options.UserOptions.RoleClaim = "role";
-        });
-
-        // Configure authenticated HTTP client
-        builder.Services.AddHttpClient("web_backend.API", client => 
-        {
-            client.BaseAddress = new Uri(remoteServiceBaseUrl ?? builder.HostEnvironment.BaseAddress);
-        })
-        .AddHttpMessageHandler(sp => 
-        {
-            var handler = sp.GetRequiredService<AuthorizationMessageHandler>()
-                .ConfigureHandler(
-                    authorizedUrls: new[] { remoteServiceBaseUrl ?? builder.HostEnvironment.BaseAddress },
-                    scopes: new[] { "web_backend" });
-            return handler;
-        });
-
-        // Enable prerendering support (works with server prerendering)
-        builder.Services.AddOptions();
+        // Register our custom authentication state provider
+        builder.Services.AddScoped<TokenAuthenticationStateProvider>();
+        builder.Services.AddScoped<AuthenticationStateProvider>(provider => 
+            provider.GetRequiredService<TokenAuthenticationStateProvider>());
+        
+        // Add authorization core services
         builder.Services.AddAuthorizationCore();
 
-        // Add memory caching for client-side caching
+        // Register our custom HTTP message handler
+        builder.Services.AddScoped<AuthorizationHeaderHandler>();
+
+        // Configure HttpClient with the token authorization handler
+        builder.Services.AddScoped(sp => {
+            var authHandler = sp.GetRequiredService<AuthorizationHeaderHandler>();
+            authHandler.InnerHandler = new HttpClientHandler();
+            
+            return new HttpClient(authHandler) {
+                BaseAddress = new Uri(remoteServiceBaseUrl ?? builder.HostEnvironment.BaseAddress),
+                DefaultRequestVersion = new Version(2, 0)  // Use HTTP/2 for better performance
+            };
+        });
+
+        // Enable memory caching for client-side caching
         builder.Services.AddMemoryCache();
 
         // Register Debug Service first
         builder.Services.AddSingleton<DebugService>();
 
-        // Register custom authentication state provider
-        builder.Services.AddScoped<TokenAuthenticationStateProvider>();
-        builder.Services.AddScoped<AuthenticationStateProvider>(provider => 
-            provider.GetRequiredService<TokenAuthenticationStateProvider>());
-
         // Configure the application
         var application = await builder.AddApplicationAsync<web_backendBlazorClientModule>(options =>
         {
             options.UseAutofac();
-        });
-
-        // Additional HttpClient for API with optimized settings
-        builder.Services.AddHttpClient("API", client =>
-        {
-            client.BaseAddress = new Uri(remoteServiceBaseUrl ?? builder.HostEnvironment.BaseAddress);
-            client.DefaultRequestVersion = new Version(2, 0);
-            
-            // Set default timeout (adjust as needed)
-            client.Timeout = TimeSpan.FromSeconds(30);
         });
 
         var host = builder.Build();
