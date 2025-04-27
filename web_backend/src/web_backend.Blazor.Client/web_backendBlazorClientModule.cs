@@ -53,6 +53,9 @@ public class web_backendBlazorClientModule : AbpModule
         
         // Add LivestreamStateService for real-time updates
         context.Services.AddSingleton<LivestreamStateService>();
+        
+        // Add DebugService for improved error handling and logging
+        context.Services.AddSingleton<DebugService>();
 
         // Register custom authentication provider and service
         context.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();

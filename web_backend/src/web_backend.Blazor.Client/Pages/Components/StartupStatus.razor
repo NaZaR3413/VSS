@@ -59,7 +59,20 @@
     }
 </style>
 
+@namespace web_backend.Blazor.Client.Pages.Components
+
+<div id="startup-status" style="display: none;">
+    <div class="startup-spinner">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+</div>
+
 @code {
+    // This component is used as a placeholder for showing application startup status
+    // Currently it's just a hidden div that can be shown via JavaScript when needed
+
     private string status = "Initializing application...";
     private int progress = 0;
     private bool isComplete = false;

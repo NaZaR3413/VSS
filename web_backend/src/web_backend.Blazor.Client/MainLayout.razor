@@ -130,9 +130,6 @@
     <main class="vss-main">
         @Body
     </main>
-    
-    <!-- Startup Status Indicator -->
-    <StartupStatus />
 </div>
 
 @code {
@@ -145,11 +142,16 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await DebugService.Initialize();
-        await DebugService.LogAsync("MainLayout initialized");
-        
+        await SafeInitializeAsync();
+    }
+    
+    private async Task SafeInitializeAsync()
+    {
         try
         {
+            await DebugService.Initialize();
+            await DebugService.LogAsync("MainLayout initialized");
+            
             if (LivestreamState != null)
             {
                 // Unregister any existing handlers to prevent duplicates
@@ -163,18 +165,30 @@
                 await DebugService.LogAsync("WARNING: LivestreamState is null in MainLayout");
             }
 
+            // Reduced polling interval to avoid excessive refreshes
             refreshTimer = new System.Threading.Timer(async _ =>
             {
                 try
                 {
                     await RefreshLivestreams(force: false);
-                    await InvokeAsync(StateHasChanged);
+                    await InvokeAsync(() => 
+                    {
+                        try 
+                        {
+                            StateHasChanged();
+                        }
+                        catch (Exception ex) 
+                        {
+                            // Log but swallow exceptions in StateHasChanged
+                            DebugService.LogAsync($"Error in StateHasChanged: {ex.Message}").GetAwaiter().GetResult();
+                        }
+                    });
                 }
                 catch (Exception ex)
                 {
                     await DebugService.LogAsync($"Error in timer refresh: {ex.Message}");
                 }
-            }, null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
+            }, null, TimeSpan.Zero, TimeSpan.FromSeconds(30)); // Changed from 15 to 30 seconds
 
             await RefreshLivestreams(force: true);
             await DebugService.LogAsync("Initial livestream refresh completed");
@@ -194,7 +208,15 @@
             {
                 await DebugService.LogAsync("HandleLivestreamStatusChanged event received");
                 await RefreshLivestreams(force: true);
-                StateHasChanged();
+                
+                try {
+                    StateHasChanged();
+                }
+                catch (Exception ex) {
+                    // Log but swallow exceptions in StateHasChanged
+                    await DebugService.LogAsync($"Error in StateHasChanged: {ex.Message}");
+                }
+                
                 await DebugService.LogAsync("HandleLivestreamStatusChanged completed successfully");
             }
             catch (Exception ex)
@@ -209,7 +231,7 @@
         try
         {
             var now = DateTimeOffset.UtcNow;
-            if (!force && (now - lastRefreshTime).TotalSeconds < 5)
+            if (!force && (now - lastRefreshTime).TotalSeconds < 10) // Increased threshold from 5 to 10 seconds
             {
                 return;
             }
@@ -224,8 +246,16 @@
             var allStreams = await LivestreamService.GetListAsync();
             lastRefreshTime = DateTimeOffset.UtcNow;
 
+            // Safety checks
+            if (allStreams == null)
+            {
+                await DebugService.LogAsync("Warning: GetListAsync returned null");
+                return;
+            }
+
             await JS.InvokeVoidAsync("console.log", $"Total streams: {allStreams.Count}");
 
+            // Safer logging with null checks
             foreach (var stream in allStreams)
             {
                 await JS.InvokeVoidAsync("console.log",
@@ -245,7 +275,14 @@
             {
                 await JS.InvokeVoidAsync("console.log", $"Livestream list has changed, updating UI");
                 activeLivestreams = newLiveStreams;
-                await InvokeAsync(StateHasChanged);
+                
+                try {
+                    await InvokeAsync(StateHasChanged);
+                }
+                catch (Exception ex) {
+                    // Log but swallow exceptions in StateHasChanged
+                    await DebugService.LogAsync($"Error in StateHasChanged during refresh: {ex.Message}");
+                }
             }
 
             await JS.InvokeVoidAsync("console.log", $"Found {activeLivestreams.Count} LIVE streams");
@@ -253,6 +290,7 @@
         catch (Exception ex)
         {
             await JS.InvokeVoidAsync("console.error", $"Error fetching livestreams: {ex.Message}");
+            await DebugService.LogAsync($"Error fetching livestreams: {ex.Message}");
         }
     }
 
@@ -271,11 +309,26 @@
 
     public void Dispose()
     {
-        refreshTimer?.Dispose();
-
-        if (LivestreamState != null)
+        try
         {
-            LivestreamState.OnLivestreamStatusChanged -= HandleLivestreamStatusChanged;
+            // Use local variable to avoid race conditions
+            var timer = refreshTimer;
+            if (timer != null)
+            {
+                refreshTimer = null;
+                timer.Dispose();
+            }
+
+            // Only unsubscribe if LivestreamState is not null
+            if (LivestreamState != null)
+            {
+                LivestreamState.OnLivestreamStatusChanged -= HandleLivestreamStatusChanged;
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log but can't do much else in Dispose
+            Console.WriteLine($"Error in Dispose: {ex.Message}");
         }
     }
 }
