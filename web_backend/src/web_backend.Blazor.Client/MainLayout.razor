@@ -6,11 +6,13 @@
 @using Microsoft.AspNetCore.Components.Web
 @using web_backend.Blazor.Client.Pages.Components
 @using web_backend.Enums
+@using System.Net.Http.Json
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
 @inject ILivestreamAppService LivestreamService
 @inject IJSRuntime JS
 @inject DebugService DebugService
+@inject HttpClient HttpClient
 @implements IDisposable
 
 <HeadContent>
