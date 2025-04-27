@@ -272,15 +272,22 @@ public class web_backendHttpApiHostModule : AbpModule
             options.AddDefaultPolicy(builder =>
             {
                 builder
-                    .WithOrigins(configuration["App:CorsOrigins"]?
-                        .Split(",", StringSplitOptions.RemoveEmptyEntries)
-                        .Select(o => o.RemovePostFix("/"))
-                        .ToArray() ?? Array.Empty<string>())
+                    .WithOrigins(
+                        configuration["App:CorsOrigins"]?
+                            .Split(",", StringSplitOptions.RemoveEmptyEntries)
+                            .Select(o => o.RemovePostFix("/"))
+                            .ToArray() ?? Array.Empty<string>())
                     .WithAbpExposedHeaders()
                     .SetIsOriginAllowedToAllowWildcardSubdomains()
                     .AllowAnyHeader()
                     .AllowAnyMethod()
                     .AllowCredentials();
+                
+                // Allow specific Azure Static Web App origins
+                builder.WithOrigins("https://salmon-glacier-08dca301e.6.azurestaticapps.net")
+                       .AllowAnyHeader()
+                       .AllowAnyMethod()
+                       .AllowCredentials();
             });
         });
     }
@@ -349,10 +356,15 @@ public class web_backendHttpApiHostModule : AbpModule
                 responseBody.Seek(0, SeekOrigin.Begin);
                 string responseText = await new StreamReader(responseBody).ReadToEndAsync();
 
-                // Replace HTTP HLS URLs with HTTPS
+                // Fix both HTTP to HTTPS and port 8080 to port 8443
                 if (responseText.Contains("http://20.3.254.14:8080/hls"))
                 {
-                    responseText = responseText.Replace("http://20.3.254.14:8080/hls", "https://20.3.254.14:8080/hls");
+                    responseText = responseText.Replace("http://20.3.254.14:8080/hls", "https://20.3.254.14:8443/hls");
+                }
+                // Also fix any HTTPS URLs that still use port 8080
+                else if (responseText.Contains("https://20.3.254.14:8080/hls"))
+                {
+                    responseText = responseText.Replace("https://20.3.254.14:8080/hls", "https://20.3.254.14:8443/hls");
                 }
 
                 context.Response.Body = originalBodyStream;

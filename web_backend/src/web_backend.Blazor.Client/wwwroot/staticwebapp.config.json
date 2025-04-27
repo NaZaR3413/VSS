@@ -1,28 +1,48 @@
 {
-  "navigationFallback": {
-    "rewrite": "/index.html",
-    "exclude": [ "/images/*.{png,jpg,gif}", "/css/*", "/js/*" ]
-  },
   "routes": [
     {
+      "route": "/api/*",
+      "allowedRoles": ["anonymous", "authenticated"]
+    },
+    {
       "route": "/authentication/*",
-      "serve": "/index.html",
-      "statusCode": 200
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/Account/*",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/connect/*",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/livestream/*",
+      "allowedRoles": ["anonymous", "authenticated"]
     },
     {
       "route": "/*",
-      "serve": "/index.html",
-      "statusCode": 200
+      "allowedRoles": ["anonymous"]
     }
   ],
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/images/*", "/css/*", "/js/*", "/*.ico", "/*.json", "/*.svg"]
+  },
+  "responseOverrides": {
+    "401": {
+      "redirect": "/authentication/login",
+      "statusCode": 302
+    }
+  },
   "mimeTypes": {
     ".json": "text/json",
     ".woff": "application/font-woff",
     ".woff2": "application/font-woff2"
   },
   "globalHeaders": {
-    "Content-Security-Policy": "frame-ancestors 'self' https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net",
-    "Access-Control-Allow-Origin": "*",
-    "X-Content-Type-Options": "nosniff"
+    "content-security-policy": "default-src 'self' 'unsafe-inline' 'unsafe-eval' https://salmon-glacier-08dca301e.6.azurestaticapps.net https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net https://20.3.254.14:8443; img-src 'self' data: https:; media-src 'self' https://20.3.254.14:8443; connect-src 'self' https://salmon-glacier-08dca301e.6.azurestaticapps.net https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net https://20.3.254.14:8443;",
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains"
   }
 }

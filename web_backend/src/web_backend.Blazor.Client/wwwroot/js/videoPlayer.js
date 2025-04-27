@@ -10,6 +10,12 @@ window.loadHlsStream = function(streamUrl, videoElementId = 'videoPlayer', strea
         streamUrl = streamUrl.replace('http:', 'https:');
         console.log('Fixed mixed content - converted to HTTPS URL: ' + streamUrl);
     }
+    
+    // Also fix port 8080 to 8443 if needed
+    if (streamUrl.includes(':8080/hls/')) {
+        streamUrl = streamUrl.replace(':8080/hls/', ':8443/hls/');
+        console.log('Fixed port - converted to 8443: ' + streamUrl);
+    }
 
     const video = document.getElementById(videoElementId);
     if (!video) {
