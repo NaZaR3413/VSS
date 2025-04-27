@@ -6,13 +6,11 @@
 @using Microsoft.AspNetCore.Components.Web
 @using web_backend.Blazor.Client.Pages.Components
 @using web_backend.Enums
-@using System.Net.Http.Json
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
 @inject ILivestreamAppService LivestreamService
 @inject IJSRuntime JS
 @inject DebugService DebugService
-@inject HttpClient HttpClient
 @implements IDisposable
 
 <HeadContent>
@@ -172,10 +170,6 @@
         
         try
         {
-            // Check for existing authentication on startup
-            await JS.InvokeVoidAsync("authTokenManager.checkAuthCookies");
-            
-            // Get authentication state
             authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
             await DebugService.LogAsync($"Authentication state loaded: {authState.User.Identity?.IsAuthenticated}");
 
@@ -188,10 +182,6 @@
             refreshTimer = new System.Threading.Timer(async _ =>
             {
                 await RefreshLivestreams(force: false);
-                
-                // Periodically refresh authentication state (every 15 seconds)
-                authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-                
                 await InvokeAsync(StateHasChanged);
             }, null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
 
@@ -227,97 +217,34 @@
                 await JS.InvokeVoidAsync("console.log", "Forced refresh - skipping cache");
             }
 
-            // Add CORS workaround - Use HTTP client with CORS-friendly settings
-            try
+            var allStreams = await LivestreamService.GetListAsync();
+            lastRefreshTime = DateTimeOffset.UtcNow;
+
+            await JS.InvokeVoidAsync("console.log", $"Total streams: {allStreams.Count}");
+
+            foreach (var stream in allStreams)
             {
-                // Configure a request message with CORS headers
-                var requestUri = $"https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net/api/app/livestream";
-                var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
-                request.Headers.Add("Access-Control-Allow-Origin", "*");
-                request.Headers.Add("Access-Control-Allow-Credentials", "true");
-                
-                await JS.InvokeVoidAsync("console.log", $"Making API request to: {requestUri}");
-                
-                var response = await HttpClient.SendAsync(request);
-                
-                if (response.IsSuccessStatusCode)
-                {
-                    var allStreams = await response.Content.ReadFromJsonAsync<List<LivestreamDto>>();
-                    lastRefreshTime = DateTimeOffset.UtcNow;
-                    
-                    if (allStreams != null)
-                    {
-                        await JS.InvokeVoidAsync("console.log", $"Total streams: {allStreams.Count}");
-                        
-                        foreach (var stream in allStreams)
-                        {
-                            await JS.InvokeVoidAsync("console.log",
-                                $"Stream ID: {stream.Id}, Status: {stream.StreamStatus} ({(int)stream.StreamStatus}), " +
-                                $"Teams: '{stream.HomeTeam ?? "null"}' vs '{stream.AwayTeam ?? "null"}'");
-                        }
-
-                        var newLiveStreams = allStreams
-                            .Where(l => l.StreamStatus == StreamStatus.Live)
-                            .OrderByDescending(l => l.Id)
-                            .ToList();
-
-                        bool hasChanged = newLiveStreams.Count != activeLivestreams.Count ||
-                                        newLiveStreams.Any(newStream => !activeLivestreams.Any(oldStream => oldStream.Id == newStream.Id));
-
-                        if (hasChanged)
-                        {
-                            await JS.InvokeVoidAsync("console.log", $"Livestream list has changed, updating UI");
-                            activeLivestreams = newLiveStreams;
-                            await InvokeAsync(StateHasChanged);
-                        }
-
-                        await JS.InvokeVoidAsync("console.log", $"Found {activeLivestreams.Count} LIVE streams");
-                    }
-                    else
-                    {
-                        await JS.InvokeVoidAsync("console.error", "API returned null response");
-                    }
-                }
-                else
-                {
-                    await JS.InvokeVoidAsync("console.error", $"API error: {response.StatusCode}");
-                }
+                await JS.InvokeVoidAsync("console.log",
+                    $"Stream ID: {stream.Id}, Status: {stream.StreamStatus} ({(int)stream.StreamStatus}), " +
+                    $"Teams: '{stream.HomeTeam ?? "null"}' vs '{stream.AwayTeam ?? "null"}'");
             }
-            catch (Exception apiEx)
+
+            var newLiveStreams = allStreams
+                .Where(l => l.StreamStatus == StreamStatus.Live)
+                .OrderByDescending(l => l.Id)
+                .ToList();
+
+            bool hasChanged = newLiveStreams.Count != activeLivestreams.Count ||
+                              newLiveStreams.Any(newStream => !activeLivestreams.Any(oldStream => oldStream.Id == newStream.Id));
+
+            if (hasChanged)
             {
-                await JS.InvokeVoidAsync("console.error", $"Manual API error: {apiEx.Message}");
-                
-                // Fallback to standard service call if our manual approach fails
-                var allStreams = await LivestreamService.GetListAsync();
-                // Rest of processing remains the same as original...
-                lastRefreshTime = DateTimeOffset.UtcNow;
-
-                await JS.InvokeVoidAsync("console.log", $"Total streams: {allStreams.Count}");
-
-                foreach (var stream in allStreams)
-                {
-                    await JS.InvokeVoidAsync("console.log",
-                        $"Stream ID: {stream.Id}, Status: {stream.StreamStatus} ({(int)stream.StreamStatus}), " +
-                        $"Teams: '{stream.HomeTeam ?? "null"}' vs '{stream.AwayTeam ?? "null"}'");
-                }
-
-                var newLiveStreams = allStreams
-                    .Where(l => l.StreamStatus == StreamStatus.Live)
-                    .OrderByDescending(l => l.Id)
-                    .ToList();
-
-                bool hasChanged = newLiveStreams.Count != activeLivestreams.Count ||
-                                newLiveStreams.Any(newStream => !activeLivestreams.Any(oldStream => oldStream.Id == newStream.Id));
-
-                if (hasChanged)
-                {
-                    await JS.InvokeVoidAsync("console.log", $"Livestream list has changed, updating UI");
-                    activeLivestreams = newLiveStreams;
-                    await InvokeAsync(StateHasChanged);
-                }
-
-                await JS.InvokeVoidAsync("console.log", $"Found {activeLivestreams.Count} LIVE streams");
+                await JS.InvokeVoidAsync("console.log", $"Livestream list has changed, updating UI");
+                activeLivestreams = newLiveStreams;
+                await InvokeAsync(StateHasChanged);
             }
+
+            await JS.InvokeVoidAsync("console.log", $"Found {activeLivestreams.Count} LIVE streams");
         }
         catch (Exception ex)
         {
@@ -341,73 +268,25 @@
 
     private void LoginClick()
     {
-        // Get the API base URL - this should be the URL of your HttpApi.Host project
-        string apiBaseUrl;
-        
-        #if DEBUG
-        // In development, use the known local port for HttpApi.Host
-        // Make sure this port matches your HttpApi.Host project's running port
-        apiBaseUrl = "https://localhost:44305";
-        #else
-        // In production, use the known deployed API URL
-        apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
-        #endif
-        
-        // Log the navigation for debugging
-        JS.InvokeVoidAsync("console.log", $"Navigating to login page at: {apiBaseUrl}/Account/Login");
-        
-        // Navigate to the custom Login.cshtml page in HttpApi.Host with forceLoad to ensure
-        // it's a full page navigation rather than client-side routing
-        NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Login?returnUrl={Uri.EscapeDataString(NavigationManager.Uri)}", forceLoad: true);
+        // Direct to the authentication pages on the API server
+        var apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
+        var returnUrl = Uri.EscapeDataString(NavigationManager.Uri);
+        NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Login?returnUrl={returnUrl}", forceLoad: true);
     }
 
     private void RegisterClick()
     {
-        // Get the API base URL - this should be the URL of your HttpApi.Host project
-        string apiBaseUrl;
-        
-        #if DEBUG
-        // In development, use the known local port for HttpApi.Host
-        // Make sure this port matches your HttpApi.Host project's running port
-        apiBaseUrl = "https://localhost:44305";
-        #else
-        // In production, use the known deployed API URL
-        apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
-        #endif
-        
-        // Log the navigation for debugging
-        JS.InvokeVoidAsync("console.log", $"Navigating to register page at: {apiBaseUrl}/Account/Register");
-        
-        // Navigate to the custom Register.cshtml page in HttpApi.Host with forceLoad to ensure
-        // it's a full page navigation rather than client-side routing
-        NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Register?returnUrl={Uri.EscapeDataString(NavigationManager.Uri)}", forceLoad: true);
+        // Direct to the authentication pages on the API server
+        var apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
+        var returnUrl = Uri.EscapeDataString(NavigationManager.Uri);
+        NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Register?returnUrl={returnUrl}", forceLoad: true);
     }
 
-    private async Task LogoutClick()
+    private void LogoutClick()
     {
-        try {
-            // Clear authentication tokens using our auth.js helper
-            await JS.InvokeVoidAsync("authTokenManager.clearAuthData");
-            
-            // Get the base address for the API
-            var apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
-            
-            try {
-                // Send logout request to API if needed
-                await HttpClient.PostAsync($"{apiBaseUrl}/api/account/logout", null);
-            }
-            catch {
-                // Ignore errors from the logout endpoint - we're logging out locally regardless
-            }
-            
-            // Refresh the page to clear all authentication state
-            NavigationManager.NavigateTo("/landing", forceLoad: true);
-        }
-        catch (Exception ex) {
-            // If there's an error, just force navigation to landing page
-            await JS.InvokeVoidAsync("console.error", $"Logout error: {ex.Message}");
-            NavigationManager.NavigateTo("/landing", forceLoad: true);
-        }
+        // Direct to the authentication pages on the API server
+        var apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
+        NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Logout", forceLoad: true);
     }
 
     public void Dispose()

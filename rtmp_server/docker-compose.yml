@@ -4,11 +4,9 @@ services:
     ports:
       - "1935:1935"
       - "8080:8080"
-      - "8443:8443"  # Expose HTTPS port
     container_name: rtmp_server
     volumes:
       - ./data:/hls
-      - ./rtmp/ssl:/etc/nginx/ssl  # Mount SSL certificates
     networks:
       - vssnet
     restart: always

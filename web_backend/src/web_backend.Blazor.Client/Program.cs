@@ -6,11 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.JSInterop;
 using web_backend.Blazor.Client.Services;
-using System.Net.Http.Json;
-using Microsoft.AspNetCore.Components.Web;
-using Microsoft.AspNetCore.Components.WebAssembly.Authentication;
-using Microsoft.AspNetCore.Components.Authorization;
-using Volo.Abp.AspNetCore.Components.WebAssembly;
 
 namespace web_backend.Blazor.Client;
 
@@ -21,7 +16,6 @@ public class Program
         var builder = WebAssemblyHostBuilder.CreateDefault(args);
         
         builder.RootComponents.Add<App>("#app");
-        builder.RootComponents.Add<HeadOutlet>("head::after");
 
         // Get API URL from configuration
         var configuration = builder.Configuration;
@@ -32,30 +26,11 @@ public class Program
 
         Console.WriteLine($"API URL from config: {remoteServiceBaseUrl}");
 
-        // Register our custom authentication state provider
-        builder.Services.AddScoped<TokenAuthenticationStateProvider>();
-        builder.Services.AddScoped<AuthenticationStateProvider>(provider => 
-            provider.GetRequiredService<TokenAuthenticationStateProvider>());
-        
-        // Add authorization core services
-        builder.Services.AddAuthorizationCore();
-
-        // Register our custom HTTP message handler
-        builder.Services.AddScoped<AuthorizationHeaderHandler>();
-
-        // Configure HttpClient with the token authorization handler
-        builder.Services.AddScoped(sp => {
-            var authHandler = sp.GetRequiredService<AuthorizationHeaderHandler>();
-            authHandler.InnerHandler = new HttpClientHandler();
-            
-            return new HttpClient(authHandler) {
-                BaseAddress = new Uri(remoteServiceBaseUrl ?? builder.HostEnvironment.BaseAddress),
-                DefaultRequestVersion = new Version(2, 0)  // Use HTTP/2 for better performance
-            };
+        // Configure HttpClient with the remote service URL
+        builder.Services.AddScoped(sp => new HttpClient
+        {
+            BaseAddress = new Uri(remoteServiceBaseUrl ?? builder.HostEnvironment.BaseAddress)
         });
-
-        // Enable memory caching for client-side caching
-        builder.Services.AddMemoryCache();
 
         // Register Debug Service first
         builder.Services.AddSingleton<DebugService>();
@@ -64,6 +39,12 @@ public class Program
         var application = await builder.AddApplicationAsync<web_backendBlazorClientModule>(options =>
         {
             options.UseAutofac();
+        });
+
+        // Additional HttpClient for API
+        builder.Services.AddHttpClient("API", client =>
+        {
+            client.BaseAddress = new Uri(remoteServiceBaseUrl ?? builder.HostEnvironment.BaseAddress);
         });
 
         var host = builder.Build();
@@ -81,15 +62,12 @@ public class Program
         
         try
         {
-            // Initialize ABP application
             await application.InitializeApplicationAsync(host.Services);
-            
             await jsRuntime.InvokeVoidAsync("console.log", "Application initialized successfully");
         }
         catch (Exception ex)
         {
             await jsRuntime.InvokeVoidAsync("console.error", $"Error initializing application: {ex.Message}");
-            throw;  // Re-throw to show the complete error
         }
 
         try
@@ -100,7 +78,6 @@ public class Program
         catch (Exception ex)
         {
             await jsRuntime.InvokeVoidAsync("console.error", $"Error running host: {ex.Message}");
-            throw;  // Re-throw to show the complete error
         }
     }
 }

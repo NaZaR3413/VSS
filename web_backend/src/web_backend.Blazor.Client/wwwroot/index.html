@@ -3,31 +3,25 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>web_backend.Blazor</title>
+    <title>VSS Application</title>
     <base href="/" />
 
     <!--ABP:Styles-->
-    <link href="global.css?_v=638397534598001064" rel="stylesheet"/>
-    <link href="main.css" rel="stylesheet"/>
+    <link href="global.css" rel="stylesheet" />
+    <link href="main.css" rel="stylesheet" />
     <!--/ABP:Styles-->
-    
-    <!-- Custom CORS and Auth JS files loaded first to ensure they can intercept requests -->
-    <script src="js/cors-proxy.js"></script>
-    <script src="js/auth-state-monitoring.js"></script>
-    
+
     <link href="web_backend.Blazor.Client.styles.css" rel="stylesheet" />
-    
-    <!-- Font Awesome for icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" 
-          integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA==" 
-          crossorigin="anonymous" referrerpolicy="no-referrer" />
-    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <link href="css/vss.css" rel="stylesheet" />
+
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="js/hlsPlayer.js"></script>
+    <script src="js/notifications.js"></script>
 </head>
 <body class="abp-application-layout bg-light">
-    <div id="ApplicationContainer">
+    <div id="app">
         <div class="spinner">
             <div class="double-bounce1"></div>
             <div class="double-bounce2"></div>
@@ -37,95 +31,7 @@
     <script src="_framework/blazor.webassembly.js"></script>
 
     <!--ABP:Scripts-->
-    <script src="global.js?_v=638397534599609661"></script>
+    <script src="global.js"></script>
     <!--/ABP:Scripts-->
-
-    <!-- Video.js player support -->
-    <link href="https://vjs.zencdn.net/8.5.2/video-js.css" rel="stylesheet" />
-    <script src="https://vjs.zencdn.net/8.5.2/video.min.js"></script>
-    
-    <!-- HLS.js for Safari HLS playback -->
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.4.12"></script>
-    
-    <!-- Custom video player initialization script -->
-    <script>
-        // This function will be called after Blazor components are initialized
-        function initializeVideoPlayer(playerElementId, hlsUrl) {
-            console.log(`Initializing video player for element ${playerElementId} with URL ${hlsUrl}`);
-            
-            // Check if the player element exists
-            const playerElement = document.getElementById(playerElementId);
-            if (!playerElement) {
-                console.error(`Player element ${playerElementId} not found`);
-                return;
-            }
-            
-            // Create a video.js player instance
-            const player = videojs(playerElementId, {
-                autoplay: true,
-                controls: true,
-                responsive: true,
-                fluid: true,
-                sources: [{
-                    src: hlsUrl,
-                    type: 'application/x-mpegURL'
-                }]
-            });
-            
-            player.ready(function() {
-                console.log('Player is ready');
-                
-                // If we have HLS.js and this is not Safari (which has native HLS support)
-                if (Hls.isSupported() && !videojs.browser.IS_SAFARI) {
-                    console.log('Using HLS.js for playback');
-                    const hls = new Hls();
-                    hls.loadSource(hlsUrl);
-                    hls.attachMedia(playerElement.querySelector('video'));
-                    
-                    hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                        player.play();
-                    });
-                    
-                    // Handle HLS errors
-                    hls.on(Hls.Events.ERROR, function(event, data) {
-                        console.error('HLS error:', data);
-                        if (data.fatal) {
-                            switch(data.type) {
-                                case Hls.ErrorTypes.NETWORK_ERROR:
-                                    console.log('Network error - attempting to recover');
-                                    hls.startLoad();
-                                    break;
-                                case Hls.ErrorTypes.MEDIA_ERROR:
-                                    console.log('Media error - attempting to recover');
-                                    hls.recoverMediaError();
-                                    break;
-                                default:
-                                    console.error('Unrecoverable HLS error');
-                                    hls.destroy();
-                                    break;
-                            }
-                        }
-                    });
-                } else {
-                    console.log('Using native HLS playback');
-                    player.src({
-                        src: hlsUrl,
-                        type: 'application/x-mpegURL'
-                    });
-                }
-            });
-            
-            // Return the player reference so it can be stored in Blazor
-            return player;
-        }
-        
-        // Function to dispose of a player when component is destroyed
-        function disposeVideoPlayer(playerRef) {
-            if (playerRef) {
-                console.log('Disposing video player');
-                playerRef.dispose();
-            }
-        }
-    </script>
 </body>
 </html>

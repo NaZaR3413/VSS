@@ -20,15 +20,15 @@ using static Volo.Abp.Identity.Settings.IdentitySettingNames;
 using Microsoft.Extensions.Logging;
 using Volo.Abp;
 using Volo.Abp.Domain.Repositories;
+
 using System.Text.RegularExpressions;
-using System.Linq; // Add this for the Select() extension method
+
 
 namespace web_backend.HttpApi.Host.Pages.Account;
 public class CustomRegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
 {
     private readonly IdentityUserManager _userManager;
     private readonly IRepository<Volo.Abp.Identity.IdentityUser, Guid> _identityUserRepository;
-    private readonly ILogger<CustomRegisterModel> _logger;
 
     public CustomRegisterModel(
         IdentityUserManager userManager,
@@ -36,30 +36,28 @@ public class CustomRegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterMo
         IAuthenticationSchemeProvider schemeProvider,
         IOptions<AbpAccountOptions> accountOptions,
         IdentityDynamicClaimsPrincipalContributorCache claimsPrincipalContributionCache,
-        IRepository<Volo.Abp.Identity.IdentityUser, Guid> identityUserRepository,
-        ILogger<CustomRegisterModel> logger
+        IRepository<Volo.Abp.Identity.IdentityUser, Guid> identityUserRepository
     ) : base(accountAppService, schemeProvider, accountOptions, claimsPrincipalContributionCache)
     {
         _identityUserRepository = identityUserRepository;
         _userManager = userManager;
-        _logger = logger;
-        Input = new CustomRegisterInput();
+        Input = new CustomRegisterInput(); // Use CustomRegisterInput instead of PostInput
     }
 
+
+
     [BindProperty]
-    public new CustomRegisterInput Input { get; set; }
+    public new CustomRegisterInput Input { get; set; } // Override Input with CustomRegisterInput
+
 
     public override async Task<IActionResult> OnPostAsync()
     {
+        if (!ModelState.IsValid)
+        {
+            return Page(); // Return to the same page if validation fails
+        }
         try
         {
-            if (!ModelState.IsValid)
-            {
-                return Page(); // Return to the same page if validation fails
-            }
-
-            _logger.LogInformation("Registration attempt for user: {Email}", Input.EmailAddress);
-            
             ExternalProviders = await GetExternalProviders();
 
             if (!await CheckSelfRegistrationAsync())
@@ -85,151 +83,84 @@ public class CustomRegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterMo
             {
                 await RegisterLocalUserAsync();
             }
-            
-            _logger.LogInformation("Registration successful for user: {Email}", Input.EmailAddress);
-            
-            // Parse and validate the return URL to ensure it's allowed
-            var returnUrl = ReturnUrl;
-            if (!string.IsNullOrEmpty(returnUrl))
-            {
-                _logger.LogInformation("Redirecting to return URL: {ReturnUrl}", returnUrl);
-                
-                if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var uri))
-                {
-                    // Check if it's in the allowed redirects list
-                    var redirectAllowedUrls = await SettingProvider.GetOrNullAsync("App.RedirectAllowedUrls");
-                    var allowedUrls = redirectAllowedUrls?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
-                    
-                    if (allowedUrls.Any(url => uri.AbsoluteUri.StartsWith(url, StringComparison.OrdinalIgnoreCase)))
-                    {
-                        // If it's allowed, use plain Redirect
-                        return Redirect(returnUrl);
-                    }
-                    
-                    _logger.LogWarning("Attempted redirect to non-allowed URL: {ReturnUrl}", returnUrl);
-                    // If not allowed, redirect to home
-                    return LocalRedirect("~/");
-                }
-                
-                return LocalRedirect(returnUrl);
-            }
-            
-            return LocalRedirect("~/");
+            return LocalRedirect(ReturnUrl ?? "/");
+
         }
         catch (UserFriendlyException ex)
         {
-            _logger.LogWarning(ex, "User-friendly exception during registration: {Message}", ex.Message);
-            ViewData["ErrorMessage"] = ex.Message;
-            return Page();
+            ViewData["ErrorMessage"] = ex.Message; // Set the error message
+            return Page(); // Return the page with the error message
         }
-        catch (Exception e)
+        catch (BusinessException e)
         {
-            _logger.LogError(e, "Unexpected error during registration: {Message}", e.Message);
-            ViewData["ErrorMessage"] = "An error occurred during registration. Please try again or contact support.";
+            Alerts.Danger(GetLocalizeExceptionMessage(e));
             return Page();
         }
+
     }
 
     protected override async Task RegisterLocalUserAsync()
     {
-        try
+       
+        string? rawPhone = Input.PhoneNumber;
+        string? normalizedPhone = null;
+
+        if (!string.IsNullOrWhiteSpace(rawPhone))
         {
-            string? rawPhone = Input.PhoneNumber;
-            string? normalizedPhone = null;
+            // Normalize the phone number - remove all non-digit characters
+            normalizedPhone = Regex.Replace(rawPhone, @"\D", "");
 
-            if (!string.IsNullOrWhiteSpace(rawPhone))
+            if (string.IsNullOrWhiteSpace(normalizedPhone))
             {
-                // Normalize the phone number - remove all non-digit characters
-                normalizedPhone = Regex.Replace(rawPhone, @"\D", "");
-
-                if (string.IsNullOrWhiteSpace(normalizedPhone))
-                {
-                    throw new UserFriendlyException("Invalid phone number format.");
-                }
-
-                // Check if already exists
-                var existingUser = await _identityUserRepository
-                    .FirstOrDefaultAsync(u => u.PhoneNumber == normalizedPhone);
-
-                if (existingUser != null)
-                {
-                    throw new UserFriendlyException("The phone number is already registered.");
-                }
-            }
-            
-            if (!Input.AcceptTerms)
-            {
-                throw new UserFriendlyException("You must accept the terms and conditions to register.");
-            }
-            
-            if (!ModelState.IsValid)
-            {
-                throw new UserFriendlyException("Please correct the errors and try again.");
+                throw new UserFriendlyException("Invalid phone number format.");
             }
 
-            _logger.LogInformation("Creating user with standard registration process");
-            
-            // Create a standard RegisterDto to avoid serialization issues
-            var registerDto = new Volo.Abp.Account.RegisterDto
+            // Check if already exists
+            var existingUser = await _identityUserRepository
+                .FirstOrDefaultAsync(u => u.PhoneNumber == normalizedPhone);
+
+            if (existingUser != null)
+            {
+                throw new UserFriendlyException("The phone number is already registered.");
+            }
+        }
+        if (!Input.AcceptTerms)
+        {
+            throw new UserFriendlyException("You must accept the terms and conditions to register.");
+        }
+        //ValidateModel();
+        if (!ModelState.IsValid)
+        {
+            return;
+        }
+
+        var userDto = await AccountAppService.RegisterAsync(
+            new web_backend.Pages.Account.CustomRegisterDto
             {
                 AppName = "MVC",
                 EmailAddress = Input.EmailAddress,
                 Password = Input.Password,
-                UserName = Input.UserName
-            };
-            
-            try
-            {
-                _logger.LogInformation("Calling AccountAppService.RegisterAsync");
-                var userDto = await AccountAppService.RegisterAsync(registerDto);
-                _logger.LogInformation("User registered successfully with ID: {UserId}", userDto.Id);
-                
-                // Now update the user with additional properties
-                var user = await UserManager.GetByIdAsync(userDto.Id);
-                
-                if (!string.IsNullOrEmpty(Input.Name))
-                {
-                    user.Name = Input.Name;
-                    _logger.LogInformation("Setting user name to: {Name}", Input.Name);
-                }
-                
-                if (!string.IsNullOrEmpty(normalizedPhone))
-                {
-                    user.SetPhoneNumber(normalizedPhone, true);
-                    _logger.LogInformation("Setting phone number to: {Phone}", normalizedPhone);
-                }
-                
-                // Save the changes
-                var updateResult = await UserManager.UpdateAsync(user);
-                if (!updateResult.Succeeded)
-                {
-                    _logger.LogWarning("User update failed: {Errors}", string.Join(", ", updateResult.Errors.Select(e => e.Description)));
-                    throw new UserFriendlyException("Registration partially succeeded but user details could not be updated.");
-                }
-                
-                _logger.LogInformation("User updated with custom fields");
-                
-                await SignInManager.SignInAsync(user, isPersistent: true);
-                _logger.LogInformation("User signed in successfully");
+                UserName = Input.UserName,
+                Name = Input.Name,
+                PhoneNumber = normalizedPhone,
+                ConfirmPassword = Input.ConfirmPassword,
+                AcceptTerms = Input.AcceptTerms
+            }
+        );
 
-                // Clear the dynamic claims cache.
-                await IdentityDynamicClaimsPrincipalContributorCache.ClearAsync(user.Id, user.TenantId);
-            }
-            catch (AbpValidationException validationEx)
-            {
-                _logger.LogWarning(validationEx, "Validation error during registration");
-                foreach (var error in validationEx.ValidationErrors)
-                {
-                    ModelState.AddModelError(string.Empty, error.ErrorMessage);
-                }
-                throw new UserFriendlyException("Registration validation failed: " + string.Join("; ", validationEx.ValidationErrors.Select(e => e.ErrorMessage)));
-            }
-        }
-        catch (Exception ex)
+        var user = await UserManager.GetByIdAsync(userDto.Id);
+        if (!string.IsNullOrEmpty(Input.Name))
         {
-            _logger.LogError(ex, "Error in RegisterLocalUserAsync: {Message}", ex.Message);
-            throw;
+            user.SetProperty("Name", Input.Name);
         }
+        if (!string.IsNullOrEmpty(normalizedPhone))
+        {
+            user.SetProperty("PhoneNumber", normalizedPhone);
+        }
+        await SignInManager.SignInAsync(user, isPersistent: true);
+
+        // Clear the dynamic claims cache.
+        await IdentityDynamicClaimsPrincipalContributorCache.ClearAsync(user.Id, user.TenantId);
     }
 
     public class CustomRegisterInput : Volo.Abp.Account.Web.Pages.Account.RegisterModel.PostInput
@@ -237,6 +168,7 @@ public class CustomRegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterMo
         [Required(ErrorMessage = "Name is required.")]
         [DynamicStringLength(typeof(IdentityUserConsts), nameof(IdentityUserConsts.MaxNameLength))]
         public string Name { get; set; }
+
         
         [DynamicStringLength(typeof(IdentityUserConsts), nameof(IdentityUserConsts.MaxPhoneNumberLength))]
         [Phone]
@@ -251,5 +183,6 @@ public class CustomRegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterMo
 
         [Required(ErrorMessage = "You must accept the terms and conditions to register.")]
         public bool AcceptTerms { get; set; }
+
     }
 }
