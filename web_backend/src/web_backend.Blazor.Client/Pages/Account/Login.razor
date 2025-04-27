@@ -1,0 +1,199 @@
+@page "/account/login"
+@using System.ComponentModel.DataAnnotations
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@inject HttpClient HttpClient
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="card vss-login-card">
+            <!-- Logo -->
+            <img class="vss-img" src="/images/varsitylogoempty.jpg" alt="VSS Logo" />
+            <h4>Login</h4>
+
+            <div class="card-body" style="text-align:center;">
+                <strong>
+                    Are you a new user?
+                    <a href="/account/register" class="text-decoration-none">Register</a>
+                </strong>
+                
+                <EditForm Model="@loginModel" OnValidSubmit="LoginUser" class="mt-4">
+                    <DataAnnotationsValidator />
+
+                    <div class="mb-3 vss-login-layout">
+                        <label class="form-label">Username or Email Address</label>
+                        <InputText @bind-Value="loginModel.UserNameOrEmailAddress" class="form-control" />
+                        <ValidationMessage For="@(() => loginModel.UserNameOrEmailAddress)" class="text-danger" />
+                    </div>
+
+                    <div class="mb-3 vss-login-layout">
+                        <label class="form-label">Password</label>
+                        <div class="input-group">
+                            <InputText type="@passwordInputType" @bind-Value="loginModel.Password" class="form-control" autocomplete="new-password" />
+                            <button class="btn btn-secondary" type="button" @onclick="TogglePasswordVisibility" id="PasswordVisibilityButton">
+                                <i class="fa fa-eye-slash" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <ValidationMessage For="@(() => loginModel.Password)" class="text-danger" />
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col vss-login-layout">
+                            <div class="form-check">
+                                <InputCheckbox @bind-Value="loginModel.RememberMe" class="form-check-input mb-4 border-dark" id="rememberMe" />
+                                <label class="form-check-label" for="rememberMe">
+                                    Remember Me
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col text-end vss-login-layout">
+                            <a href="/account/forgot-password">Forgot Password</a>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center">
+                        <button type="submit" class="btn btn-primary btn-lg mt-3 vss-submit-button" disabled="@isLoading">
+                            @if (isLoading)
+                            {
+                                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                <span> Loading...</span>
+                            }
+                            else
+                            {
+                                <span>Login</span>
+                            }
+                        </button>
+                    </div>
+                    
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger mt-3">
+                            @errorMessage
+                        </div>
+                    }
+                </EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private class LoginModel
+    {
+        [Required(ErrorMessage = "Username or email is required")]
+        public string UserNameOrEmailAddress { get; set; } = string.Empty;
+        
+        [Required(ErrorMessage = "Password is required")]
+        public string Password { get; set; } = string.Empty;
+        
+        public bool RememberMe { get; set; }
+    }
+    
+    private LoginModel loginModel = new LoginModel();
+    private bool isLoading = false;
+    private string errorMessage = string.Empty;
+    private string passwordInputType = "password";
+    
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string ReturnUrl { get; set; } = string.Empty;
+    
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "returnUrlHash")]
+    public string ReturnUrlHash { get; set; } = string.Empty;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        // If no return URL is specified, default to the landing page
+        if (string.IsNullOrEmpty(ReturnUrl))
+        {
+            ReturnUrl = "/landing";
+        }
+        
+        // Apply eye icon toggling via JavaScript
+        await JSRuntime.InvokeVoidAsync("eval", @"
+            document.getElementById('PasswordVisibilityButton')?.addEventListener('click', function() {
+                var passwordInput = document.querySelector('input[type=""password""]');
+                if (passwordInput) {
+                    if (passwordInput.type === 'password') {
+                        passwordInput.type = 'text';
+                        this.querySelector('i').classList.remove('fa-eye-slash');
+                        this.querySelector('i').classList.add('fa-eye');
+                    } else {
+                        passwordInput.type = 'password';
+                        this.querySelector('i').classList.remove('fa-eye');
+                        this.querySelector('i').classList.add('fa-eye-slash');
+                    }
+                }
+            });
+        ");
+    }
+    
+    private void TogglePasswordVisibility()
+    {
+        if (passwordInputType == "password")
+        {
+            passwordInputType = "text";
+        }
+        else
+        {
+            passwordInputType = "password";
+        }
+    }
+    
+    private async Task LoginUser()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = string.Empty;
+            
+            // Get the base address for the API
+            var apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
+            
+            // Make the login request to the API endpoint
+            var loginRequest = new
+            {
+                userNameOrEmailAddress = loginModel.UserNameOrEmailAddress,
+                password = loginModel.Password,
+                rememberMe = loginModel.RememberMe,
+                returnUrl = ReturnUrl,
+                returnUrlHash = ReturnUrlHash
+            };
+            
+            var response = await HttpClient.PostAsJsonAsync($"{apiBaseUrl}/api/account/login", loginRequest);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                // If login successful, redirect to the return URL
+                await JSRuntime.InvokeVoidAsync("console.log", "Login successful, redirecting to: " + ReturnUrl);
+                
+                // Construct the full return URL with hash if present
+                var redirectUrl = ReturnUrl;
+                if (!string.IsNullOrEmpty(ReturnUrlHash))
+                {
+                    redirectUrl += "#" + ReturnUrlHash;
+                }
+                
+                Navigation.NavigateTo(redirectUrl, forceLoad: true);
+            }
+            else
+            {
+                // Handle login failure
+                var content = await response.Content.ReadAsStringAsync();
+                await JSRuntime.InvokeVoidAsync("console.error", "Login failed: " + content);
+                errorMessage = "Invalid username or password. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred during login. Please try again.";
+            await JSRuntime.InvokeVoidAsync("console.error", "Login error: " + ex.Message);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+}

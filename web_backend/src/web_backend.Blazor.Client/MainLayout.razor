@@ -268,21 +268,37 @@
 
     private void LoginClick()
     {
-        // Use the OIDC authentication flow instead of directly navigating to the API
-        NavigationManager.NavigateTo("/authentication/login", forceLoad: false);
+        // Use our new Blazor login page
+        NavigationManager.NavigateTo("/account/login", forceLoad: false);
     }
 
     private void RegisterClick()
     {
-        // Use the built-in OIDC authentication flow for registration
-        NavigationManager.NavigateTo("/authentication/register", forceLoad: false);
+        // Use our new Blazor register page
+        NavigationManager.NavigateTo("/account/register", forceLoad: false);
     }
 
-    private void LogoutClick()
+    private async Task LogoutClick()
     {
-        // Direct to the authentication pages on the API server
-        var apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
-        NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Logout", forceLoad: true);
+        try {
+            // Get the base address for the API
+            var apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
+            
+            // Send logout request
+            await HttpClient.PostAsync($"{apiBaseUrl}/api/account/logout", null);
+            
+            // Clear local storage (remove tokens)
+            await JS.InvokeVoidAsync("localStorage.removeItem", "authToken");
+            await JS.InvokeVoidAsync("localStorage.removeItem", "refreshToken");
+            
+            // Refresh the page to clear all authentication state
+            NavigationManager.NavigateTo("/landing", forceLoad: true);
+        }
+        catch (Exception ex) {
+            // If there's an error, just force navigation to landing page
+            await JS.InvokeVoidAsync("console.error", $"Logout error: {ex.Message}");
+            NavigationManager.NavigateTo("/landing", forceLoad: true);
+        }
     }
 
     public void Dispose()
