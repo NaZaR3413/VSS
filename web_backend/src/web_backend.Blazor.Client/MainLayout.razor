@@ -281,14 +281,46 @@
 
     private void LoginClick()
     {
-        // Use Account/Login.cshtml page
-        NavigationManager.NavigateTo("/Account/Login", forceLoad: true);
+        // Get the API base URL - this should be the URL of your HttpApi.Host project
+        string apiBaseUrl;
+        
+        #if DEBUG
+        // In development, use the known local port for HttpApi.Host
+        // Make sure this port matches your HttpApi.Host project's running port
+        apiBaseUrl = "https://localhost:44305";
+        #else
+        // In production, use the known deployed API URL
+        apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
+        #endif
+        
+        // Log the navigation for debugging
+        JS.InvokeVoidAsync("console.log", $"Navigating to login page at: {apiBaseUrl}/Account/Login");
+        
+        // Navigate to the custom Login.cshtml page in HttpApi.Host with forceLoad to ensure
+        // it's a full page navigation rather than client-side routing
+        NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Login", forceLoad: true);
     }
 
     private void RegisterClick()
     {
-        // Use Account/Register.cshtml page
-        NavigationManager.NavigateTo("/Account/Register", forceLoad: true);
+        // Get the API base URL - this should be the URL of your HttpApi.Host project
+        string apiBaseUrl;
+        
+        #if DEBUG
+        // In development, use the known local port for HttpApi.Host
+        // Make sure this port matches your HttpApi.Host project's running port
+        apiBaseUrl = "https://localhost:44305";
+        #else
+        // In production, use the known deployed API URL
+        apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
+        #endif
+        
+        // Log the navigation for debugging
+        JS.InvokeVoidAsync("console.log", $"Navigating to register page at: {apiBaseUrl}/Account/Register");
+        
+        // Navigate to the custom Register.cshtml page in HttpApi.Host with forceLoad to ensure
+        // it's a full page navigation rather than client-side routing
+        NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Register", forceLoad: true);
     }
 
     private async Task LogoutClick()
