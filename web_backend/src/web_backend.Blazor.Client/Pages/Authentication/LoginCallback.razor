@@ -1,0 +1,41 @@
+@page "/authentication/login-callback"
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@using Microsoft.Extensions.Configuration
+
+@inject NavigationManager Navigation
+@inject IConfiguration Configuration
+@inject IJSRuntime JS
+
+<div class="card">
+    <div class="card-body text-center">
+        <h3>Processing login...</h3>
+        <div class="mt-4">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Log status for debugging
+            await JS.InvokeVoidAsync("console.log", "Login callback page loaded");
+            await JS.InvokeVoidAsync("console.log", $"Current URL: {Navigation.Uri}");
+            
+            // Attempt to complete the authentication process
+            await JS.InvokeVoidAsync("console.log", "Attempting to complete authentication");
+            
+            // Navigate to the home page after successful login
+            Navigation.NavigateTo("/");
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("console.error", $"Login error: {ex.Message}");
+            Navigation.NavigateTo("/");
+        }
+    }
+}
