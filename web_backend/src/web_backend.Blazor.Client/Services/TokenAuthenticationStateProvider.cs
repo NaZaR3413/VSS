@@ -13,23 +13,117 @@ namespace web_backend.Blazor.Client.Services
     public class TokenAuthenticationStateProvider : AuthenticationStateProvider, ITransientDependency
     {
         private readonly IJSRuntime _jsRuntime;
-        private AuthenticationState _latestState;
+        private readonly DebugService _debugService;
 
         // Event that allows components to subscribe to auth state changes
         public event AuthenticationStateChangedHandler AuthenticationStateChanged;
         public delegate void AuthenticationStateChangedHandler(Task<AuthenticationState> task);
 
-        public TokenAuthenticationStateProvider(IJSRuntime jsRuntime)
+        public TokenAuthenticationStateProvider(IJSRuntime jsRuntime, DebugService debugService)
         {
             _jsRuntime = jsRuntime;
-            _latestState = new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+            _debugService = debugService;
         }
 
         public override async Task<AuthenticationState> GetAuthenticationStateAsync()
         {
-            // Always check authentication state from JS storage
-            _latestState = await GetAuthenticationStateFromJsAsync();
-            return _latestState;
+            await _debugService.LogAsync("TokenAuthProvider: Getting authentication state");
+            
+            try
+            {
+                // Check if user is authenticated in localStorage
+                var isAuthenticated = await _jsRuntime.InvokeAsync<bool>("eval", 
+                    "localStorage.getItem('isAuthenticated') === 'true'");
+                
+                if (!isAuthenticated)
+                {
+                    await _debugService.LogAsync("TokenAuthProvider: Not authenticated");
+                    return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+                }
+
+                // Check if we have user info stored
+                var userInfoJson = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "currentUser");
+                
+                if (string.IsNullOrEmpty(userInfoJson))
+                {
+                    // Try to get user from token if available
+                    var token = await _jsRuntime.InvokeAsync<string>("eval", 
+                        "localStorage.getItem('accessToken') || ''");
+                    
+                    if (!string.IsNullOrEmpty(token))
+                    {
+                        var claims = ParseClaimsFromJwt(token);
+                        var identity = new ClaimsIdentity(claims, "jwt");
+                        await _debugService.LogAsync("TokenAuthProvider: Created identity from JWT token");
+                        return new AuthenticationState(new ClaimsPrincipal(identity));
+                    }
+                    
+                    await _debugService.LogAsync("TokenAuthProvider: No user info available");
+                    return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+                }
+
+                // Parse the user info from JSON
+                try
+                {
+                    var userInfo = JsonSerializer.Deserialize<JsonElement>(userInfoJson);
+                    
+                    // Build claims from user info
+                    var claims = new List<Claim>();
+                    
+                    // Always add a name claim
+                    if (userInfo.TryGetProperty("userName", out var userName))
+                    {
+                        claims.Add(new Claim(ClaimTypes.Name, userName.GetString()));
+                    }
+                    else if (userInfo.TryGetProperty("name", out var name))
+                    {
+                        claims.Add(new Claim(ClaimTypes.Name, name.GetString()));
+                    }
+                    
+                    // Add email claim if available
+                    if (userInfo.TryGetProperty("email", out var email))
+                    {
+                        claims.Add(new Claim(ClaimTypes.Email, email.GetString()));
+                    }
+                    
+                    // Add roles if available
+                    if (userInfo.TryGetProperty("roles", out var roles) && roles.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var role in roles.EnumerateArray())
+                        {
+                            claims.Add(new Claim(ClaimTypes.Role, role.GetString()));
+                        }
+                    }
+                    
+                    // Include all other properties as claims
+                    foreach (var prop in userInfo.EnumerateObject())
+                    {
+                        if (prop.Name != "userName" && prop.Name != "name" && 
+                            prop.Name != "email" && prop.Name != "roles")
+                        {
+                            claims.Add(new Claim(prop.Name, prop.Value.ToString()));
+                        }
+                    }
+                    
+                    // Create the identity and return authentication state
+                    var identity = new ClaimsIdentity(claims, "abp");
+                    await _debugService.LogAsync($"TokenAuthProvider: Created identity with {claims.Count} claims");
+                    
+                    return new AuthenticationState(new ClaimsPrincipal(identity));
+                }
+                catch (Exception ex)
+                {
+                    await _debugService.LogAsync($"TokenAuthProvider: Error parsing user info: {ex.Message}");
+                }
+                
+                await _debugService.LogAsync("TokenAuthProvider: Fallback to unauthenticated state");
+                return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+            }
+            catch (Exception ex)
+            {
+                await _debugService.LogAsync($"TokenAuthProvider: Error in GetAuthenticationStateAsync: {ex.Message}");
+                return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+            }
         }
 
         public void NotifyAuthenticationStateChanged()
@@ -39,39 +133,6 @@ namespace web_backend.Blazor.Client.Services
             
             // Also notify our custom subscribers
             AuthenticationStateChanged?.Invoke(authStateTask);
-        }
-
-        private async Task<AuthenticationState> GetAuthenticationStateFromJsAsync()
-        {
-            try
-            {
-                var isAuthenticated = await _jsRuntime.InvokeAsync<bool>("authTokenManager.isAuthenticated");
-                
-                if (!isAuthenticated)
-                {
-                    return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
-                }
-
-                var token = await _jsRuntime.InvokeAsync<string>("authTokenManager.getAccessToken");
-                if (string.IsNullOrEmpty(token))
-                {
-                    return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
-                }
-
-                // Parse the JWT token to extract claims
-                var claims = ParseClaimsFromJwt(token);
-                
-                // Create the authenticated user identity
-                var identity = new ClaimsIdentity(claims, "jwt");
-                var user = new ClaimsPrincipal(identity);
-                
-                return new AuthenticationState(user);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error getting auth state: {ex.Message}");
-                return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
-            }
         }
 
         private IEnumerable<Claim> ParseClaimsFromJwt(string jwt)
