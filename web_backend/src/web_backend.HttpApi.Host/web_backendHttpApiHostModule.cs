@@ -58,7 +58,7 @@ public class web_backendHttpApiHostModule : AbpModule
         Console.WriteLine($"Hosting Environment: {hostingEnvironment.EnvironmentName}");
 
         // Only run production config in a non-Development environment
-        if (true)
+        if (!hostingEnvironment.IsDevelopment())
         {
             Console.WriteLine("Running production OpenIddict configuration...");
 
@@ -66,7 +66,6 @@ public class web_backendHttpApiHostModule : AbpModule
             {
                 // Disable automatic development certificates individually.
                 options.AddDevelopmentEncryptionAndSigningCertificate = false;
-                Console.WriteLine("Disabled development signing/encryption certificates.");
             });
 
             PreConfigure<OpenIddictServerBuilder>(serverBuilder =>
@@ -77,13 +76,19 @@ public class web_backendHttpApiHostModule : AbpModule
                     var pfxPassword = configuration["OpenIddict:Certificates:Default:Password"];
 
                     Console.WriteLine("Retrieved PFX password from configuration.");
+                    
                     var certPath = Path.Combine(AppContext.BaseDirectory, "openiddict.pfx");
 
                     Console.WriteLine($"Looking for certificate at: {certPath}");
                     if (!File.Exists(certPath))
                     {
-                        Console.WriteLine("Certificate file not found!");
-                        throw new FileNotFoundException("openiddict.pfx not found in expected location.", certPath);
+                        Console.WriteLine("Certificate file not found! Falling back to development certificate.");
+                        // Instead of throwing an exception, fall back to development certificate
+                        PreConfigure<AbpOpenIddictAspNetCoreOptions>(fallbackOptions =>
+                        {
+                            fallbackOptions.AddDevelopmentEncryptionAndSigningCertificate = true;
+                        });
+                        return;
                     }
 
                     var certificate = new X509Certificate2(
@@ -102,13 +107,22 @@ public class web_backendHttpApiHostModule : AbpModule
                 {
                     Console.WriteLine("Exception while loading certificate:");
                     Console.WriteLine(ex.ToString());
-                    throw;
+                    // Instead of throwing, fall back to development certificate
+                    Console.WriteLine("Falling back to development certificate due to error.");
+                    PreConfigure<AbpOpenIddictAspNetCoreOptions>(fallbackOptions =>
+                    {
+                        fallbackOptions.AddDevelopmentEncryptionAndSigningCertificate = true;
+                    });
                 }
             });
         }
         else
         {
-            Console.WriteLine("Development environment detected. Skipping production certificate configuration.");
+            Console.WriteLine("Development environment detected, using development certificates.");
+            PreConfigure<AbpOpenIddictAspNetCoreOptions>(options =>
+            {
+                options.AddDevelopmentEncryptionAndSigningCertificate = true;
+            });
         }
 
         PreConfigure<OpenIddictBuilder>(builder =>

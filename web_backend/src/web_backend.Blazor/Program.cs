@@ -36,7 +36,7 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseAntiforgery();
 
-app.MapRazorComponents<App>()
+app.MapRazorComponents<web_backend.Blazor.App>()
     .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(WebAppAdditionalAssembliesHelper.GetAssemblies<web_backendBlazorClientModule>());
 

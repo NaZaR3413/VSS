@@ -90,10 +90,14 @@ public class web_backendBlazorClientModule : AbpModule
             options.UserOptions.NameClaim = OpenIddictConstants.Claims.Name;
             options.UserOptions.RoleClaim = OpenIddictConstants.Claims.Role;
 
+            // Ensure these are set correctly
             options.ProviderOptions.DefaultScopes.Add("web_backend");
             options.ProviderOptions.DefaultScopes.Add("roles");
             options.ProviderOptions.DefaultScopes.Add("email");
             options.ProviderOptions.DefaultScopes.Add("phone");
+            
+            // Add this line to ensure proper redirect handling
+            options.ProviderOptions.PostLogoutRedirectUri = "/";
         });
     }
 
@@ -112,26 +116,29 @@ public class web_backendBlazorClientModule : AbpModule
 
         Console.WriteLine($"Using API base address: {remoteServiceBaseUrl}");
 
+        // Configure the default HttpClient
         context.Services.AddTransient(sp => new HttpClient
         {
             BaseAddress = new Uri(remoteServiceBaseUrl)
         });
         
-        // Register the AbpMvcClient explicitly
+        // Configure the named HttpClients
         context.Services.AddHttpClient("AbpMvcClient", client =>
         {
             client.BaseAddress = new Uri(remoteServiceBaseUrl);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
         });
         
-        // Register API client
         context.Services.AddHttpClient("API", client =>
         {
             client.BaseAddress = new Uri(remoteServiceBaseUrl);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
         });
         
-        // Disable the IdentityModelAuthenticationService that's trying to use authorization_code
-        context.Services.RemoveAll<IIdentityModelAuthenticationService>();
-        context.Services.AddSingleton<IIdentityModelAuthenticationService, NullIdentityModelAuthenticationService>();
+        // Re-enable the standard identity model authentication service
+        // Previously we had disabled it with:
+        // context.Services.RemoveAll<IIdentityModelAuthenticationService>();
+        // context.Services.AddSingleton<IIdentityModelAuthenticationService, NullIdentityModelAuthenticationService>();
     }
 
     private void ConfigureAutoMapper(ServiceConfigurationContext context)
