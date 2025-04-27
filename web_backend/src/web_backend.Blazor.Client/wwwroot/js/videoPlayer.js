@@ -321,20 +321,7 @@ if (typeof window.PaywallManager === 'undefined') {
                     // Also pause and disable the video
                     const video = document.getElementById('videoPlayer');
                     if (video) {
-                        video.pause();
-                        video.controls = false;
-                        video.style.opacity = '0.5';
-
-                        // Disable video playback
-                        video.onplay = function() {
-                            video.pause();
-                        };
-
-                        // Additional measure to prevent playback
-                        if (window.hls) {
-                            window.hls.detachMedia();
-                            window.hls.stopLoad();
-                        }
+                        window.pauseAndDisableVideo('videoPlayer');
                     }
                 }
             } else {
@@ -343,20 +330,7 @@ if (typeof window.PaywallManager === 'undefined') {
                 // Make sure video stays paused
                 const video = document.getElementById('videoPlayer');
                 if (video) {
-                    video.pause();
-                    video.controls = false;
-                    video.style.opacity = '0.5';
-
-                    // Disable video playback
-                    video.onplay = function() {
-                        video.pause();
-                    };
-
-                    // Additional measure to prevent playback
-                    if (window.hls) {
-                        window.hls.detachMedia();
-                        window.hls.stopLoad();
-                    }
+                    window.pauseAndDisableVideo('videoPlayer');
                 }
             }
         },
@@ -368,6 +342,40 @@ if (typeof window.PaywallManager === 'undefined') {
         }
     };
 }
+
+// Function to pause and disable a video element
+window.pauseAndDisableVideo = function(videoElementId) {
+    console.log(`Pausing and disabling video: ${videoElementId}`);
+    const video = document.getElementById(videoElementId);
+    if (!video) {
+        console.error(`Video element with ID ${videoElementId} not found`);
+        return;
+    }
+
+    // Pause the video
+    video.pause();
+    
+    // Disable controls and lower opacity to indicate it's disabled
+    video.controls = false;
+    video.style.opacity = '0.5';
+    
+    // Prevent video from being played again
+    video.onplay = function() {
+        video.pause();
+    };
+    
+    // Additional measure to prevent playback with HLS.js
+    if (window.hls) {
+        try {
+            window.hls.detachMedia();
+            window.hls.stopLoad();
+        } catch (error) {
+            console.error('Error while disabling HLS stream:', error);
+        }
+    }
+    
+    console.log('Video successfully paused and disabled');
+};
 
 // Add function to call .NET methods after a delay
 window.invokeDotNetAfterDelay = function(dotNetRef, methodName, delayMs) {

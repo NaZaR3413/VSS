@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -134,12 +135,30 @@ public class web_backendHttpApiHostModule : AbpModule
                 });
     }
 
-
-
     public override void ConfigureServices(ServiceConfigurationContext context)
     {
         var configuration = context.Services.GetConfiguration();
         var hostingEnvironment = context.Services.GetHostingEnvironment();
+
+        // Configure response compression with Brotli and Gzip
+        context.Services.AddResponseCompression(options =>
+        {
+            options.EnableForHttps = true;
+            options.Providers.Add<BrotliCompressionProvider>();
+            options.Providers.Add<GzipCompressionProvider>();
+            options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(
+                new[] { "application/octet-stream", "application/wasm", "application/json" });
+        });
+        
+        context.Services.Configure<BrotliCompressionProviderOptions>(options => 
+        {
+            options.Level = System.IO.Compression.CompressionLevel.Fastest;
+        });
+
+        context.Services.Configure<GzipCompressionProviderOptions>(options => 
+        {
+            options.Level = System.IO.Compression.CompressionLevel.Fastest;
+        });
 
         ConfigureAuthentication(context);
         ConfigureBundles();
@@ -283,8 +302,33 @@ public class web_backendHttpApiHostModule : AbpModule
             app.UseErrorPage();
         }
 
+        // Enable response compression to reduce payload sizes
+        app.UseResponseCompression();
+        
         app.UseCorrelationId();
-        app.UseStaticFiles();
+        
+        // Configure static files with cache headers
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            OnPrepareResponse = ctx =>
+            {
+                // Cache static resources for 7 days (604800 seconds)
+                // Except for Blazor WebAssembly framework files which need special handling
+                var path = ctx.File.PhysicalPath?.ToLower();
+                if (path != null && 
+                    (path.EndsWith(".js") || path.EndsWith(".css") || 
+                     path.EndsWith(".woff") || path.EndsWith(".woff2") || 
+                     path.EndsWith(".png") || path.EndsWith(".jpg") || path.EndsWith(".svg")))
+                {
+                    // Don't cache framework files with version in query string
+                    if (!ctx.Context.Request.Path.Value!.Contains("_framework"))
+                    {
+                        ctx.Context.Response.Headers.Append("Cache-Control", "public,max-age=604800");
+                    }
+                }
+            }
+        });
+        
         app.UseRouting();
         app.UseCors();
         
