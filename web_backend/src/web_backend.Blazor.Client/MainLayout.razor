@@ -189,6 +189,9 @@
 
             await RefreshLivestreams(force: true);
             await DebugService.LogAsync("Initial livestream refresh completed");
+            
+            // Call authentication state monitoring initialization
+            await InitializeAuthStateMonitoring();
         }
         catch (Exception ex)
         {
@@ -315,6 +318,9 @@
         {
             LivestreamState.OnLivestreamStatusChanged -= HandleLivestreamStatusChanged;
         }
+        
+        // Clean up authentication state monitoring
+        CleanupAuthStateMonitoring();
     }
 
     private string GetUserDisplayName(System.Security.Claims.ClaimsPrincipal user)

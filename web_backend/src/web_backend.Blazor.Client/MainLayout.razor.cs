@@ -7,7 +7,7 @@ using web_backend.Blazor.Client.Services;
 
 namespace web_backend.Blazor.Client
 {
-    public partial class MainLayout : LayoutComponentBase, IDisposable
+    public partial class MainLayout
     {
         [Parameter]
         public string Sport { get; set; } = "default";
@@ -15,15 +15,13 @@ namespace web_backend.Blazor.Client
         [Inject]
         protected AuthenticationStateProvider AuthStateProvider { get; set; }
         
-        [Inject]
-        protected NavigationManager NavigationManager { get; set; }
+        // Removed NavigationManager injection since it's already in MainLayout.razor
         
         private AuthenticationState previousAuthState;
         
-        protected override async Task OnInitializedAsync()
+        // Renamed to avoid conflict with the OnInitializedAsync in MainLayout.razor
+        protected async Task InitializeAuthStateMonitoring()
         {
-            await base.OnInitializedAsync();
-            
             // Subscribe to authentication state changes
             if (AuthStateProvider is TokenAuthenticationStateProvider tokenProvider)
             {
@@ -59,7 +57,8 @@ namespace web_backend.Blazor.Client
             }
         }
         
-        public void Dispose()
+        // Renamed to avoid conflict with the Dispose method in MainLayout.razor
+        protected void CleanupAuthStateMonitoring()
         {
             // Unsubscribe from authentication state changes
             if (AuthStateProvider is TokenAuthenticationStateProvider tokenProvider)
