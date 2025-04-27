@@ -172,10 +172,14 @@
         }
     }
 
-    private async void HandleLivestreamStatusChanged(object? sender, EventArgs e)
+    private void HandleLivestreamStatusChanged(object? sender, EventArgs e)
     {
-        await RefreshLivestreams(force: true);
-        await InvokeAsync(StateHasChanged);
+        // Use InvokeAsync to ensure state changes happen on the UI thread
+        InvokeAsync(async () => 
+        {
+            await RefreshLivestreams(force: true);
+            StateHasChanged();
+        });
     }
 
     private async Task RefreshLivestreams(bool force = false)
