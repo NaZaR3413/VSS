@@ -94,6 +94,30 @@ public class web_backendBlazorClientModule : AbpModule
             options.ProviderOptions.DefaultScopes.Add("roles");
             options.ProviderOptions.DefaultScopes.Add("email");
             options.ProviderOptions.DefaultScopes.Add("phone");
+            
+            // Set these explicitly based on server configuration
+            options.ProviderOptions.ResponseType = "code";
+            
+            // Use the same client ID from your appsettings.json
+            options.ProviderOptions.ClientId = "web_backend_Blazor";
+            
+            var configuration = builder.Services.GetSingletonInstance<IConfiguration>();
+            var remoteServiceBaseUrl = configuration
+                .GetSection("RemoteServices")
+                .GetSection("Default")
+                .GetValue<string>("BaseUrl");
+            
+            if (!string.IsNullOrEmpty(remoteServiceBaseUrl))
+            {
+                // These URLs must match what OpenIddict expects on the server
+                options.ProviderOptions.Authority = remoteServiceBaseUrl;
+                // Set explicit metadata URL to ensure discovery works
+                options.ProviderOptions.MetadataUrl = $"{remoteServiceBaseUrl}/.well-known/openid-configuration";
+            }
+            
+            // Set callback path
+            options.ProviderOptions.RedirectUri = $"{builder.HostEnvironment.BaseAddress}authentication/login-callback";
+            options.ProviderOptions.PostLogoutRedirectUri = builder.HostEnvironment.BaseAddress;
         });
     }
 
