@@ -5,6 +5,7 @@
 @using System.Linq
 @using Microsoft.AspNetCore.Components.Web
 @using web_backend.Blazor.Client.Pages.Components
+@using web_backend.Blazor.Client.Pages.Authentication
 @using web_backend.Enums
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
@@ -114,7 +115,7 @@
 
             <div class="vss-auth d-flex">
                 <!-- Use our new LoginStatus component -->
-                <web_backend.Blazor.Client.Pages.Authentication.LoginStatus />
+                <LoginStatus />
             </div>
         </nav>
     </header>
@@ -130,6 +131,9 @@
     <main class="vss-main">
         @Body
     </main>
+    
+    <!-- Startup Status Indicator -->
+    <StartupStatus />
 </div>
 
 @code {
@@ -142,53 +146,22 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await SafeInitializeAsync();
-    }
-    
-    private async Task SafeInitializeAsync()
-    {
+        await DebugService.Initialize();
+        await DebugService.LogAsync("MainLayout initialized");
+        
         try
         {
-            await DebugService.Initialize();
-            await DebugService.LogAsync("MainLayout initialized");
-            
             if (LivestreamState != null)
             {
-                // Unregister any existing handlers to prevent duplicates
-                LivestreamState.OnLivestreamStatusChanged -= HandleLivestreamStatusChanged;
-                // Register the event handler
                 LivestreamState.OnLivestreamStatusChanged += HandleLivestreamStatusChanged;
                 await DebugService.LogAsync("Registered livestream state handler");
             }
-            else
-            {
-                await DebugService.LogAsync("WARNING: LivestreamState is null in MainLayout");
-            }
 
-            // Reduced polling interval to avoid excessive refreshes
             refreshTimer = new System.Threading.Timer(async _ =>
             {
-                try
-                {
-                    await RefreshLivestreams(force: false);
-                    await InvokeAsync(() => 
-                    {
-                        try 
-                        {
-                            StateHasChanged();
-                        }
-                        catch (Exception ex) 
-                        {
-                            // Log but swallow exceptions in StateHasChanged
-                            DebugService.LogAsync($"Error in StateHasChanged: {ex.Message}").GetAwaiter().GetResult();
-                        }
-                    });
-                }
-                catch (Exception ex)
-                {
-                    await DebugService.LogAsync($"Error in timer refresh: {ex.Message}");
-                }
-            }, null, TimeSpan.Zero, TimeSpan.FromSeconds(30)); // Changed from 15 to 30 seconds
+                await RefreshLivestreams(force: false);
+                await InvokeAsync(StateHasChanged);
+            }, null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
 
             await RefreshLivestreams(force: true);
             await DebugService.LogAsync("Initial livestream refresh completed");
@@ -199,31 +172,10 @@
         }
     }
 
-    private void HandleLivestreamStatusChanged(object? sender, EventArgs e)
+    private async void HandleLivestreamStatusChanged(object? sender, EventArgs e)
     {
-        // Always use InvokeAsync to ensure we're on the UI thread
-        _ = InvokeAsync(async () => 
-        {
-            try
-            {
-                await DebugService.LogAsync("HandleLivestreamStatusChanged event received");
-                await RefreshLivestreams(force: true);
-                
-                try {
-                    StateHasChanged();
-                }
-                catch (Exception ex) {
-                    // Log but swallow exceptions in StateHasChanged
-                    await DebugService.LogAsync($"Error in StateHasChanged: {ex.Message}");
-                }
-                
-                await DebugService.LogAsync("HandleLivestreamStatusChanged completed successfully");
-            }
-            catch (Exception ex)
-            {
-                await DebugService.LogAsync($"Error in HandleLivestreamStatusChanged: {ex.Message}");
-            }
-        });
+        await RefreshLivestreams(force: true);
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task RefreshLivestreams(bool force = false)
@@ -231,7 +183,7 @@
         try
         {
             var now = DateTimeOffset.UtcNow;
-            if (!force && (now - lastRefreshTime).TotalSeconds < 10) // Increased threshold from 5 to 10 seconds
+            if (!force && (now - lastRefreshTime).TotalSeconds < 5)
             {
                 return;
             }
@@ -246,16 +198,8 @@
             var allStreams = await LivestreamService.GetListAsync();
             lastRefreshTime = DateTimeOffset.UtcNow;
 
-            // Safety checks
-            if (allStreams == null)
-            {
-                await DebugService.LogAsync("Warning: GetListAsync returned null");
-                return;
-            }
-
             await JS.InvokeVoidAsync("console.log", $"Total streams: {allStreams.Count}");
 
-            // Safer logging with null checks
             foreach (var stream in allStreams)
             {
                 await JS.InvokeVoidAsync("console.log",
@@ -275,14 +219,7 @@
             {
                 await JS.InvokeVoidAsync("console.log", $"Livestream list has changed, updating UI");
                 activeLivestreams = newLiveStreams;
-                
-                try {
-                    await InvokeAsync(StateHasChanged);
-                }
-                catch (Exception ex) {
-                    // Log but swallow exceptions in StateHasChanged
-                    await DebugService.LogAsync($"Error in StateHasChanged during refresh: {ex.Message}");
-                }
+                await InvokeAsync(StateHasChanged);
             }
 
             await JS.InvokeVoidAsync("console.log", $"Found {activeLivestreams.Count} LIVE streams");
@@ -290,7 +227,6 @@
         catch (Exception ex)
         {
             await JS.InvokeVoidAsync("console.error", $"Error fetching livestreams: {ex.Message}");
-            await DebugService.LogAsync($"Error fetching livestreams: {ex.Message}");
         }
     }
 
@@ -309,26 +245,11 @@
 
     public void Dispose()
     {
-        try
-        {
-            // Use local variable to avoid race conditions
-            var timer = refreshTimer;
-            if (timer != null)
-            {
-                refreshTimer = null;
-                timer.Dispose();
-            }
+        refreshTimer?.Dispose();
 
-            // Only unsubscribe if LivestreamState is not null
-            if (LivestreamState != null)
-            {
-                LivestreamState.OnLivestreamStatusChanged -= HandleLivestreamStatusChanged;
-            }
-        }
-        catch (Exception ex)
+        if (LivestreamState != null)
         {
-            // Log but can't do much else in Dispose
-            Console.WriteLine($"Error in Dispose: {ex.Message}");
+            LivestreamState.OnLivestreamStatusChanged -= HandleLivestreamStatusChanged;
         }
     }
 }

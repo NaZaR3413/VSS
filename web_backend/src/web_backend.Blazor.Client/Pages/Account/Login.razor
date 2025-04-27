@@ -41,19 +41,19 @@
             .GetSection("Default")
             .GetValue<string>("BaseUrl") ?? "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
             
-        // Use the actual login page URL instead of the OIDC endpoint
+        // For Blazor WASM, we need to use the OIDC protocol for authentication
         var clientReturnUrl = string.IsNullOrEmpty(ReturnUrl) 
-            ? NavigationManager.BaseUri 
+            ? $"{NavigationManager.BaseUri}authentication/login-callback"
             : ReturnUrl;
             
         var encodedClientReturnUrl = Uri.EscapeDataString(clientReturnUrl);
         
-        // Direct to the login page (not the OIDC authorize endpoint)
-        var loginUrl = $"{apiBaseUrl}/Account/Login?returnUrl={encodedClientReturnUrl}";
+        // Generate OIDC authorization URL with parameters
+        var loginUrl = $"{apiBaseUrl}/connect/authorize?client_id=web_backend_Blazor&redirect_uri={encodedClientReturnUrl}&response_type=code&scope=web_backend%20roles%20email%20phone%20openid%20profile&state={Guid.NewGuid()}";
         
         await JS.InvokeVoidAsync("console.log", $"Redirecting to: {loginUrl}");
         
-        // Redirect to the login page
+        // Redirect to the authorization server
         NavigationManager.NavigateTo(loginUrl, forceLoad: true);
     }
 }

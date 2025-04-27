@@ -1,19 +1,16 @@
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
 @using System.Security.Claims
-@using web_backend.Blazor.Client.Services
-@namespace web_backend.Blazor.Client.Pages.Authentication
 
-@inject AuthenticationStateProvider AuthStateProvider
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
-@inject AuthService AuthService
-@inject DebugService DebugService
 
 <AuthorizeView>
     <Authorized>
         <div class="d-flex align-items-center">
             <div class="user-info me-3">
-                Hello, @context.User.Identity?.Name
+                Hello, @GetDisplayName()
             </div>
             <button class="btn btn-outline-light btn-sm" @onclick="BeginSignOut">
                 <i class="bi bi-box-arrow-right me-1"></i> Logout
@@ -33,16 +30,31 @@
 </AuthorizeView>
 
 @code {
-    protected override async Task OnInitializedAsync()
-    {
-        await DebugService.LogAsync("LoginStatus component initialized");
-        // Check if user is authenticated on component load
-        await AuthService.CheckAuthenticationStatus();
-    }
-    
     private async Task BeginSignOut()
     {
-        await DebugService.LogAsync("Logout requested");
-        await AuthService.Logout();
+        await JS.InvokeVoidAsync("console.log", "Signing out...");
+        
+        // Navigate to the backend logout endpoint and force refresh
+        var logoutUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net/Account/Logout";
+        Navigation.NavigateTo(logoutUrl, forceLoad: true);
+    }
+    
+    private string GetDisplayName()
+    {
+        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
+        var user = authState.User;
+        
+        if (user.Identity?.IsAuthenticated != true)
+            return string.Empty;
+            
+        var name = user.FindFirst(c => c.Type == ClaimTypes.Name)?.Value;
+        if (!string.IsNullOrEmpty(name))
+            return name;
+            
+        var givenName = user.FindFirst(c => c.Type == ClaimTypes.GivenName)?.Value;
+        if (!string.IsNullOrEmpty(givenName))
+            return givenName;
+            
+        return user.Identity.Name ?? "User";
     }
 }
