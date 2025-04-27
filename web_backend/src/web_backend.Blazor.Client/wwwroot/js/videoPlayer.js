@@ -4,6 +4,12 @@ window.loadHlsStream = function(streamUrl, videoElementId = 'videoPlayer', strea
         console.error('Stream URL is null or empty');
         return;
     }
+    
+    // Fix mixed content by converting HTTP to HTTPS for HLS URLs
+    if (streamUrl.startsWith('http:') && streamUrl.includes('/hls/')) {
+        streamUrl = streamUrl.replace('http:', 'https:');
+        console.log('Fixed mixed content - converted to HTTPS URL: ' + streamUrl);
+    }
 
     const video = document.getElementById(videoElementId);
     if (!video) {
