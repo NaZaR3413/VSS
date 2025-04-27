@@ -84,6 +84,11 @@ public class web_backendBlazorClientModule : AbpModule
 
     private static void ConfigureAuthentication(WebAssemblyHostBuilder builder)
     {
+        // First register a fallback identity service to prevent crashes when auth fails
+        builder.Services.RemoveAll<IIdentityModelAuthenticationService>();
+        builder.Services.AddSingleton<IIdentityModelAuthenticationService, NullIdentityModelAuthenticationService>();
+        
+        // Configure OIDC with more resilient error handling
         builder.Services.AddOidcAuthentication(options =>
         {
             builder.Configuration.Bind("AuthServer", options.ProviderOptions);
@@ -94,6 +99,16 @@ public class web_backendBlazorClientModule : AbpModule
             options.ProviderOptions.DefaultScopes.Add("roles");
             options.ProviderOptions.DefaultScopes.Add("email");
             options.ProviderOptions.DefaultScopes.Add("phone");
+            
+            // Add ResponseMode to improve compatibility
+            options.ProviderOptions.ResponseMode = "fragment";
+            
+            // Add more resilient options
+            options.ProviderOptions.ResponseType = "code";
+            options.ProviderOptions.MetadataUrl = builder.Configuration
+                .GetSection("RemoteServices")
+                .GetSection("Default")
+                .GetValue<string>("BaseUrl") + "/.well-known/openid-configuration";
         });
     }
 
@@ -114,19 +129,31 @@ public class web_backendBlazorClientModule : AbpModule
 
         context.Services.AddTransient(sp => new HttpClient
         {
-            BaseAddress = new Uri(remoteServiceBaseUrl)
+            BaseAddress = new Uri(remoteServiceBaseUrl),
+            Timeout = TimeSpan.FromSeconds(30)
         });
         
-        // Register the AbpMvcClient explicitly
+        // Configure AbpRemoteServiceOptions for better reliability
+        context.Services.Configure<AbpRemoteServiceOptions>(options =>
+        {
+            options.RemoteServices.Default = new RemoteServiceConfiguration(remoteServiceBaseUrl)
+            {
+                Version = "1.0"
+            };
+        });
+        
+        // Register the AbpMvcClient explicitly with proper timeout
         context.Services.AddHttpClient("AbpMvcClient", client =>
         {
             client.BaseAddress = new Uri(remoteServiceBaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(30);
         });
         
-        // Register API client
+        // Register API client with timeout
         context.Services.AddHttpClient("API", client =>
         {
             client.BaseAddress = new Uri(remoteServiceBaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(30);
         });
         
         // Disable the IdentityModelAuthenticationService that's trying to use authorization_code
