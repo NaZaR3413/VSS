@@ -124,24 +124,9 @@ namespace web_backend.HttpApi.Host.Pages.Account
                     return Page();
                 }
 
-                // Additionally sign the user in with OpenIddict to establish proper OIDC authentication
-                _logger.LogInformation("Establishing OpenID Connect authentication for user: {UserName}", user.UserName);
-                
-                var principal = await SignInManager.CreateUserPrincipalAsync(user);
-                
-                // Add OpenID Connect specific claims
-                principal.SetScopes(new[]
-                {
-                    OpenIddictConstants.Scopes.OpenId,
-                    OpenIddictConstants.Scopes.Email,
-                    OpenIddictConstants.Scopes.Profile,
-                    OpenIddictConstants.Scopes.Roles,
-                    "web_backend"
-                });
-                
-                await HttpContext.SignInAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme, principal);
-                _logger.LogInformation("OpenID Connect authentication established successfully");
-
+                // We don't need to directly sign in with OpenIddict here.
+                // The standard Identity sign-in is sufficient, and OpenIddict will use that authentication
+                // when the user is redirected to the OIDC endpoints.
                 _logger.LogInformation("Login succeeded for user: {UserName}, redirecting to: {ReturnUrl}", 
                     LoginInput.UserNameOrEmailAddress, ReturnUrl ?? "/");
                 
