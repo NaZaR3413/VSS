@@ -1,10 +1,13 @@
 @page "/authentication/login-callback"
-@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
 @using Microsoft.Extensions.Configuration
+@using System.Text.Json
+@using web_backend.Blazor.Client.Services
 
 @inject NavigationManager Navigation
 @inject IConfiguration Configuration
 @inject IJSRuntime JS
+@inject AuthService AuthService
+@inject DebugService DebugService
 
 <div class="card">
     <div class="card-body text-center">
@@ -22,20 +25,22 @@
     {
         try
         {
-            // Log status for debugging
-            await JS.InvokeVoidAsync("console.log", "Login callback page loaded");
-            await JS.InvokeVoidAsync("console.log", $"Current URL: {Navigation.Uri}");
+            await DebugService.LogAsync("Login callback page loaded");
+            await DebugService.LogAsync($"Current URL: {Navigation.Uri}");
             
-            // Attempt to complete the authentication process
-            await JS.InvokeVoidAsync("console.log", "Attempting to complete authentication");
+            // Check if user is authenticated after redirect from login page
+            var isAuthenticated = await AuthService.CheckAuthenticationStatus();
             
-            // Navigate to the home page after successful login
-            Navigation.NavigateTo("/");
+            await DebugService.LogAsync($"Authentication check result: {isAuthenticated}");
+            
+            // Navigate to landing page after processing
+            Navigation.NavigateTo("/landing");
         }
         catch (Exception ex)
         {
-            await JS.InvokeVoidAsync("console.error", $"Login error: {ex.Message}");
-            Navigation.NavigateTo("/");
+            await DebugService.LogAsync($"Login error: {ex.Message}");
+            await JS.InvokeVoidAsync("console.error", ex.StackTrace);
+            Navigation.NavigateTo("/landing");
         }
     }
 }

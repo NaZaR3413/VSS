@@ -2,11 +2,13 @@
 using System.Net.Http;
 using Blazorise.Bootstrap5;
 using Blazorise.Icons.FontAwesome;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Http;
 using web_backend.Blazor.Client.Menus;
 using web_backend.Blazor.Client.Services;
 using OpenIddict.Abstractions;
@@ -51,6 +53,24 @@ public class web_backendBlazorClientModule : AbpModule
         
         // Add LivestreamStateService for real-time updates
         context.Services.AddSingleton<LivestreamStateService>();
+
+        // Register custom authentication provider and service
+        context.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
+        context.Services.AddScoped<AuthService>();
+
+        // Configure HTTP client to include cookies for all requests
+        context.Services.Configure<HttpClientFactoryOptions>(options =>
+        {
+            options.HttpMessageHandlerBuilderActions.Add(builder =>
+            {
+                builder.PrimaryHandler = new HttpClientHandler
+                {
+                    UseCookies = true,
+                    AllowAutoRedirect = false,
+                    UseDefaultCredentials = false
+                };
+            });
+        });
     }
 
     // We're commenting out this method to avoid duplicate root component registration
