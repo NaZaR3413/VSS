@@ -122,6 +122,22 @@ namespace web_backend.HttpApi.Host.Pages.Account
                 {
                     try
                     {
+                        // Frontend application URL
+                        string frontendUrl = "https://salmon-glacier-08dca301e.6.azurestaticapps.net";
+                        
+                        // Local development frontend URL (for testing)
+                        string localFrontendUrl = "https://localhost:44307";
+                        
+                        // Default URL to redirect to after successful login
+                        string defaultRedirectUrl = frontendUrl;
+                        
+                        #if DEBUG
+                        // Use local frontend URL for development
+                        defaultRedirectUrl = localFrontendUrl;
+                        #endif
+                        
+                        _logger.LogInformation("Login successful for user: {UserName}", LoginInput.UserNameOrEmailAddress);
+                        
                         // Check if ReturnUrl is provided
                         if (!string.IsNullOrEmpty(ReturnUrl))
                         {
@@ -134,13 +150,7 @@ namespace web_backend.HttpApi.Host.Pages.Account
                                 var redirectAllowedUrls = await SettingProvider.GetOrNullAsync("App.RedirectAllowedUrls");
                                 var allowedUrls = !string.IsNullOrEmpty(redirectAllowedUrls)
                                     ? redirectAllowedUrls.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                                    : Array.Empty<string>();
-
-                                // Add at least one default allowed URL if none are configured
-                                if (allowedUrls.Length == 0)
-                                {
-                                    allowedUrls = new[] { "https://salmon-glacier-08dca301e.6.azurestaticapps.net" };
-                                }
+                                    : new[] { frontendUrl, localFrontendUrl };
 
                                 // Check if the URL is in the allowed list
                                 if (allowedUrls.Any(url => uri.AbsoluteUri.StartsWith(url, StringComparison.OrdinalIgnoreCase)))
@@ -155,13 +165,14 @@ namespace web_backend.HttpApi.Host.Pages.Account
                             }
                         }
                         
-                        // If ReturnUrl is not valid or not in allowed list, redirect to home
-                        return LocalRedirect(Url.Content("~/") ?? "/");
+                        // If ReturnUrl is not valid or not in allowed list, redirect to frontend home
+                        _logger.LogInformation("Redirecting to frontend application: {Url}", defaultRedirectUrl);
+                        return Redirect(defaultRedirectUrl);
                     }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error processing return URL: {Message}", ex.Message);
-                        return LocalRedirect(Url.Content("~/") ?? "/");
+                        return Redirect("https://salmon-glacier-08dca301e.6.azurestaticapps.net");
                     }
                 }
                 
