@@ -172,6 +172,10 @@
         
         try
         {
+            // Check for existing authentication on startup
+            await JS.InvokeVoidAsync("authTokenManager.checkAuthCookies");
+            
+            // Get authentication state
             authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
             await DebugService.LogAsync($"Authentication state loaded: {authState.User.Identity?.IsAuthenticated}");
 
@@ -184,6 +188,10 @@
             refreshTimer = new System.Threading.Timer(async _ =>
             {
                 await RefreshLivestreams(force: false);
+                
+                // Periodically refresh authentication state (every 15 seconds)
+                authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                
                 await InvokeAsync(StateHasChanged);
             }, null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
 

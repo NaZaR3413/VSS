@@ -31,13 +31,14 @@ namespace web_backend.Blazor.Client.Services
             
             try
             {
-                // Check if user is authenticated in localStorage
-                var isAuthenticated = await _jsRuntime.InvokeAsync<bool>("eval", 
-                    "localStorage.getItem('isAuthenticated') === 'true'");
+                // First check if ABP auth cookie exists - this is the most reliable way
+                // The ABP auth cookie is typically named .AspNetCore.Identity.Application
+                var hasCookie = await _jsRuntime.InvokeAsync<bool>("eval", 
+                    "document.cookie.indexOf('.AspNetCore.Identity.Application') >= 0 || localStorage.getItem('isAuthenticated') === 'true'");
                 
-                if (!isAuthenticated)
+                if (!hasCookie)
                 {
-                    await _debugService.LogAsync("TokenAuthProvider: Not authenticated");
+                    await _debugService.LogAsync("TokenAuthProvider: No auth cookie found - not authenticated");
                     return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
                 }
 
@@ -47,8 +48,7 @@ namespace web_backend.Blazor.Client.Services
                 if (string.IsNullOrEmpty(userInfoJson))
                 {
                     // Try to get user from token if available
-                    var token = await _jsRuntime.InvokeAsync<string>("eval", 
-                        "localStorage.getItem('accessToken') || ''");
+                    var token = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "accessToken");
                     
                     if (!string.IsNullOrEmpty(token))
                     {
@@ -58,13 +58,24 @@ namespace web_backend.Blazor.Client.Services
                         return new AuthenticationState(new ClaimsPrincipal(identity));
                     }
                     
-                    await _debugService.LogAsync("TokenAuthProvider: No user info available");
-                    return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+                    await _debugService.LogAsync("TokenAuthProvider: Auth cookie exists but no user info available - creating minimal identity");
+                    
+                    // If we have a cookie but no user info, create a minimal authenticated identity
+                    // This at least shows the user as logged in even if we don't have detailed info
+                    var minimalClaims = new List<Claim>
+                    {
+                        new Claim(ClaimTypes.Name, "User"),
+                        new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString())
+                    };
+                    
+                    var minimalIdentity = new ClaimsIdentity(minimalClaims, "cookie");
+                    return new AuthenticationState(new ClaimsPrincipal(minimalIdentity));
                 }
 
                 // Parse the user info from JSON
                 try
                 {
+                    await _debugService.LogAsync("TokenAuthProvider: Parsing user info from storage");
                     var userInfo = JsonSerializer.Deserialize<JsonElement>(userInfoJson);
                     
                     // Build claims from user info
@@ -74,10 +85,12 @@ namespace web_backend.Blazor.Client.Services
                     if (userInfo.TryGetProperty("userName", out var userName))
                     {
                         claims.Add(new Claim(ClaimTypes.Name, userName.GetString()));
+                        claims.Add(new Claim(ClaimTypes.NameIdentifier, userName.GetString()));
                     }
                     else if (userInfo.TryGetProperty("name", out var name))
                     {
                         claims.Add(new Claim(ClaimTypes.Name, name.GetString()));
+                        claims.Add(new Claim(ClaimTypes.NameIdentifier, name.GetString()));
                     }
                     
                     // Add email claim if available
