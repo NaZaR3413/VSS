@@ -33,9 +33,6 @@ using Volo.Abp.UI.Navigation.Urls;
 using Volo.Abp.VirtualFileSystem;
 using Volo.Abp.OpenIddict;
 using System.Security.Cryptography.X509Certificates;
-using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.Extensions.Logging;
-using Microsoft.AspNetCore.Http;
 
 using Volo.Abp.ObjectExtending;
 using Volo.Abp.Identity;
@@ -57,12 +54,11 @@ public class web_backendHttpApiHostModule : AbpModule
     public override void PreConfigureServices(ServiceConfigurationContext context)
     {
         var hostingEnvironment = context.Services.GetHostingEnvironment();
-        var configuration = context.Services.GetConfiguration();
 
         Console.WriteLine($"Hosting Environment: {hostingEnvironment.EnvironmentName}");
 
         // Only run production config in a non-Development environment
-        if (!hostingEnvironment.IsDevelopment())
+        if (true)
         {
             Console.WriteLine("Running production OpenIddict configuration...");
 
@@ -77,30 +73,23 @@ public class web_backendHttpApiHostModule : AbpModule
             {
                 try
                 {
+                    var configuration = context.Services.GetConfiguration();
                     var pfxPassword = configuration["OpenIddict:Certificates:Default:Password"];
-                    if (string.IsNullOrEmpty(pfxPassword))
-                    {
-                        Console.WriteLine("Warning: PFX password is not set in configuration. Using default password.");
-                        pfxPassword = "Varsity2024"; // Fallback to default only if not in configuration
-                    }
-                    else
-                    {
-                        Console.WriteLine("Retrieved PFX password from configuration.");
-                    }
 
+                    Console.WriteLine("Retrieved PFX password from configuration.");
                     var certPath = Path.Combine(AppContext.BaseDirectory, "openiddict.pfx");
 
                     Console.WriteLine($"Looking for certificate at: {certPath}");
                     if (!File.Exists(certPath))
                     {
-                        Console.WriteLine("Certificate file not found! Falling back to development certificates.");
-                        return; // Fall back to development certificates
+                        Console.WriteLine("Certificate file not found!");
+                        throw new FileNotFoundException("openiddict.pfx not found in expected location.", certPath);
                     }
 
                     var certificate = new X509Certificate2(
                         certPath,
-                        pfxPassword,
-                        X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.PersistKeySet
+                        "Varsity2024",
+                        X509KeyStorageFlags.MachineKeySet
                     );
 
                     Console.WriteLine("Certificate loaded successfully.");
@@ -113,14 +102,13 @@ public class web_backendHttpApiHostModule : AbpModule
                 {
                     Console.WriteLine("Exception while loading certificate:");
                     Console.WriteLine(ex.ToString());
-                    Console.WriteLine("Falling back to development certificates.");
-                    // Don't throw - let it fall back to development certificates
+                    throw;
                 }
             });
         }
         else
         {
-            Console.WriteLine("Development environment detected. Using development certificates.");
+            Console.WriteLine("Development environment detected. Skipping production certificate configuration.");
         }
 
         PreConfigure<OpenIddictBuilder>(builder =>
@@ -149,6 +137,8 @@ public class web_backendHttpApiHostModule : AbpModule
                     propertyBuilder.HasMaxLength(IdentityUserConsts.MaxPhoneNumberLength);
                 });
     }
+
+
 
     public override void ConfigureServices(ServiceConfigurationContext context)
     {
@@ -271,29 +261,10 @@ public class web_backendHttpApiHostModule : AbpModule
     {
         var app = context.GetApplicationBuilder();
         var env = context.GetEnvironment();
-        var logger = context.ServiceProvider.GetRequiredService<ILogger<web_backendHttpApiHostModule>>();
 
         if (env.IsDevelopment())
         {
             app.UseDeveloperExceptionPage();
-        }
-        else
-        {
-            app.UseExceptionHandler(appBuilder =>
-            {
-                appBuilder.Run(async context =>
-                {
-                    context.Response.StatusCode = 500;
-                    var exceptionHandlerFeature = context.Features.Get<IExceptionHandlerFeature>();
-                    if (exceptionHandlerFeature != null)
-                    {
-                        var exception = exceptionHandlerFeature.Error;
-                        logger.LogError(exception, "An unhandled exception occurred during the request execution.");
-                    }
-                    await context.Response.WriteAsync("An error occurred. Please try again later.");
-                });
-            });
-            app.UseHsts();
         }
 
         app.UseAbpRequestLocalization();

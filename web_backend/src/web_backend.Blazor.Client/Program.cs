@@ -35,17 +35,16 @@ public class Program
         // Register Debug Service first
         builder.Services.AddSingleton<DebugService>();
 
-        // Configure the application with error handling
+        // Configure the application
         var application = await builder.AddApplicationAsync<web_backendBlazorClientModule>(options =>
         {
             options.UseAutofac();
         });
 
-        // Additional HttpClient for API with proper configuration
+        // Additional HttpClient for API
         builder.Services.AddHttpClient("API", client =>
         {
             client.BaseAddress = new Uri(remoteServiceBaseUrl ?? builder.HostEnvironment.BaseAddress);
-            client.Timeout = TimeSpan.FromSeconds(30);
         });
 
         var host = builder.Build();
@@ -69,15 +68,6 @@ public class Program
         catch (Exception ex)
         {
             await jsRuntime.InvokeVoidAsync("console.error", $"Error initializing application: {ex.Message}");
-            if (ex.InnerException != null)
-            {
-                await jsRuntime.InvokeVoidAsync("console.error", $"Inner exception: {ex.InnerException.Message}");
-            }
-            
-            if (debugService != null)
-            {
-                await debugService.LogAsync($"Error initializing application: {ex.Message}");
-            }
         }
 
         try
@@ -88,15 +78,6 @@ public class Program
         catch (Exception ex)
         {
             await jsRuntime.InvokeVoidAsync("console.error", $"Error running host: {ex.Message}");
-            if (ex.InnerException != null)
-            {
-                await jsRuntime.InvokeVoidAsync("console.error", $"Inner exception: {ex.InnerException.Message}");
-            }
-            
-            if (debugService != null)
-            {
-                await debugService.LogAsync($"Error running host: {ex.Message}");
-            }
         }
     }
 }
