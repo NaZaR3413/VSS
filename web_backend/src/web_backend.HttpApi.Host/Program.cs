@@ -20,8 +20,13 @@ public class Program
 #endif
             .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
             .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
+            // Add more detailed logging for authentication components
+            .MinimumLevel.Override("Microsoft.AspNetCore.Authentication", LogEventLevel.Debug)
+            .MinimumLevel.Override("OpenIddict", LogEventLevel.Debug)
+            .MinimumLevel.Override("Volo.Abp.Identity", LogEventLevel.Debug)
+            .MinimumLevel.Override("Volo.Abp.OpenIddict", LogEventLevel.Debug)
             .Enrich.FromLogContext()
-            .WriteTo.Async(c => c.File("Logs/logs.txt"))
+            .WriteTo.Async(c => c.File("Logs/logs.txt", rollingInterval: RollingInterval.Day))
             .WriteTo.Async(c => c.Console())
             .CreateLogger();
 
