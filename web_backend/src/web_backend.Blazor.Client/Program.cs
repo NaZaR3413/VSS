@@ -9,6 +9,7 @@ using web_backend.Blazor.Client.Services;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Authentication;
+using Microsoft.AspNetCore.Components.Authorization;
 
 namespace web_backend.Blazor.Client;
 
@@ -74,6 +75,11 @@ public class Program
 
         // Register Debug Service first
         builder.Services.AddSingleton<DebugService>();
+
+        // Register custom authentication state provider
+        builder.Services.AddScoped<TokenAuthenticationStateProvider>();
+        builder.Services.AddScoped<AuthenticationStateProvider>(provider => 
+            provider.GetRequiredService<TokenAuthenticationStateProvider>());
 
         // Configure the application
         var application = await builder.AddApplicationAsync<web_backendBlazorClientModule>(options =>

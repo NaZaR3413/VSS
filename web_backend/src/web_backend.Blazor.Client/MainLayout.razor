@@ -283,15 +283,19 @@
     private async Task LogoutClick()
     {
         try {
+            // Clear authentication tokens using our auth.js helper
+            await JS.InvokeVoidAsync("authTokenManager.clearAuthData");
+            
             // Get the base address for the API
             var apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
             
-            // Send logout request
-            await HttpClient.PostAsync($"{apiBaseUrl}/api/account/logout", null);
-            
-            // Clear local storage (remove tokens)
-            await JS.InvokeVoidAsync("localStorage.removeItem", "authToken");
-            await JS.InvokeVoidAsync("localStorage.removeItem", "refreshToken");
+            try {
+                // Send logout request to API if needed
+                await HttpClient.PostAsync($"{apiBaseUrl}/api/account/logout", null);
+            }
+            catch {
+                // Ignore errors from the logout endpoint - we're logging out locally regardless
+            }
             
             // Refresh the page to clear all authentication state
             NavigationManager.NavigateTo("/landing", forceLoad: true);

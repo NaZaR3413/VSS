@@ -27,7 +27,7 @@
                     <a href="/account/login" class="text-decoration-none">Login</a>
                 </strong>
                 
-                <EditForm Model="@registerModel" OnValidSubmit="RegisterUser" class="mt-4">
+                <form method="post" class="mt-4" @onsubmit="RegisterUser">
                     <DataAnnotationsValidator />
 
                     <!-- Name -->
@@ -90,7 +90,7 @@
                     </div>
 
                     <div class="d-grid gap-2">
-                        <button type="submit" class="btn-lg mt-4 btn btn-primary vss-register-button" disabled="@isLoading">
+                        <button type="submit" class="btn-lg mt-4 btn btn-primary vss-register-button" data-busy-text="Processing..." disabled="@isLoading">
                             @if (isLoading)
                             {
                                 <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
@@ -102,7 +102,7 @@
                             }
                         </button>
                     </div>
-                </EditForm>              
+                </form>              
             </div>
         </div>        
     </div>
