@@ -3,56 +3,77 @@
 @using System.ComponentModel.DataAnnotations
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@inject DebugService DebugService
 
-<h1>Login</h1>
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h2 class="mb-0">Sign In</h2>
+                </div>
+                <div class="card-body">
+                    <EditForm Model="@loginModel" OnValidSubmit="HandleValidSubmit">
+                        <DataAnnotationsValidator />
+                        <Microsoft.AspNetCore.Components.Forms.ValidationSummary />
 
-<div class="card">
-    <div class="card-body">
-        <h5 class="card-title">Sign In</h5>
-        <EditForm Model="@loginModel" OnValidSubmit="HandleValidSubmit">
-            <DataAnnotationsValidator />
-            <Microsoft.AspNetCore.Components.Forms.ValidationSummary />
+                        <div class="form-group mb-3">
+                            <label for="username">Username or Email</label>
+                            <InputText id="username" @bind-Value="loginModel.UserName" class="form-control" />
+                            <ValidationMessage For="@(() => loginModel.UserName)" />
+                        </div>
 
-            <div class="form-group mt-3">
-                <label for="username">Username</label>
-                <InputText id="username" @bind-Value="loginModel.UserName" class="form-control" />
-                <ValidationMessage For="@(() => loginModel.UserName)" />
-            </div>
+                        <div class="form-group mb-3">
+                            <label for="password">Password</label>
+                            <InputText id="password" type="password" @bind-Value="loginModel.Password" class="form-control" />
+                            <ValidationMessage For="@(() => loginModel.Password)" />
+                        </div>
 
-            <div class="form-group mt-3">
-                <label for="password">Password</label>
-                <InputText id="password" type="password" @bind-Value="loginModel.Password" class="form-control" />
-                <ValidationMessage For="@(() => loginModel.Password)" />
-            </div>
+                        <div class="form-group mb-3">
+                            <div class="form-check">
+                                <InputCheckbox id="rememberMe" @bind-Value="loginModel.RememberMe" class="form-check-input" />
+                                <label class="form-check-label" for="rememberMe">Remember me</label>
+                            </div>
+                        </div>
 
-            <div class="form-group mt-3">
-                <div class="form-check">
-                    <InputCheckbox id="rememberMe" @bind-Value="loginModel.RememberMe" class="form-check-input" />
-                    <label class="form-check-label" for="rememberMe">Remember me</label>
+                        <div class="form-group mb-3">
+                            <button type="submit" class="btn btn-primary w-100" disabled="@isLoading">
+                                @if (isLoading)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                    <span>Signing in...</span>
+                                }
+                                else
+                                {
+                                    <span>Sign In</span>
+                                }
+                            </button>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(errorMessage))
+                        {
+                            <div class="alert alert-danger mt-3">
+                                @errorMessage
+                            </div>
+                        }
+                        
+                        @if (showDebugInfo)
+                        {
+                            <div class="alert alert-info mt-3">
+                                <h5>Debug Information</h5>
+                                <pre style="white-space: pre-wrap;">@debugInfo</pre>
+                            </div>
+                        }
+                    </EditForm>
+                </div>
+                <div class="card-footer bg-light">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="ToggleDebugInfo">
+                        @(showDebugInfo ? "Hide Debug Info" : "Show Debug Info")
+                    </button>
                 </div>
             </div>
-
-            <div class="form-group mt-3">
-                <button type="submit" class="btn btn-primary" disabled="@isLoading">
-                    @if (isLoading)
-                    {
-                        <span class="spinner-border spinner-border-sm mr-1" role="status" aria-hidden="true"></span>
-                        <span>Loading...</span>
-                    }
-                    else
-                    {
-                        <span>Login</span>
-                    }
-                </button>
-            </div>
-
-            @if (!string.IsNullOrEmpty(errorMessage))
-            {
-                <div class="alert alert-danger mt-3">
-                    @errorMessage
-                </div>
-            }
-        </EditForm>
+        </div>
     </div>
 </div>
 
@@ -65,20 +86,51 @@
         [Required]
         public string Password { get; set; } = string.Empty;
 
-        public bool RememberMe { get; set; }
+        public bool RememberMe { get; set; } = true;
     }
 
     private LoginModel loginModel = new LoginModel();
     private bool isLoading = false;
     private string errorMessage = string.Empty;
+    private bool showDebugInfo = false;
+    private string debugInfo = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
+        await DebugService.LogAsync("Login page initialized");
+        
         // Check if user is already authenticated
         if (await AuthService.IsAuthenticatedAsync())
         {
+            await DebugService.LogAsync("User is already authenticated, redirecting to home");
             NavigationManager.NavigateTo("/");
         }
+        
+        // Get any debug cookies to display
+        await UpdateDebugInfo();
+    }
+    
+    private async Task UpdateDebugInfo()
+    {
+        try
+        {
+            var isAuth = await JSRuntime.InvokeAsync<bool>("eval", 
+                "localStorage.getItem('isAuthenticated') === 'true'");
+            
+            var cookies = await JSRuntime.InvokeAsync<string>("eval", "document.cookie");
+            
+            debugInfo = $"LocalStorage Auth: {isAuth}\n" +
+                        $"Cookies: {cookies}\n";
+        }
+        catch (Exception ex)
+        {
+            debugInfo = $"Error getting debug info: {ex.Message}";
+        }
+    }
+    
+    private void ToggleDebugInfo()
+    {
+        showDebugInfo = !showDebugInfo;
     }
 
     private async Task HandleValidSubmit()
@@ -87,21 +139,28 @@
         {
             isLoading = true;
             errorMessage = string.Empty;
+            
+            await DebugService.LogAsync($"Login attempt for username: {loginModel.UserName}");
 
             var result = await AuthService.LoginAsync(loginModel.UserName, loginModel.Password);
 
             if (result)
             {
-                NavigationManager.NavigateTo("/");
+                await DebugService.LogAsync("Login successful, redirecting to home");
+                NavigationManager.NavigateTo("/", forceLoad: false);
             }
             else
             {
                 errorMessage = "Login failed. Please check your username and password.";
+                await DebugService.LogAsync("Login failed");
+                await UpdateDebugInfo();
             }
         }
         catch (Exception ex)
         {
             errorMessage = $"An error occurred: {ex.Message}";
+            await DebugService.LogAsync($"Login exception: {ex.Message}");
+            await UpdateDebugInfo();
         }
         finally
         {

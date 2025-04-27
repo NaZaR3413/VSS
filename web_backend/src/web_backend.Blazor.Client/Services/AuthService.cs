@@ -40,34 +40,27 @@ namespace web_backend.Blazor.Client.Services
         {
             try
             {
-                await _debugService.LogAsync("AuthService: Starting login process...");
+                await _debugService.LogAsync("AuthService: *** STARTING LOGIN PROCESS ***");
                 
                 // Get base API URL from configuration
                 var apiBaseUrl = _configuration["RemoteServices:Default:BaseUrl"];
                 if (string.IsNullOrEmpty(apiBaseUrl))
                 {
-                    await _debugService.LogAsync("AuthService: API base URL is missing from configuration");
-                    return false;
+                    await _debugService.LogAsync("AuthService: API base URL is missing, using hardcoded default");
+                    apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
                 }
 
-                // Use the standard ABP login endpoint per your API list
-                var loginEndpoint = $"{apiBaseUrl}/api/account/login";
-                
-                // Create login request with credentials using ABP format
-                var loginRequest = new
-                {
-                    UserNameOrEmailAddress = username,
-                    Password = password,
-                    RememberMe = true
-                };
+                await _debugService.LogAsync($"AuthService: Using API URL: {apiBaseUrl}");
 
-                await _debugService.LogAsync($"AuthService: Sending login request to {loginEndpoint}");
+                // Create a DelegatingHandler to capture and log cookies
+                var cookieHandler = new CookieCaptureHandler();
                 
-                // Create a custom HttpClient that doesn't follow redirects automatically
+                // Create a custom HttpClient using our cookie capturing handler
                 using var handler = new HttpClientHandler
                 {
                     AllowAutoRedirect = false,
-                    UseCookies = true
+                    UseCookies = true,
+                    CookieContainer = new CookieContainer()
                 };
                 
                 using var client = new HttpClient(handler)
@@ -75,80 +68,186 @@ namespace web_backend.Blazor.Client.Services
                     BaseAddress = new Uri(apiBaseUrl)
                 };
                 
-                // Add CORS headers
+                // Add headers to mimic a browser request
+                client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Blazor WebAssembly)");
                 client.DefaultRequestHeaders.Add("Origin", "https://salmon-glacier-08dca301e.6.azurestaticapps.net");
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                 
-                // Send the login request with proper credentials
+                // Create login request with credentials
+                var loginRequest = new
+                {
+                    UserNameOrEmailAddress = username,
+                    Password = password,
+                    RememberMe = true
+                };
+
+                await _debugService.LogAsync($"AuthService: Sending login request for user: {username}");
+                
+                // Convert to JSON
                 var jsonContent = JsonSerializer.Serialize(loginRequest);
                 var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
                 
+                // Send login request
                 var response = await client.PostAsync("/api/account/login", content);
                 
-                // Check if the request was successful (2xx) or if it's a redirect (3xx)
-                if (response.IsSuccessStatusCode || (int)response.StatusCode >= 300 && (int)response.StatusCode < 400)
+                await _debugService.LogAsync($"AuthService: Login response status: {(int)response.StatusCode} {response.StatusCode}");
+                
+                // Check for cookies in the response
+                if (response.Headers.Contains("Set-Cookie"))
                 {
-                    await _debugService.LogAsync($"AuthService: Login response received with status: {response.StatusCode}");
+                    var cookies = response.Headers.GetValues("Set-Cookie").ToList();
+                    await _debugService.LogAsync($"AuthService: Received {cookies.Count} cookies from server");
                     
-                    // Extract cookies from response if they exist
-                    if (response.Headers.Contains("Set-Cookie"))
+                    foreach (var cookie in cookies)
                     {
-                        var cookies = response.Headers.GetValues("Set-Cookie");
-                        await _debugService.LogAsync($"AuthService: Received {cookies.Count()} cookies from server");
-                        
-                        // Store cookies in localStorage to use in future requests
-                        await _jsRuntime.InvokeVoidAsync("localStorage.setItem", "authCookies", string.Join(";", cookies));
-                        
-                        // Apply cookies to document
-                        foreach (var cookie in cookies)
+                        await _debugService.LogAsync($"AuthService: Cookie: {cookie}");
+                    }
+                    
+                    // Store all cookies for later use
+                    await _jsRuntime.InvokeVoidAsync("localStorage.setItem", "authCookies", 
+                        JsonSerializer.Serialize(cookies));
+                    
+                    // Manually apply each relevant cookie to document.cookie
+                    foreach (var cookie in cookies)
+                    {
+                        try
                         {
-                            var cookieParts = cookie.Split(';')[0].Split('=');
-                            if (cookieParts.Length >= 2)
-                            {
-                                var cookieName = cookieParts[0].Trim();
-                                var cookieValue = cookieParts[1].Trim();
-                                await _debugService.LogAsync($"AuthService: Setting cookie: {cookieName}");
-                                
-                                // Store essential auth cookies for ABP
-                                if (cookieName.Contains(".AspNetCore.Identity.Application"))
-                                {
-                                    await _jsRuntime.InvokeVoidAsync("eval", 
-                                        $"document.cookie = '{cookieName}={cookieValue}; path=/; secure;'");
-                                    await _debugService.LogAsync("AuthService: Set ABP identity cookie");
-                                }
-                            }
+                            var mainPart = cookie.Split(';')[0];
+                            await _jsRuntime.InvokeVoidAsync("eval", 
+                                $"document.cookie = '{mainPart}; path=/; SameSite=None; Secure';");
+                            await _debugService.LogAsync($"AuthService: Applied cookie to document: {mainPart}");
+                        }
+                        catch (Exception ex)
+                        {
+                            await _debugService.LogAsync($"AuthService: Error applying cookie: {ex.Message}");
                         }
                     }
                     
-                    // Store authentication state in localStorage
+                    // Mark as authenticated in local storage
                     await _jsRuntime.InvokeVoidAsync("localStorage.setItem", "isAuthenticated", "true");
                     await _jsRuntime.InvokeVoidAsync("localStorage.setItem", "authTime", DateTime.UtcNow.ToString("o"));
                     
-                    // Fetch user profile using the correct ABP endpoint from your API list
-                    await _debugService.LogAsync("AuthService: Fetching user profile from ABP endpoint");
-                    await FetchAndStoreCurrentUser();
+                    // Debug log to check document.cookie
+                    var documentCookies = await _jsRuntime.InvokeAsync<string>("eval", "document.cookie");
+                    await _debugService.LogAsync($"AuthService: Current document.cookie: {documentCookies}");
                     
-                    // Notify authentication state changed
-                    await _debugService.LogAsync("AuthService: Notifying authentication state changed");
+                    // Try to fetch user profile info
+                    await _debugService.LogAsync("AuthService: Fetching user profile after login");
+                    var userProfile = await FetchCurrentUserProfile(cookies);
+                    
+                    // Store user profile if successful
+                    if (!string.IsNullOrWhiteSpace(userProfile))
+                    {
+                        await _jsRuntime.InvokeVoidAsync("localStorage.setItem", "currentUser", userProfile);
+                        await _debugService.LogAsync("AuthService: Stored user profile in localStorage");
+                    }
+                    
+                    // Notify auth state provider
+                    await _debugService.LogAsync("AuthService: Notifying auth state changed");
                     _authStateProvider.NotifyAuthenticationStateChanged();
                     
                     // Small delay to ensure UI updates
-                    await Task.Delay(300); 
+                    await Task.Delay(200);
                     
-                    await _debugService.LogAsync("AuthService: Login process completed successfully");
                     return true;
+                }
+                else if (response.IsSuccessStatusCode)
+                {
+                    // Response is successful but no cookies - try to parse the response content
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    await _debugService.LogAsync($"AuthService: Login response content: {responseContent}");
+                    
+                    try
+                    {
+                        // Store in localStorage
+                        await _jsRuntime.InvokeVoidAsync("localStorage.setItem", "currentUser", responseContent);
+                        await _jsRuntime.InvokeVoidAsync("localStorage.setItem", "isAuthenticated", "true");
+                        await _jsRuntime.InvokeVoidAsync("localStorage.setItem", "authTime", DateTime.UtcNow.ToString("o"));
+                        
+                        // Notify auth state provider
+                        _authStateProvider.NotifyAuthenticationStateChanged();
+                        
+                        return true;
+                    }
+                    catch (Exception ex)
+                    {
+                        await _debugService.LogAsync($"AuthService: Error parsing login response: {ex.Message}");
+                    }
+                }
+                
+                await _debugService.LogAsync("AuthService: Login failed - no auth cookies received");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                await _debugService.LogAsync($"AuthService: Login exception: {ex.Message}");
+                await _debugService.LogAsync($"AuthService: Stack trace: {ex.StackTrace}");
+                return false;
+            }
+        }
+
+        private async Task<string> FetchCurrentUserProfile(List<string> cookies)
+        {
+            try
+            {
+                // Get API URL from configuration
+                var apiBaseUrl = _configuration["RemoteServices:Default:BaseUrl"];
+                if (string.IsNullOrEmpty(apiBaseUrl))
+                {
+                    apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
+                }
+                
+                // Create HttpClient with our cookie handling
+                using var handler = new HttpClientHandler
+                {
+                    AllowAutoRedirect = false,
+                    UseCookies = true,
+                    CookieContainer = new CookieContainer()
+                };
+                
+                using var client = new HttpClient(handler)
+                {
+                    BaseAddress = new Uri(apiBaseUrl)
+                };
+                
+                // Add headers to request
+                client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Blazor WebAssembly)");
+                client.DefaultRequestHeaders.Add("Origin", "https://salmon-glacier-08dca301e.6.azurestaticapps.net");
+                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                
+                // Add cookies to request
+                client.DefaultRequestHeaders.Add("Cookie", string.Join("; ", cookies.Select(c => c.Split(';')[0])));
+                
+                // Request user profile
+                await _debugService.LogAsync("AuthService: Sending request to /api/account/my-profile");
+                var response = await client.GetAsync("/api/account/my-profile");
+                
+                await _debugService.LogAsync($"AuthService: Profile response status: {(int)response.StatusCode} {response.StatusCode}");
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var userProfile = await response.Content.ReadAsStringAsync();
+                    await _debugService.LogAsync($"AuthService: Received profile: {userProfile}");
+                    return userProfile;
+                }
+                else if ((int)response.StatusCode >= 300 && (int)response.StatusCode < 400)
+                {
+                    // Handle redirect
+                    var location = response.Headers.Location?.ToString();
+                    await _debugService.LogAsync($"AuthService: Profile request redirected to: {location}");
                 }
                 else
                 {
                     var errorContent = await response.Content.ReadAsStringAsync();
-                    await _debugService.LogAsync($"AuthService: Login failed with status {response.StatusCode}: {errorContent}");
-                    return false;
+                    await _debugService.LogAsync($"AuthService: Profile request failed: {errorContent}");
                 }
+                
+                return string.Empty;
             }
             catch (Exception ex)
             {
-                await _debugService.LogAsync($"AuthService: Login exception: {ex.Message}, StackTrace: {ex.StackTrace}");
-                return false;
+                await _debugService.LogAsync($"AuthService: Error fetching profile: {ex.Message}");
+                return string.Empty;
             }
         }
 
@@ -350,6 +449,24 @@ namespace web_backend.Blazor.Client.Services
                 await _debugService.LogAsync($"AuthService: Error fetching user profile: {ex.Message}");
                 return false;
             }
+        }
+    }
+
+    // Helper class to capture cookies
+    public class CookieCaptureHandler : DelegatingHandler
+    {
+        public List<string> CapturedCookies { get; } = new List<string>();
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, System.Threading.CancellationToken cancellationToken)
+        {
+            var response = await base.SendAsync(request, cancellationToken);
+            
+            if (response.Headers.Contains("Set-Cookie"))
+            {
+                CapturedCookies.AddRange(response.Headers.GetValues("Set-Cookie"));
+            }
+            
+            return response;
         }
     }
 }

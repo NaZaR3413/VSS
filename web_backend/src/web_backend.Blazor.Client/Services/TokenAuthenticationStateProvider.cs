@@ -31,110 +31,113 @@ namespace web_backend.Blazor.Client.Services
             
             try
             {
-                // First check if ABP auth cookie exists - this is the most reliable way
-                // The ABP auth cookie is typically named .AspNetCore.Identity.Application
+                // Check authentication status in multiple ways
+                var isJsAuthenticated = await _jsRuntime.InvokeAsync<bool>("eval", 
+                    "window.authTokenManager && window.authTokenManager.isAuthenticated ? window.authTokenManager.isAuthenticated() : false");
+                
+                var isLocalStorageAuth = await _jsRuntime.InvokeAsync<bool>("eval", 
+                    "localStorage.getItem('isAuthenticated') === 'true'");
+                
                 var hasCookie = await _jsRuntime.InvokeAsync<bool>("eval", 
-                    "document.cookie.indexOf('.AspNetCore.Identity.Application') >= 0 || localStorage.getItem('isAuthenticated') === 'true'");
+                    "document.cookie.indexOf('.AspNetCore.Identity.Application') >= 0");
                 
-                if (!hasCookie)
-                {
-                    await _debugService.LogAsync("TokenAuthProvider: No auth cookie found - not authenticated");
-                    return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
-                }
-
-                // Check if we have user info stored
-                var userInfoJson = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "currentUser");
+                await _debugService.LogAsync($"TokenAuthProvider: Auth checks - JS auth: {isJsAuthenticated}, LocalStorage: {isLocalStorageAuth}, Cookie: {hasCookie}");
                 
-                if (string.IsNullOrEmpty(userInfoJson))
+                // Check if any auth method indicates user is authenticated
+                if (isJsAuthenticated || isLocalStorageAuth || hasCookie)
                 {
-                    // Try to get user from token if available
-                    var token = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "accessToken");
+                    // Attempt to get document cookies to see what's available
+                    var cookies = await _jsRuntime.InvokeAsync<string>("eval", "document.cookie");
+                    await _debugService.LogAsync($"TokenAuthProvider: Current cookies: {cookies}");
                     
-                    if (!string.IsNullOrEmpty(token))
+                    // Check if we have user info in localStorage
+                    var userInfoJson = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "currentUser");
+                    
+                    if (!string.IsNullOrEmpty(userInfoJson))
                     {
-                        var claims = ParseClaimsFromJwt(token);
-                        var identity = new ClaimsIdentity(claims, "jwt");
-                        await _debugService.LogAsync("TokenAuthProvider: Created identity from JWT token");
+                        await _debugService.LogAsync("TokenAuthProvider: Found user info in localStorage");
+                        
+                        try
+                        {
+                            var userInfo = JsonSerializer.Deserialize<JsonElement>(userInfoJson);
+                            
+                            // Build claims from user info
+                            var claims = new List<Claim>();
+                            
+                            // Always add a name claim
+                            if (userInfo.TryGetProperty("userName", out var userName))
+                            {
+                                claims.Add(new Claim(ClaimTypes.Name, userName.GetString()));
+                                claims.Add(new Claim(ClaimTypes.NameIdentifier, userName.GetString()));
+                                await _debugService.LogAsync($"TokenAuthProvider: Found username: {userName.GetString()}");
+                            }
+                            else if (userInfo.TryGetProperty("name", out var name))
+                            {
+                                claims.Add(new Claim(ClaimTypes.Name, name.GetString()));
+                                claims.Add(new Claim(ClaimTypes.NameIdentifier, name.GetString()));
+                                await _debugService.LogAsync($"TokenAuthProvider: Found name: {name.GetString()}");
+                            }
+                            
+                            // Add email claim if available
+                            if (userInfo.TryGetProperty("email", out var email))
+                            {
+                                claims.Add(new Claim(ClaimTypes.Email, email.GetString()));
+                            }
+                            
+                            // Add roles if available
+                            if (userInfo.TryGetProperty("roles", out var roles) && roles.ValueKind == JsonValueKind.Array)
+                            {
+                                foreach (var role in roles.EnumerateArray())
+                                {
+                                    claims.Add(new Claim(ClaimTypes.Role, role.GetString()));
+                                    await _debugService.LogAsync($"TokenAuthProvider: Added role: {role.GetString()}");
+                                }
+                            }
+                            
+                            // Include all other properties as claims
+                            foreach (var prop in userInfo.EnumerateObject())
+                            {
+                                if (prop.Name != "userName" && prop.Name != "name" && 
+                                    prop.Name != "email" && prop.Name != "roles")
+                                {
+                                    claims.Add(new Claim(prop.Name, prop.Value.ToString()));
+                                }
+                            }
+                            
+                            // Create the identity and return authentication state
+                            var identity = new ClaimsIdentity(claims, "abp");
+                            await _debugService.LogAsync($"TokenAuthProvider: Created identity with {claims.Count} claims");
+                            
+                            return new AuthenticationState(new ClaimsPrincipal(identity));
+                        }
+                        catch (Exception ex)
+                        {
+                            await _debugService.LogAsync($"TokenAuthProvider: Error parsing user info: {ex.Message}");
+                        }
+                    }
+                    else if (hasCookie)
+                    {
+                        // If we have a cookie but no user info, we still consider the user authenticated
+                        // but with minimal info
+                        await _debugService.LogAsync("TokenAuthProvider: Auth cookie exists but no user info - creating minimal identity");
+                        
+                        var minimalClaims = new List<Claim>
+                        {
+                            new Claim(ClaimTypes.Name, "User"),
+                            new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString())
+                        };
+                        
+                        var identity = new ClaimsIdentity(minimalClaims, "cookie");
                         return new AuthenticationState(new ClaimsPrincipal(identity));
                     }
-                    
-                    await _debugService.LogAsync("TokenAuthProvider: Auth cookie exists but no user info available - creating minimal identity");
-                    
-                    // If we have a cookie but no user info, create a minimal authenticated identity
-                    // This at least shows the user as logged in even if we don't have detailed info
-                    var minimalClaims = new List<Claim>
-                    {
-                        new Claim(ClaimTypes.Name, "User"),
-                        new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString())
-                    };
-                    
-                    var minimalIdentity = new ClaimsIdentity(minimalClaims, "cookie");
-                    return new AuthenticationState(new ClaimsPrincipal(minimalIdentity));
-                }
-
-                // Parse the user info from JSON
-                try
-                {
-                    await _debugService.LogAsync("TokenAuthProvider: Parsing user info from storage");
-                    var userInfo = JsonSerializer.Deserialize<JsonElement>(userInfoJson);
-                    
-                    // Build claims from user info
-                    var claims = new List<Claim>();
-                    
-                    // Always add a name claim
-                    if (userInfo.TryGetProperty("userName", out var userName))
-                    {
-                        claims.Add(new Claim(ClaimTypes.Name, userName.GetString()));
-                        claims.Add(new Claim(ClaimTypes.NameIdentifier, userName.GetString()));
-                    }
-                    else if (userInfo.TryGetProperty("name", out var name))
-                    {
-                        claims.Add(new Claim(ClaimTypes.Name, name.GetString()));
-                        claims.Add(new Claim(ClaimTypes.NameIdentifier, name.GetString()));
-                    }
-                    
-                    // Add email claim if available
-                    if (userInfo.TryGetProperty("email", out var email))
-                    {
-                        claims.Add(new Claim(ClaimTypes.Email, email.GetString()));
-                    }
-                    
-                    // Add roles if available
-                    if (userInfo.TryGetProperty("roles", out var roles) && roles.ValueKind == JsonValueKind.Array)
-                    {
-                        foreach (var role in roles.EnumerateArray())
-                        {
-                            claims.Add(new Claim(ClaimTypes.Role, role.GetString()));
-                        }
-                    }
-                    
-                    // Include all other properties as claims
-                    foreach (var prop in userInfo.EnumerateObject())
-                    {
-                        if (prop.Name != "userName" && prop.Name != "name" && 
-                            prop.Name != "email" && prop.Name != "roles")
-                        {
-                            claims.Add(new Claim(prop.Name, prop.Value.ToString()));
-                        }
-                    }
-                    
-                    // Create the identity and return authentication state
-                    var identity = new ClaimsIdentity(claims, "abp");
-                    await _debugService.LogAsync($"TokenAuthProvider: Created identity with {claims.Count} claims");
-                    
-                    return new AuthenticationState(new ClaimsPrincipal(identity));
-                }
-                catch (Exception ex)
-                {
-                    await _debugService.LogAsync($"TokenAuthProvider: Error parsing user info: {ex.Message}");
                 }
                 
-                await _debugService.LogAsync("TokenAuthProvider: Fallback to unauthenticated state");
+                await _debugService.LogAsync("TokenAuthProvider: No auth cookie found - not authenticated");
                 return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
             }
             catch (Exception ex)
             {
-                await _debugService.LogAsync($"TokenAuthProvider: Error in GetAuthenticationStateAsync: {ex.Message}");
+                await _debugService.LogAsync($"TokenAuthProvider: Error getting auth state: {ex.Message}");
                 return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
             }
         }
