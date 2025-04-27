@@ -29,11 +29,31 @@ public class Program
         {
             Log.Information("Starting web_backend.HttpApi.Host.");
             var builder = WebApplication.CreateBuilder(args);
+            
+            // Add CORS configuration before building the host
+            builder.Services.AddCors(options =>
+            {
+                options.AddDefaultPolicy(policy =>
+                {
+                    policy.WithOrigins(
+                            "https://salmon-glacier-08dca301e.6.azurestaticapps.net",
+                            "https://localhost:44307",
+                            "http://localhost:4200")
+                        .AllowAnyHeader()
+                        .AllowAnyMethod()
+                        .AllowCredentials();
+                });
+            });
+            
             builder.Host.AddAppSettingsSecretsJson()
                 .UseAutofac()
                 .UseSerilog();
             await builder.AddApplicationAsync<web_backendHttpApiHostModule>();
             var app = builder.Build();
+            
+            // Use CORS before routing
+            app.UseCors();
+            
             await app.InitializeApplicationAsync();
             await app.RunAsync();
             return 0;
