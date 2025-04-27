@@ -268,18 +268,14 @@
 
     private void LoginClick()
     {
-        // Direct to the authentication pages on the API server
-        var apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
-        var returnUrl = Uri.EscapeDataString(NavigationManager.Uri);
-        NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Login?returnUrl={returnUrl}", forceLoad: true);
+        // Use the OIDC authentication flow instead of directly navigating to the API
+        NavigationManager.NavigateTo("/authentication/login", forceLoad: false);
     }
 
     private void RegisterClick()
     {
-        // Direct to the authentication pages on the API server
-        var apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
-        var returnUrl = Uri.EscapeDataString(NavigationManager.Uri);
-        NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Register?returnUrl={returnUrl}", forceLoad: true);
+        // Use the built-in OIDC authentication flow for registration
+        NavigationManager.NavigateTo("/authentication/register", forceLoad: false);
     }
 
     private void LogoutClick()
