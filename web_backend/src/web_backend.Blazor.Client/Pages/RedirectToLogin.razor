@@ -1,36 +1,26 @@
 @inject NavigationManager Navigation
-@inject IJSRuntime JS
-@using Microsoft.Extensions.Configuration
-@inject IConfiguration Configuration
+@inject HttpClient HttpClient
+@using System.Configuration
 
 @code {
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        // Log for debugging
-        await JS.InvokeVoidAsync("console.log", "RedirectToLogin component initialized");
+        // Determine the API base URL
+        var apiBaseUrl = DetermineApiBaseUrl();
         
-        // Get the current URI for the return URL
         var currentUri = Navigation.Uri;
         var returnUrl = Uri.EscapeDataString(currentUri);
         
-        // Get the API base URL from configuration
-        var apiBaseUrl = Configuration
-            .GetSection("RemoteServices")
-            .GetSection("Default")
-            .GetValue<string>("BaseUrl") ?? "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
-            
-        await JS.InvokeVoidAsync("console.log", $"Using API base URL: {apiBaseUrl}");
-        
-        // For OIDC with Blazor WASM, we need to use a special return URL that handles the callback
-        var clientReturnUrl = $"{Navigation.BaseUri}authentication/login-callback";
-        var encodedClientReturnUrl = Uri.EscapeDataString(clientReturnUrl);
-        
-        // Navigate to the login page on the API server with the client return URL
-        var loginUrl = $"{apiBaseUrl}/connect/authorize?client_id=web_backend_Blazor&redirect_uri={encodedClientReturnUrl}&response_type=code&scope=web_backend%20roles%20email%20phone%20openid%20profile&state={Guid.NewGuid()}";
-        
-        await JS.InvokeVoidAsync("console.log", $"Redirecting to: {loginUrl}");
+        // Navigate to the login page on the API server
+        var loginUrl = $"{apiBaseUrl}/Account/Login?returnUrl={returnUrl}";
         
         // Use forceLoad to ensure browser navigation
         Navigation.NavigateTo(loginUrl, forceLoad: true);
+    }
+    
+    private string DetermineApiBaseUrl()
+    {
+        // This should be the URL of your HttpApi.Host project where the authentication pages are hosted
+        return "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
     }
 }

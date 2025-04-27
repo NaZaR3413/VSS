@@ -5,7 +5,6 @@
 @using System.Linq
 @using Microsoft.AspNetCore.Components.Web
 @using web_backend.Blazor.Client.Pages.Components
-@using web_backend.Blazor.Client.Pages.Authentication
 @using web_backend.Enums
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
@@ -89,33 +88,52 @@
                     </a>
                 </li>
 
-                <AuthorizeView Roles="admin">
-                    <Authorized>
-                        <li class="vss-nav__item nav-item dropdown">
-                            <a class="vss-nav__link nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                Admin
-                                <svg><rect x="0" y="0" width="100%" height="100%"></rect></svg>
-                            </a>
-                            <ul class="vss-dropdown dropdown-menu" aria-labelledby="adminDropdown">
-                                <li class="vss-dropdown__item">
-                                    <a class="vss-dropdown__link dropdown-item" href="admin/create-livestream">
-                                        Create Livestream
-                                    </a>
-                                </li>
-                                <li class="vss-dropdown__item">
-                                    <a class="vss-dropdown__link dropdown-item" href="/admin/manage-livestreams">
-                                        Manage Livestreams
-                                    </a>
-                                </li>
-                            </ul>
-                        </li>
-                    </Authorized>
-                </AuthorizeView>
+                @if (authState != null && authState.User.IsInRole("admin"))
+                {
+                    <li class="vss-nav__item nav-item dropdown">
+                        <a class="vss-nav__link nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Admin
+                            <svg><rect x="0" y="0" width="100%" height="100%"></rect></svg>
+                        </a>
+                        <ul class="vss-dropdown dropdown-menu" aria-labelledby="adminDropdown">
+                            <li class="vss-dropdown__item">
+                                <a class="vss-dropdown__link dropdown-item" href="admin/create-livestream">
+                                    Create Livestream
+                                </a>
+                            </li>
+                            <li class="vss-dropdown__item">
+                                <a class="vss-dropdown__link dropdown-item" href="/admin/manage-livestreams">
+                                    Manage Livestreams
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                }
             </ul>
 
             <div class="vss-auth d-flex">
-                <!-- Use our new LoginStatus component -->
-                <LoginStatus />
+                @if (authState == null)
+                {
+                    <span class="vss-auth__username navbar-text me-3">Loading...</span>
+                }
+                else if (authState.User.Identity?.IsAuthenticated ?? false)
+                {
+                    <span class="vss-auth__username navbar-text me-3">
+                        Hello, @GetUserDisplayName(authState.User)
+                    </span>
+                    <a class="vss-auth__link nav-link" href="#" @onclick="LogoutClick" @onclick:preventDefault>Logout</a>
+                }
+                else
+                {
+                    <a class="vss-auth__button btn me-3" href="#" @onclick="LoginClick" @onclick:preventDefault>
+                        Login
+                        <svg><rect x="0" y="0" width="100%" height="100%"></rect></svg>
+                    </a>
+                    <a class="vss-auth__button btn" href="#" @onclick="RegisterClick" @onclick:preventDefault>
+                        Register
+                        <svg><rect x="0" y="0" width="100%" height="100%"></rect></svg>
+                    </a>
+                }
             </div>
         </nav>
     </header>
@@ -137,6 +155,7 @@
 </div>
 
 @code {
+    private AuthenticationState? authState;
     private List<LivestreamDto> activeLivestreams = new List<LivestreamDto>();
     private System.Threading.Timer? refreshTimer;
     private DateTimeOffset lastRefreshTime = DateTimeOffset.MinValue;
@@ -151,6 +170,9 @@
         
         try
         {
+            authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            await DebugService.LogAsync($"Authentication state loaded: {authState.User.Identity?.IsAuthenticated}");
+
             if (LivestreamState != null)
             {
                 LivestreamState.OnLivestreamStatusChanged += HandleLivestreamStatusChanged;
@@ -240,7 +262,31 @@
     private async Task ShowNoLivestreamsNotification()
     {
         await JS.InvokeVoidAsync("console.log", "No active livestreams to navigate to");
+
         await JS.InvokeVoidAsync("showBannerNotification", "No active livestreams available at the moment. Please check back later.");
+    }
+
+    private void LoginClick()
+    {
+        // Direct to the authentication pages on the API server
+        var apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
+        var returnUrl = Uri.EscapeDataString(NavigationManager.Uri);
+        NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Login?returnUrl={returnUrl}", forceLoad: true);
+    }
+
+    private void RegisterClick()
+    {
+        // Direct to the authentication pages on the API server
+        var apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
+        var returnUrl = Uri.EscapeDataString(NavigationManager.Uri);
+        NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Register?returnUrl={returnUrl}", forceLoad: true);
+    }
+
+    private void LogoutClick()
+    {
+        // Direct to the authentication pages on the API server
+        var apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
+        NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Logout", forceLoad: true);
     }
 
     public void Dispose()
@@ -251,5 +297,41 @@
         {
             LivestreamState.OnLivestreamStatusChanged -= HandleLivestreamStatusChanged;
         }
+    }
+
+    private string GetUserDisplayName(System.Security.Claims.ClaimsPrincipal user)
+    {
+
+        var name = user.FindFirst("name")?.Value;
+
+        if (string.IsNullOrEmpty(name))
+            name = user.Identity?.Name;
+
+        if (string.IsNullOrEmpty(name))
+            name = user.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
+
+        if (string.IsNullOrEmpty(name))
+        {
+            var firstName = user.FindFirst(System.Security.Claims.ClaimTypes.GivenName)?.Value;
+            var lastName = user.FindFirst(System.Security.Claims.ClaimTypes.Surname)?.Value;
+
+            if (!string.IsNullOrEmpty(firstName))
+            {
+                name = !string.IsNullOrEmpty(lastName)
+                    ? $"{firstName} {lastName}"
+                    : firstName;
+            }
+        }
+
+        if (string.IsNullOrEmpty(name))
+            name = user.FindFirst("given_name")?.Value;
+
+        if (string.IsNullOrEmpty(name))
+            name = user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
+
+        if (string.IsNullOrEmpty(name))
+            name = user.FindFirst("preferred_username")?.Value;
+
+        return !string.IsNullOrEmpty(name) ? name : "User";
     }
 }
