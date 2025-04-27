@@ -13,11 +13,12 @@ namespace web_backend.Blazor.Client
         public string Sport { get; set; } = "default";
         
         [Inject]
-        protected AuthenticationStateProvider AuthStateProvider { get; set; }
+        protected AuthenticationStateProvider AuthStateProvider { get; set; } = default!;
         
-        // Removed NavigationManager injection since it's already in MainLayout.razor
+        [Inject]
+        protected DebugService DebugService { get; set; } = default!;
         
-        private AuthenticationState previousAuthState;
+        private AuthenticationState? previousAuthState;
         
         // Renamed to avoid conflict with the OnInitializedAsync in MainLayout.razor
         protected async Task InitializeAuthStateMonitoring()
@@ -33,27 +34,27 @@ namespace web_backend.Blazor.Client
             await DebugService.LogAsync($"MainLayout.razor.cs: Initial auth state: {previousAuthState?.User?.Identity?.IsAuthenticated}");
         }
         
-        private async void OnAuthenticationStateChanged(Task<AuthenticationState> task)
+        private void OnAuthenticationStateChanged(Task<AuthenticationState> task)
         {
             try
             {
-                var newAuthState = await task;
+                var newAuthState = task.Result;
                 var wasAuthenticated = previousAuthState?.User?.Identity?.IsAuthenticated ?? false;
                 var isAuthenticated = newAuthState?.User?.Identity?.IsAuthenticated ?? false;
                 
-                await DebugService.LogAsync($"Auth state changed: Was={wasAuthenticated}, Now={isAuthenticated}");
+                DebugService.LogAsync($"Auth state changed: Was={wasAuthenticated}, Now={isAuthenticated}").ConfigureAwait(false);
                 
                 // Only force refresh if authentication status actually changed
                 if (wasAuthenticated != isAuthenticated)
                 {
                     previousAuthState = newAuthState;
-                    await InvokeAsync(StateHasChanged);
-                    await DebugService.LogAsync("MainLayout state refreshed due to auth change");
+                    // InvokeAsync is called from the component instance in the razor file
+                    DebugService.LogAsync("MainLayout state changed due to auth change").ConfigureAwait(false);
                 }
             }
             catch (Exception ex)
             {
-                await DebugService.LogAsync($"Error in auth state change handler: {ex.Message}");
+                DebugService.LogAsync($"Error in auth state change handler: {ex.Message}").ConfigureAwait(false);
             }
         }
         

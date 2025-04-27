@@ -281,14 +281,14 @@
 
     private void LoginClick()
     {
-        // Use our login page at the correct path
-        NavigationManager.NavigateTo("/login", forceLoad: false);
+        // Use Account/Login.cshtml page
+        NavigationManager.NavigateTo("/Account/Login", forceLoad: true);
     }
 
     private void RegisterClick()
     {
-        // Use our new Blazor register page
-        NavigationManager.NavigateTo("/account/register", forceLoad: false);
+        // Use Account/Register.cshtml page
+        NavigationManager.NavigateTo("/Account/Register", forceLoad: true);
     }
 
     private async Task LogoutClick()
