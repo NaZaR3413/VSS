@@ -15,6 +15,8 @@ using Volo.Abp.AspNetCore.Components.WebAssembly.BasicTheme;
 using Volo.Abp.Autofac.WebAssembly;
 using Volo.Abp.AutoMapper;
 using Volo.Abp.Http.Client;
+using Volo.Abp.Http.Client.Authentication;
+using Volo.Abp.Http.Client.IdentityModel.WebAssembly;
 using Volo.Abp.Identity.Blazor.WebAssembly;
 using Volo.Abp.IdentityModel;
 using Volo.Abp.Modularity;
@@ -30,7 +32,8 @@ namespace web_backend.Blazor.Client;
     typeof(AbpAspNetCoreComponentsWebAssemblyBasicThemeModule),
     typeof(AbpIdentityBlazorWebAssemblyModule),
     typeof(AbpTenantManagementBlazorWebAssemblyModule),
-    typeof(AbpSettingManagementBlazorWebAssemblyModule)
+    typeof(AbpSettingManagementBlazorWebAssemblyModule),
+    typeof(AbpHttpClientIdentityModelWebAssemblyModule)
 )]
 public class web_backendBlazorClientModule : AbpModule
 {
@@ -51,6 +54,12 @@ public class web_backendBlazorClientModule : AbpModule
         
         // Add LivestreamStateService for real-time updates
         context.Services.AddSingleton<LivestreamStateService>();
+        
+        // Register custom AuthService
+        context.Services.AddScoped<AuthService>();
+        
+        // Register custom authenticator and remove default implementations
+        context.Services.Replace(ServiceDescriptor.Singleton<IRemoteServiceHttpClientAuthenticator, CustomWebAssemblyAccessTokenProvider>());
     }
 
     // We're commenting out this method to avoid duplicate root component registration
@@ -117,6 +126,9 @@ public class web_backendBlazorClientModule : AbpModule
             BaseAddress = new Uri(remoteServiceBaseUrl)
         });
         
+        // Replace the standard HTTP authenticator with our custom implementation
+        context.Services.Replace(ServiceDescriptor.Singleton<IIdentityModelAuthenticationService, NullIdentityModelAuthenticationService>());
+        
         // Register the AbpMvcClient explicitly
         context.Services.AddHttpClient("AbpMvcClient", client =>
         {
@@ -128,10 +140,6 @@ public class web_backendBlazorClientModule : AbpModule
         {
             client.BaseAddress = new Uri(remoteServiceBaseUrl);
         });
-        
-        // Disable the IdentityModelAuthenticationService that's trying to use authorization_code
-        context.Services.RemoveAll<IIdentityModelAuthenticationService>();
-        context.Services.AddSingleton<IIdentityModelAuthenticationService, NullIdentityModelAuthenticationService>();
     }
 
     private void ConfigureAutoMapper(ServiceConfigurationContext context)

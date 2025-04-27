@@ -10,6 +10,7 @@ using System.Net.Http.Json;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Authentication;
 using Microsoft.AspNetCore.Components.Authorization;
+using Volo.Abp.AspNetCore.Components.WebAssembly;
 
 namespace web_backend.Blazor.Client;
 
@@ -80,12 +81,15 @@ public class Program
         
         try
         {
+            // Initialize ABP application
             await application.InitializeApplicationAsync(host.Services);
+            
             await jsRuntime.InvokeVoidAsync("console.log", "Application initialized successfully");
         }
         catch (Exception ex)
         {
             await jsRuntime.InvokeVoidAsync("console.error", $"Error initializing application: {ex.Message}");
+            throw;  // Re-throw to show the complete error
         }
 
         try
@@ -96,6 +100,7 @@ public class Program
         catch (Exception ex)
         {
             await jsRuntime.InvokeVoidAsync("console.error", $"Error running host: {ex.Message}");
+            throw;  // Re-throw to show the complete error
         }
     }
 }
