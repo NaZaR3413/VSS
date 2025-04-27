@@ -29,79 +29,113 @@ namespace web_backend.HttpApi.Host.Pages.Account
     [Dependency(ReplaceServices = true)]
     public class CustomLoginModel : LoginModel
     {
+        private readonly ILogger<CustomLoginModel> _logger;
+
         public CustomLoginModel(
             IAuthenticationSchemeProvider schemeProvider,
             IOptions<AbpAccountOptions> accountOptions,
             IOptions<IdentityOptions> identityOptions,
-            IdentityDynamicClaimsPrincipalContributorCache identityDynamicClaimsPrincipalContributorCache
+            IdentityDynamicClaimsPrincipalContributorCache identityDynamicClaimsPrincipalContributorCache,
+            ILoggerFactory loggerFactory
         ) : base(schemeProvider, accountOptions, identityOptions, identityDynamicClaimsPrincipalContributorCache)
-        { }
+        {
+            _logger = loggerFactory.CreateLogger<CustomLoginModel>();
+        }
 
         public override async Task<IActionResult> OnPostAsync(string action)
         {
-
-            await CheckLocalLoginAsync();
-            ValidateModel();
-
-            // External login providers
-            ExternalProviders = await GetExternalProviders();
-            EnableLocalLogin = await SettingProvider.IsTrueAsync(AccountSettingNames.EnableLocalLogin);
-
-            await ReplaceEmailToUsernameOfInputIfNeeds();
-
-            await IdentityOptions.SetAsync();
-
-            var result = await SignInManager.PasswordSignInAsync(
-                LoginInput.UserNameOrEmailAddress,
-                LoginInput.Password,
-                LoginInput.RememberMe,
-                true
-            );
-
-            await IdentitySecurityLogManager.SaveAsync(new IdentitySecurityLogContext()
+            try
             {
-                Identity = IdentitySecurityLogIdentityConsts.Identity,
-                Action = result.ToIdentitySecurityLogAction(),
-                UserName = LoginInput.UserNameOrEmailAddress
-            });
+                _logger.LogInformation("Login attempt started for user: {UserName}", LoginInput?.UserNameOrEmailAddress);
+                
+                await CheckLocalLoginAsync();
+                _logger.LogInformation("CheckLocalLoginAsync completed");
+                
+                ValidateModel();
+                _logger.LogInformation("Model validation completed");
 
-            if (result.RequiresTwoFactor)
-            {
-                return await TwoFactorLoginResultAsync();
-            }
+                // External login providers
+                ExternalProviders = await GetExternalProviders();
+                EnableLocalLogin = await SettingProvider.IsTrueAsync(AccountSettingNames.EnableLocalLogin);
 
-            if (result.IsLockedOut)
-            {
-                Alerts.Warning(L["UserLockedOutMessage"]);
-                return Page();
-            }
+                await ReplaceEmailToUsernameOfInputIfNeeds();
+                _logger.LogInformation("Email to username replacement completed");
 
-            if (result.IsNotAllowed)
-            {
-                Alerts.Warning(L["LoginIsNotAllowed"]);
-                return Page();
-            }
+                await IdentityOptions.SetAsync();
+                _logger.LogInformation("IdentityOptions set completed");
 
-            if (!result.Succeeded)
-            {
-                Alerts.Danger(L["InvalidUserNameOrPassword"]);
-                return Page();
-            }
+                _logger.LogInformation("Attempting password sign in for user: {UserName}", LoginInput.UserNameOrEmailAddress);
+                var result = await SignInManager.PasswordSignInAsync(
+                    LoginInput.UserNameOrEmailAddress,
+                    LoginInput.Password,
+                    LoginInput.RememberMe,
+                    true
+                );
+                _logger.LogInformation("Password sign-in result: {Result}", result.ToString());
 
-            var user = await UserManager.FindByNameAsync(LoginInput.UserNameOrEmailAddress) ??
-                       await UserManager.FindByEmailAsync(LoginInput.UserNameOrEmailAddress);
+                await IdentitySecurityLogManager.SaveAsync(new IdentitySecurityLogContext()
+                {
+                    Identity = IdentitySecurityLogIdentityConsts.Identity,
+                    Action = result.ToIdentitySecurityLogAction(),
+                    UserName = LoginInput.UserNameOrEmailAddress
+                });
+                _logger.LogInformation("Security log saved");
 
-            if (user == null)
-            {
-                Alerts.Danger(L["InvalidUserNameOrPassword"]);
-                return Page();
-            }
+                if (result.RequiresTwoFactor)
+                {
+                    _logger.LogInformation("Two-factor authentication required");
+                    return await TwoFactorLoginResultAsync();
+                }
 
-            if(result.Succeeded)
-            {                
+                if (result.IsLockedOut)
+                {
+                    _logger.LogInformation("User account is locked out");
+                    Alerts.Warning(L["UserLockedOutMessage"]);
+                    return Page();
+                }
+
+                if (result.IsNotAllowed)
+                {
+                    _logger.LogInformation("Login is not allowed");
+                    Alerts.Warning(L["LoginIsNotAllowed"]);
+                    return Page();
+                }
+
+                if (!result.Succeeded)
+                {
+                    _logger.LogInformation("Invalid username or password");
+                    Alerts.Danger(L["InvalidUserNameOrPassword"]);
+                    return Page();
+                }
+
+                var user = await UserManager.FindByNameAsync(LoginInput.UserNameOrEmailAddress) ??
+                           await UserManager.FindByEmailAsync(LoginInput.UserNameOrEmailAddress);
+
+                if (user == null)
+                {
+                    _logger.LogInformation("User not found");
+                    Alerts.Danger(L["InvalidUserNameOrPassword"]);
+                    return Page();
+                }
+
+                _logger.LogInformation("Login succeeded for user: {UserName}, redirecting to: {ReturnUrl}", 
+                    LoginInput.UserNameOrEmailAddress, ReturnUrl ?? "/");
                 return LocalRedirect(ReturnUrl ?? "/");
             }
-            return Page();
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during login process: {ErrorMessage}", ex.Message);
+                _logger.LogError("Stack trace: {StackTrace}", ex.StackTrace);
+                
+                if (ex.InnerException != null)
+                {
+                    _logger.LogError("Inner exception: {InnerExceptionMessage}", ex.InnerException.Message);
+                    _logger.LogError("Inner exception stack trace: {InnerExceptionStackTrace}", ex.InnerException.StackTrace);
+                }
+                
+                Alerts.Danger("An error occurred during login. Please try again later.");
+                return Page();
+            }
         }
     }
 }

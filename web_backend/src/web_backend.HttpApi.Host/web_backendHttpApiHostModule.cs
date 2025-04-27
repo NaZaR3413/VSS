@@ -33,9 +33,12 @@ using Volo.Abp.UI.Navigation.Urls;
 using Volo.Abp.VirtualFileSystem;
 using Volo.Abp.OpenIddict;
 using System.Security.Cryptography.X509Certificates;
-
 using Volo.Abp.ObjectExtending;
 using Volo.Abp.Identity;
+using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Http;
+using System.Threading.Tasks;
+
 namespace web_backend;
 
 [DependsOn(
@@ -257,11 +260,29 @@ public class web_backendHttpApiHostModule : AbpModule
         {
             options.AddDefaultPolicy(builder =>
             {
+                // Get the CORS origins from configuration
+                var corsOrigins = configuration["App:CorsOrigins"]?
+                    .Split(",", StringSplitOptions.RemoveEmptyEntries)
+                    .Select(o => o.RemovePostFix("/"))
+                    .ToArray() ?? Array.Empty<string>();
+
+                // Log the configured CORS origins for debugging
+                Console.WriteLine("Configured CORS origins:");
+                foreach (var origin in corsOrigins)
+                {
+                    Console.WriteLine($"  - {origin}");
+                }
+
+                // Add wildcard for development environments
+                var env = context.Services.GetHostingEnvironment();
+                if (env.IsDevelopment())
+                {
+                    Console.WriteLine("Development environment detected, adding '*' to CORS origins");
+                    corsOrigins = corsOrigins.Append("*").ToArray();
+                }
+
                 builder
-                    .WithOrigins(configuration["App:CorsOrigins"]?
-                        .Split(",", StringSplitOptions.RemoveEmptyEntries)
-                        .Select(o => o.RemovePostFix("/"))
-                        .ToArray() ?? Array.Empty<string>())
+                    .WithOrigins(corsOrigins)
                     .WithAbpExposedHeaders()
                     .SetIsOriginAllowedToAllowWildcardSubdomains()
                     .AllowAnyHeader()
@@ -280,13 +301,47 @@ public class web_backendHttpApiHostModule : AbpModule
         {
             app.UseDeveloperExceptionPage();
         }
+        else
+        {
+            // Custom error handler for production to see detailed errors
+            app.UseExceptionHandler(errorApp =>
+            {
+                errorApp.Run(async appContext =>
+                {
+                    appContext.Response.StatusCode = 500;
+                    appContext.Response.ContentType = "text/html";
+                    
+                    var errorFeature = appContext.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+                    if (errorFeature != null)
+                    {
+                        var exception = errorFeature.Error;
+                        
+                        // Log the error
+                        var logger = appContext.RequestServices.GetService<Microsoft.Extensions.Logging.ILogger<web_backendHttpApiHostModule>>();
+                        logger?.LogError(exception, "Unhandled exception");
+                        
+                        // Write detailed error for troubleshooting
+                        await appContext.Response.WriteAsync("<html><body>\n");
+                        await appContext.Response.WriteAsync("<h1>Error 500: Internal Server Error</h1>\n");
+                        await appContext.Response.WriteAsync("<hr>\n");
+                        await appContext.Response.WriteAsync($"<p><strong>Error Message:</strong> {exception.Message}</p>\n");
+                        await appContext.Response.WriteAsync($"<p><strong>Exception Type:</strong> {exception.GetType().FullName}</p>\n");
+                        
+                        if (exception.InnerException != null)
+                        {
+                            await appContext.Response.WriteAsync($"<p><strong>Inner Exception:</strong> {exception.InnerException.Message}</p>\n");
+                        }
+                        
+                        await appContext.Response.WriteAsync("<pre>");
+                        await appContext.Response.WriteAsync(exception.StackTrace ?? "No stack trace available");
+                        await appContext.Response.WriteAsync("</pre>");
+                        await appContext.Response.WriteAsync("</body></html>");
+                    }
+                });
+            });
+        }
 
         app.UseAbpRequestLocalization();
-
-        if (!env.IsDevelopment())
-        {
-            app.UseErrorPage();
-        }
 
         app.UseCorrelationId();
         app.UseStaticFiles();
