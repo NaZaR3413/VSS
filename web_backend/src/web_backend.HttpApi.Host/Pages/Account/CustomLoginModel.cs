@@ -22,9 +22,6 @@ using Volo.Abp.Validation;
 using Volo.Abp.Account.Web.Pages.Account;
 using Volo.Abp.Account.Web;
 using Volo.Abp.DependencyInjection;
-using OpenIddict.Abstractions;
-using System.Security.Principal;
-using OpenIddict.Server.AspNetCore;
 
 namespace web_backend.HttpApi.Host.Pages.Account
 {
@@ -33,19 +30,16 @@ namespace web_backend.HttpApi.Host.Pages.Account
     public class CustomLoginModel : LoginModel
     {
         private readonly ILogger<CustomLoginModel> _logger;
-        private readonly IOpenIddictApplicationManager _applicationManager;
 
         public CustomLoginModel(
             IAuthenticationSchemeProvider schemeProvider,
             IOptions<AbpAccountOptions> accountOptions,
             IOptions<IdentityOptions> identityOptions,
             IdentityDynamicClaimsPrincipalContributorCache identityDynamicClaimsPrincipalContributorCache,
-            ILoggerFactory loggerFactory,
-            IOpenIddictApplicationManager applicationManager
+            ILoggerFactory loggerFactory
         ) : base(schemeProvider, accountOptions, identityOptions, identityDynamicClaimsPrincipalContributorCache)
         {
             _logger = loggerFactory.CreateLogger<CustomLoginModel>();
-            _applicationManager = applicationManager;
         }
 
         public override async Task<IActionResult> OnPostAsync(string action)
@@ -124,26 +118,9 @@ namespace web_backend.HttpApi.Host.Pages.Account
                     return Page();
                 }
 
-                // We don't need to directly sign in with OpenIddict here.
-                // The standard Identity sign-in is sufficient, and OpenIddict will use that authentication
-                // when the user is redirected to the OIDC endpoints.
                 _logger.LogInformation("Login succeeded for user: {UserName}, redirecting to: {ReturnUrl}", 
                     LoginInput.UserNameOrEmailAddress, ReturnUrl ?? "/");
-                
-                // Check if ReturnUrl is absolute (external) or relative
-                if (Uri.TryCreate(ReturnUrl, UriKind.Absolute, out var uri))
-                {
-                    // It's an absolute URL, use Redirect instead of LocalRedirect
-                    _logger.LogInformation("Using Redirect for external URL: {Url}", ReturnUrl);
-                    return Redirect(ReturnUrl);
-                }
-                else
-                {
-                    // It's a relative URL, use LocalRedirect
-                    var localUrl = ReturnUrl ?? "/";
-                    _logger.LogInformation("Using LocalRedirect for local URL: {Url}", localUrl);
-                    return LocalRedirect(localUrl);
-                }
+                return LocalRedirect(ReturnUrl ?? "/");
             }
             catch (Exception ex)
             {

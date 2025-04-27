@@ -96,11 +96,7 @@ public class web_backendBlazorClientModule : AbpModule
             options.ProviderOptions.DefaultScopes.Add("email");
             options.ProviderOptions.DefaultScopes.Add("phone");
             
-            // Fix for login_required error by using code flow instead of implicit
-            options.ProviderOptions.ResponseType = "code";
-            options.ProviderOptions.ResponseMode = "query";
-            
-            // Make sure we have appropriate redirects
+            // Add this line to ensure proper redirect handling
             options.ProviderOptions.PostLogoutRedirectUri = "/";
         });
     }
