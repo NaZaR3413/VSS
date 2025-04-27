@@ -96,8 +96,12 @@ public class web_backendBlazorClientModule : AbpModule
             options.ProviderOptions.DefaultScopes.Add("email");
             options.ProviderOptions.DefaultScopes.Add("phone");
             
-            // Add this line to ensure proper redirect handling
-            options.ProviderOptions.PostLogoutRedirectUri = "/";
+            // Make sure redirect URIs are properly set as relative paths
+            options.ProviderOptions.RedirectUri = "authentication/login-callback";
+            options.ProviderOptions.PostLogoutRedirectUri = "authentication/logout-callback";
+            
+            // Ensure response type is set correctly
+            options.ProviderOptions.ResponseType = "code";
         });
     }
 
