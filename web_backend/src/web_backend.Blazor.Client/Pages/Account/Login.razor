@@ -1,4 +1,4 @@
-@page "/Account/Register"
+@page "/Account/Login"
 @using Microsoft.Extensions.Configuration
 @inject IJSRuntime JS
 @inject NavigationManager NavigationManager
@@ -9,11 +9,11 @@
         <div class="col-md-6">
             <div class="card shadow-sm">
                 <div class="card-header bg-primary text-white">
-                    <h3 class="m-0">Register New Account</h3>
+                    <h3 class="m-0">Login</h3>
                 </div>
                 <div class="card-body">
                     <p class="text-center mb-4">
-                        You will be redirected to the registration page...
+                        You will be redirected to the authentication server to login...
                     </p>
                     <div class="d-flex justify-content-center">
                         <div class="spinner-border text-primary" role="status">
@@ -27,25 +27,33 @@
 </div>
 
 @code {
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string ReturnUrl { get; set; }
+    
     protected override async Task OnInitializedAsync()
     {
-        await JS.InvokeVoidAsync("console.log", "Register page loaded");
+        await JS.InvokeVoidAsync("console.log", "Login page loaded");
         
         // Get the API base URL from configuration
         var apiBaseUrl = Configuration
             .GetSection("RemoteServices")
             .GetSection("Default")
             .GetValue<string>("BaseUrl") ?? "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
+            
+        // For Blazor WASM, we need to use the OIDC protocol for authentication
+        var clientReturnUrl = string.IsNullOrEmpty(ReturnUrl) 
+            ? $"{NavigationManager.BaseUri}authentication/login-callback"
+            : ReturnUrl;
+            
+        var encodedClientReturnUrl = Uri.EscapeDataString(clientReturnUrl);
         
-        // Create return URL to come back to the application
-        var returnUrl = Uri.EscapeDataString($"{NavigationManager.BaseUri}authentication/login-callback");
+        // Generate OIDC authorization URL with parameters
+        var loginUrl = $"{apiBaseUrl}/connect/authorize?client_id=web_backend_Blazor&redirect_uri={encodedClientReturnUrl}&response_type=code&scope=web_backend%20roles%20email%20phone%20openid%20profile&state={Guid.NewGuid()}";
         
-        // Redirect to the backend register page
-        var registerUrl = $"{apiBaseUrl}/Account/Register?returnUrl={returnUrl}";
+        await JS.InvokeVoidAsync("console.log", $"Redirecting to: {loginUrl}");
         
-        await JS.InvokeVoidAsync("console.log", $"Redirecting to: {registerUrl}");
-        
-        // Use forceLoad to ensure browser navigation to external URL
-        NavigationManager.NavigateTo(registerUrl, forceLoad: true);
+        // Redirect to the authorization server
+        NavigationManager.NavigateTo(loginUrl, forceLoad: true);
     }
 }
