@@ -5,7 +5,6 @@
 @using System.Linq
 @using Microsoft.AspNetCore.Components.Web
 @using web_backend.Blazor.Client.Pages.Components
-@using web_backend.Blazor.Client.Pages.Authentication
 @using web_backend.Enums
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
@@ -115,7 +114,7 @@
 
             <div class="vss-auth d-flex">
                 <!-- Use our new LoginStatus component -->
-                <LoginStatus />
+                <web_backend.Blazor.Client.Pages.Authentication.LoginStatus />
             </div>
         </nav>
     </header>
@@ -153,14 +152,28 @@
         {
             if (LivestreamState != null)
             {
+                // Unregister any existing handlers to prevent duplicates
+                LivestreamState.OnLivestreamStatusChanged -= HandleLivestreamStatusChanged;
+                // Register the event handler
                 LivestreamState.OnLivestreamStatusChanged += HandleLivestreamStatusChanged;
                 await DebugService.LogAsync("Registered livestream state handler");
+            }
+            else
+            {
+                await DebugService.LogAsync("WARNING: LivestreamState is null in MainLayout");
             }
 
             refreshTimer = new System.Threading.Timer(async _ =>
             {
-                await RefreshLivestreams(force: false);
-                await InvokeAsync(StateHasChanged);
+                try
+                {
+                    await RefreshLivestreams(force: false);
+                    await InvokeAsync(StateHasChanged);
+                }
+                catch (Exception ex)
+                {
+                    await DebugService.LogAsync($"Error in timer refresh: {ex.Message}");
+                }
             }, null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
 
             await RefreshLivestreams(force: true);
@@ -174,11 +187,20 @@
 
     private void HandleLivestreamStatusChanged(object? sender, EventArgs e)
     {
-        // Use InvokeAsync to ensure state changes happen on the UI thread
-        InvokeAsync(async () => 
+        // Always use InvokeAsync to ensure we're on the UI thread
+        _ = InvokeAsync(async () => 
         {
-            await RefreshLivestreams(force: true);
-            StateHasChanged();
+            try
+            {
+                await DebugService.LogAsync("HandleLivestreamStatusChanged event received");
+                await RefreshLivestreams(force: true);
+                StateHasChanged();
+                await DebugService.LogAsync("HandleLivestreamStatusChanged completed successfully");
+            }
+            catch (Exception ex)
+            {
+                await DebugService.LogAsync($"Error in HandleLivestreamStatusChanged: {ex.Message}");
+            }
         });
     }
 
