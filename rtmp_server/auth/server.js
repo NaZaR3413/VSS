@@ -50,7 +50,8 @@ const client = new SecretClient(url, credential);
         if (result.recordset.length > 0) {
           console.log('✅ Stream key is valid');
 
-          const hlsUrl = `http://20.3.254.14:8080/hls/${streamKey}.m3u8`;
+          // Use HTTPS instead of HTTP for HLS URLs to avoid mixed content errors
+          const hlsUrl = `https://20.3.254.14:8080/hls/${streamKey}.m3u8`;
 
           await sql.query`
             UPDATE Livestream 

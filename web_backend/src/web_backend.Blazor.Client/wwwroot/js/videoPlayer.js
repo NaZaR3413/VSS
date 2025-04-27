@@ -363,6 +363,21 @@ if (typeof window.PaywallManager === 'undefined') {
     };
 }
 
+// Add function to call .NET methods after a delay
+window.invokeDotNetAfterDelay = function(dotNetRef, methodName, delayMs) {
+    console.log(`Setting up delayed callback to ${methodName} after ${delayMs}ms`);
+    setTimeout(() => {
+        console.log(`Invoking .NET method ${methodName}`);
+        dotNetRef.invokeMethodAsync(methodName)
+            .then(() => {
+                console.log(`Successfully invoked ${methodName}`);
+            })
+            .catch(error => {
+                console.error(`Error invoking ${methodName}:`, error);
+            });
+    }, delayMs);
+};
+
 // Function to create a free access timer display
 window.createFreeAccessTimer = function(streamId, remainingTimeSeconds) {
     // Get the video element

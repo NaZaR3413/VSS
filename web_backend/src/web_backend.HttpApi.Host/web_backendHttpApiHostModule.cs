@@ -2,9 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -284,6 +287,39 @@ public class web_backendHttpApiHostModule : AbpModule
         app.UseStaticFiles();
         app.UseRouting();
         app.UseCors();
+        
+        // Add middleware to handle HLS URL upgrades when needed
+        app.Use(async (context, next) =>
+        {
+            // If this is an API request that might be returning HLS URLs
+            if (context.Request.Path.StartsWithSegments("/api") && 
+                context.Request.Method == "GET" && 
+                context.Response.ContentType?.Contains("application/json") == true)
+            {
+                var originalBodyStream = context.Response.Body;
+                using var responseBody = new MemoryStream();
+                context.Response.Body = responseBody;
+
+                await next();
+
+                responseBody.Seek(0, SeekOrigin.Begin);
+                string responseText = await new StreamReader(responseBody).ReadToEndAsync();
+
+                // Replace HTTP HLS URLs with HTTPS
+                if (responseText.Contains("http://20.3.254.14:8080/hls"))
+                {
+                    responseText = responseText.Replace("http://20.3.254.14:8080/hls", "https://20.3.254.14:8080/hls");
+                }
+
+                context.Response.Body = originalBodyStream;
+                await context.Response.WriteAsync(responseText);
+            }
+            else
+            {
+                await next();
+            }
+        });
+        
         app.UseAuthentication();
         app.UseAbpOpenIddictValidation();
 
