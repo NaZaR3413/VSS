@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,14 +34,41 @@ public class Program
             // Add CORS configuration before building the host
             builder.Services.AddCors(options =>
             {
+                // Default policy from appsettings.json
                 options.AddDefaultPolicy(policy =>
                 {
                     policy.WithOrigins(
+                            builder.Configuration["App:CorsOrigins"]
+                                ?.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                                .Select(o => o.Trim().RemovePostFix("/"))
+                                .ToArray() ?? Array.Empty<string>()
+                        )
+                        .AllowAnyHeader()
+                        .AllowAnyMethod()
+                        .AllowCredentials();
+                });
+                
+                // Specific permissive policy for troubleshooting CORS issues
+                options.AddPolicy("AllowSpecificOrigins", builder =>
+                {
+                    builder
+                        .WithOrigins(
                             "https://salmon-glacier-08dca301e.6.azurestaticapps.net",
-                            "https://localhost:44307",
+                            "https://localhost:44307", 
                             "http://localhost:4200")
                         .AllowAnyHeader()
                         .AllowAnyMethod()
+                        .AllowCredentials()
+                        .SetIsOriginAllowedToAllowWildcardSubdomains();
+                });
+                
+                // Fallback policy for development
+                options.AddPolicy("AllowAll", builder =>
+                {
+                    builder
+                        .SetIsOriginAllowed(_ => true) // Allow any origin
+                        .AllowAnyMethod()
+                        .AllowAnyHeader()
                         .AllowCredentials();
                 });
             });
@@ -51,7 +79,17 @@ public class Program
             await builder.AddApplicationAsync<web_backendHttpApiHostModule>();
             var app = builder.Build();
             
-            // Use CORS before routing
+            // Configure the HTTP request pipeline - ensure CORS is before auth
+            if (app.Environment.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+            }
+            else
+            {
+                app.UseHsts();
+            }
+            
+            // Use CORS before routing and authentication
             app.UseCors();
             
             await app.InitializeApplicationAsync();

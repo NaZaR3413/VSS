@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Cors;
@@ -291,35 +290,23 @@ public class web_backendHttpApiHostModule : AbpModule
                     .WithOrigins(
                         configuration["App:CorsOrigins"]?
                             .Split(",", StringSplitOptions.RemoveEmptyEntries)
-                            .Select(o => o.RemovePostFix("/"))
-                            .ToArray() ?? Array.Empty<string>())
+                            .Select(o => o.Trim().RemovePostFix("/"))
+                            .ToArray() ?? Array.Empty<string>()
+                    )
                     .WithAbpExposedHeaders()
                     .SetIsOriginAllowedToAllowWildcardSubdomains()
                     .AllowAnyHeader()
                     .AllowAnyMethod()
                     .AllowCredentials();
-                
-                // Explicitly add the Azure Static Web App domain with proper configuration
-                builder.WithOrigins("https://salmon-glacier-08dca301e.6.azurestaticapps.net")
-                       .AllowAnyHeader()
-                       .AllowAnyMethod()
-                       .AllowCredentials()
-                       .SetPreflightMaxAge(TimeSpan.FromMinutes(10)); // Reduce preflight requests
-                
-                // Allow options requests during preflight for authentication endpoints
-                if (configuration["App:CorsOrigins"] != null)
-                {
-                    var origins = configuration["App:CorsOrigins"]
-                        .Split(",", StringSplitOptions.RemoveEmptyEntries)
-                        .Select(o => o.RemovePostFix("/"))
-                        .ToArray();
-                    
-                    if (!origins.Contains("https://salmon-glacier-08dca301e.6.azurestaticapps.net"))
-                    {
-                        // Add to appsettings if not already there
-                        Console.WriteLine("Adding Azure Static Web App to allowed origins in memory");
-                    }
-                }
+            });
+            
+            // Add a more permissive policy for specific endpoints that need it
+            options.AddPolicy("AllowAllOrigins", builder =>
+            {
+                builder
+                    .AllowAnyOrigin()
+                    .AllowAnyHeader()
+                    .AllowAnyMethod();
             });
         });
     }
@@ -369,8 +356,10 @@ public class web_backendHttpApiHostModule : AbpModule
         });
         
         app.UseRouting();
-        app.UseCors();
         
+        // Use CORS before authentication
+        app.UseCors();
+
         // Add middleware to handle HLS URL upgrades when needed
         app.Use(async (context, next) =>
         {

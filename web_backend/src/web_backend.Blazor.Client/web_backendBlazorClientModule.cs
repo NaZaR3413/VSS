@@ -1,7 +1,10 @@
 ﻿using System;
+using System.Linq;
 using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
 using Blazorise.Bootstrap5;
-using Blazorise.Icons.FontAwesome;
+using Blazorise;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -10,8 +13,10 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using web_backend.Blazor.Client.Menus;
 using web_backend.Blazor.Client.Services;
 using OpenIddict.Abstractions;
+using Volo.Abp.Account;
 using Volo.Abp.AspNetCore.Components.Web.Theming.Routing;
-using Volo.Abp.AspNetCore.Components.WebAssembly.BasicTheme;
+using Volo.Abp.AspNetCore.Components.Web.Theming.Toolbars;
+using Volo.Abp.AspNetCore.Components.WebAssembly.Theming;
 using Volo.Abp.Autofac.WebAssembly;
 using Volo.Abp.AutoMapper;
 using Volo.Abp.Http.Client;
@@ -29,7 +34,8 @@ namespace web_backend.Blazor.Client;
 [DependsOn(
     typeof(AbpAutofacWebAssemblyModule),
     typeof(web_backendHttpApiClientModule),
-    typeof(AbpAspNetCoreComponentsWebAssemblyBasicThemeModule),
+    typeof(AbpAspNetCoreComponentsWebAssemblyThemingModule),
+    typeof(AbpAccountHttpApiClientModule),
     typeof(AbpIdentityBlazorWebAssemblyModule),
     typeof(AbpTenantManagementBlazorWebAssemblyModule),
     typeof(AbpSettingManagementBlazorWebAssemblyModule),
@@ -42,31 +48,29 @@ public class web_backendBlazorClientModule : AbpModule
         var environment = context.Services.GetSingletonInstance<IWebAssemblyHostEnvironment>();
         var builder = context.Services.GetSingletonInstance<WebAssemblyHostBuilder>();
 
-        // Skip explicit root component registration - we'll let Program.cs handle this
-        // ConfigureRootComponents(builder);
-        
         ConfigureAuthentication(builder);
         ConfigureHttpClient(context, environment);
         ConfigureBlazorise(context);
         ConfigureRouter(context);
+        ConfigureUI(builder);
         ConfigureMenu(context);
         ConfigureAutoMapper(context);
         
-        // Add LivestreamStateService for real-time updates
-        context.Services.AddSingleton<LivestreamStateService>();
-        
-        // Register custom AuthService
-        context.Services.AddScoped<AuthService>();
-        
-        // Register custom authenticator and remove default implementations
-        context.Services.Replace(ServiceDescriptor.Singleton<IRemoteServiceHttpClientAuthenticator, CustomWebAssemblyAccessTokenProvider>());
+        // Register our custom services
+        ConfigureCustomServices(context);
     }
-
-    // We're commenting out this method to avoid duplicate root component registration
-    // private void ConfigureRootComponents(WebAssemblyHostBuilder builder)
-    // {
-    //     builder.RootComponents.Add<App>("#app");
-    // }
+    
+    private void ConfigureCustomServices(ServiceConfigurationContext context)
+    {
+        // Register CORS interceptor service
+        context.Services.AddSingleton<CorsInterceptorService>();
+        
+        // Register debug service
+        context.Services.AddSingleton<DebugService>();
+        
+        // Register video service
+        context.Services.AddSingleton<VideoService>();
+    }
 
     private void ConfigureRouter(ServiceConfigurationContext context)
     {
@@ -82,64 +86,70 @@ public class web_backendBlazorClientModule : AbpModule
         {
             options.MenuContributors.Add(new web_backendMenuContributor(context.Services.GetConfiguration()));
         });
+
+        Configure<AbpToolbarOptions>(options =>
+        {
+            options.Contributors.Add(new web_backendToolbarContributor());
+        });
     }
 
     private void ConfigureBlazorise(ServiceConfigurationContext context)
     {
         context.Services
-            .AddBootstrap5Providers()
-            .AddFontAwesomeIcons();
+            .AddBlazorise()
+            .AddBootstrap5Providers();
     }
 
-    private static void ConfigureAuthentication(WebAssemblyHostBuilder builder)
+    private void ConfigureAuthentication(WebAssemblyHostBuilder builder)
     {
         builder.Services.AddOidcAuthentication(options =>
         {
             builder.Configuration.Bind("AuthServer", options.ProviderOptions);
-            options.UserOptions.NameClaim = OpenIddictConstants.Claims.Name;
-            options.UserOptions.RoleClaim = OpenIddictConstants.Claims.Role;
-
+            options.UserOptions.RoleClaim = "role";
+            
+            // Add JWT header configuration
+            // This ensures that the Authorization header is added to API requests
             options.ProviderOptions.DefaultScopes.Add("web_backend");
-            options.ProviderOptions.DefaultScopes.Add("roles");
-            options.ProviderOptions.DefaultScopes.Add("email");
-            options.ProviderOptions.DefaultScopes.Add("phone");
+            options.ProviderOptions.ResponseType = "code";
         });
     }
 
     private static void ConfigureHttpClient(ServiceConfigurationContext context, IWebAssemblyHostEnvironment environment)
     {
-        var configuration = context.Services.GetSingletonInstance<IConfiguration>();
-        var remoteServiceBaseUrl = configuration
-            .GetSection("RemoteServices")
-            .GetSection("Default")
-            .GetValue<string>("BaseUrl");
-
-        if (string.IsNullOrEmpty(remoteServiceBaseUrl))
+        context.Services.AddTransient<HttpClientAuthorizationDelegatingHandler>();
+        context.Services.AddScoped(sp => new HttpClient
         {
-            remoteServiceBaseUrl = environment.BaseAddress;
-        }
-
-        Console.WriteLine($"Using API base address: {remoteServiceBaseUrl}");
-
-        context.Services.AddTransient(sp => new HttpClient
-        {
-            BaseAddress = new Uri(remoteServiceBaseUrl)
+            BaseAddress = new Uri(environment.BaseAddress)
         });
         
-        // Replace the standard HTTP authenticator with our custom implementation
-        context.Services.Replace(ServiceDescriptor.Singleton<IIdentityModelAuthenticationService, NullIdentityModelAuthenticationService>());
-        
-        // Register the AbpMvcClient explicitly
-        context.Services.AddHttpClient("AbpMvcClient", client =>
-        {
-            client.BaseAddress = new Uri(remoteServiceBaseUrl);
+        // Configure HttpClient with CORS handling
+        context.Services.AddTransient(sp => {
+            // Create a message handler that adds CORS headers
+            var corsService = sp.GetRequiredService<CorsInterceptorService>();
+            var corsHandler = corsService.CreateCorsMessageHandler();
+            
+            // Create and configure the HttpClient
+            var httpClient = new HttpClient(corsHandler)
+            {
+                BaseAddress = new Uri(environment.BaseAddress)
+            };
+            
+            // Add default headers
+            httpClient.DefaultRequestHeaders.Add("X-Requested-With", "XMLHttpRequest");
+            
+            return httpClient;
         });
-        
-        // Register API client
-        context.Services.AddHttpClient("API", client =>
-        {
-            client.BaseAddress = new Uri(remoteServiceBaseUrl);
-        });
+
+        context.Services.AddHttpClient("web_backend.HttpApi.Client", client =>
+            {
+                client.BaseAddress = new Uri(environment.BaseAddress);
+            })
+            .AddHttpMessageHandler<HttpClientAuthorizationDelegatingHandler>();
+    }
+
+    private static void ConfigureUI(WebAssemblyHostBuilder builder)
+    {
+        builder.RootComponents.Add<App>("#ApplicationContainer");
     }
 
     private void ConfigureAutoMapper(ServiceConfigurationContext context)

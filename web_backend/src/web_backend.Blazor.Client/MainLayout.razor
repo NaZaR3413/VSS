@@ -197,9 +197,6 @@
 
             await RefreshLivestreams(force: true);
             await DebugService.LogAsync("Initial livestream refresh completed");
-            
-            // Call authentication state monitoring initialization
-            await InitializeAuthStateMonitoring();
         }
         catch (Exception ex)
         {
@@ -230,34 +227,97 @@
                 await JS.InvokeVoidAsync("console.log", "Forced refresh - skipping cache");
             }
 
-            var allStreams = await LivestreamService.GetListAsync();
-            lastRefreshTime = DateTimeOffset.UtcNow;
-
-            await JS.InvokeVoidAsync("console.log", $"Total streams: {allStreams.Count}");
-
-            foreach (var stream in allStreams)
+            // Add CORS workaround - Use HTTP client with CORS-friendly settings
+            try
             {
-                await JS.InvokeVoidAsync("console.log",
-                    $"Stream ID: {stream.Id}, Status: {stream.StreamStatus} ({(int)stream.StreamStatus}), " +
-                    $"Teams: '{stream.HomeTeam ?? "null"}' vs '{stream.AwayTeam ?? "null"}'");
+                // Configure a request message with CORS headers
+                var requestUri = $"https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net/api/app/livestream";
+                var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+                request.Headers.Add("Access-Control-Allow-Origin", "*");
+                request.Headers.Add("Access-Control-Allow-Credentials", "true");
+                
+                await JS.InvokeVoidAsync("console.log", $"Making API request to: {requestUri}");
+                
+                var response = await HttpClient.SendAsync(request);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var allStreams = await response.Content.ReadFromJsonAsync<List<LivestreamDto>>();
+                    lastRefreshTime = DateTimeOffset.UtcNow;
+                    
+                    if (allStreams != null)
+                    {
+                        await JS.InvokeVoidAsync("console.log", $"Total streams: {allStreams.Count}");
+                        
+                        foreach (var stream in allStreams)
+                        {
+                            await JS.InvokeVoidAsync("console.log",
+                                $"Stream ID: {stream.Id}, Status: {stream.StreamStatus} ({(int)stream.StreamStatus}), " +
+                                $"Teams: '{stream.HomeTeam ?? "null"}' vs '{stream.AwayTeam ?? "null"}'");
+                        }
+
+                        var newLiveStreams = allStreams
+                            .Where(l => l.StreamStatus == StreamStatus.Live)
+                            .OrderByDescending(l => l.Id)
+                            .ToList();
+
+                        bool hasChanged = newLiveStreams.Count != activeLivestreams.Count ||
+                                        newLiveStreams.Any(newStream => !activeLivestreams.Any(oldStream => oldStream.Id == newStream.Id));
+
+                        if (hasChanged)
+                        {
+                            await JS.InvokeVoidAsync("console.log", $"Livestream list has changed, updating UI");
+                            activeLivestreams = newLiveStreams;
+                            await InvokeAsync(StateHasChanged);
+                        }
+
+                        await JS.InvokeVoidAsync("console.log", $"Found {activeLivestreams.Count} LIVE streams");
+                    }
+                    else
+                    {
+                        await JS.InvokeVoidAsync("console.error", "API returned null response");
+                    }
+                }
+                else
+                {
+                    await JS.InvokeVoidAsync("console.error", $"API error: {response.StatusCode}");
+                }
             }
-
-            var newLiveStreams = allStreams
-                .Where(l => l.StreamStatus == StreamStatus.Live)
-                .OrderByDescending(l => l.Id)
-                .ToList();
-
-            bool hasChanged = newLiveStreams.Count != activeLivestreams.Count ||
-                              newLiveStreams.Any(newStream => !activeLivestreams.Any(oldStream => oldStream.Id == newStream.Id));
-
-            if (hasChanged)
+            catch (Exception apiEx)
             {
-                await JS.InvokeVoidAsync("console.log", $"Livestream list has changed, updating UI");
-                activeLivestreams = newLiveStreams;
-                await InvokeAsync(StateHasChanged);
-            }
+                await JS.InvokeVoidAsync("console.error", $"Manual API error: {apiEx.Message}");
+                
+                // Fallback to standard service call if our manual approach fails
+                var allStreams = await LivestreamService.GetListAsync();
+                // Rest of processing remains the same as original...
+                lastRefreshTime = DateTimeOffset.UtcNow;
 
-            await JS.InvokeVoidAsync("console.log", $"Found {activeLivestreams.Count} LIVE streams");
+                await JS.InvokeVoidAsync("console.log", $"Total streams: {allStreams.Count}");
+
+                foreach (var stream in allStreams)
+                {
+                    await JS.InvokeVoidAsync("console.log",
+                        $"Stream ID: {stream.Id}, Status: {stream.StreamStatus} ({(int)stream.StreamStatus}), " +
+                        $"Teams: '{stream.HomeTeam ?? "null"}' vs '{stream.AwayTeam ?? "null"}'");
+                }
+
+                var newLiveStreams = allStreams
+                    .Where(l => l.StreamStatus == StreamStatus.Live)
+                    .OrderByDescending(l => l.Id)
+                    .ToList();
+
+                bool hasChanged = newLiveStreams.Count != activeLivestreams.Count ||
+                                newLiveStreams.Any(newStream => !activeLivestreams.Any(oldStream => oldStream.Id == newStream.Id));
+
+                if (hasChanged)
+                {
+                    await JS.InvokeVoidAsync("console.log", $"Livestream list has changed, updating UI");
+                    activeLivestreams = newLiveStreams;
+                    await InvokeAsync(StateHasChanged);
+                }
+
+                await JS.InvokeVoidAsync("console.log", $"Found {activeLivestreams.Count} LIVE streams");
+            }
         }
         catch (Exception ex)
         {
@@ -298,7 +358,7 @@
         
         // Navigate to the custom Login.cshtml page in HttpApi.Host with forceLoad to ensure
         // it's a full page navigation rather than client-side routing
-        NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Login", forceLoad: true);
+        NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Login?returnUrl={Uri.EscapeDataString(NavigationManager.Uri)}", forceLoad: true);
     }
 
     private void RegisterClick()
@@ -320,7 +380,7 @@
         
         // Navigate to the custom Register.cshtml page in HttpApi.Host with forceLoad to ensure
         // it's a full page navigation rather than client-side routing
-        NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Register", forceLoad: true);
+        NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Register?returnUrl={Uri.EscapeDataString(NavigationManager.Uri)}", forceLoad: true);
     }
 
     private async Task LogoutClick()
@@ -358,9 +418,6 @@
         {
             LivestreamState.OnLivestreamStatusChanged -= HandleLivestreamStatusChanged;
         }
-        
-        // Clean up authentication state monitoring
-        CleanupAuthStateMonitoring();
     }
 
     private string GetUserDisplayName(System.Security.Claims.ClaimsPrincipal user)
