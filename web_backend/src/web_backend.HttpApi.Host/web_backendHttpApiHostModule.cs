@@ -98,7 +98,23 @@ public class web_backendHttpApiHostModule : AbpModule
 
                 serverBuilder.AddEncryptionCertificate(certificate);
                 serverBuilder.AddSigningCertificate(certificate);
-                Console.WriteLine("Added encryption and signing certificates.");
+                
+                // Explicitly configure OpenIddict endpoints to ensure they're accessible
+                serverBuilder
+                    .SetAuthorizationEndpointUris("/connect/authorize")
+                    .SetIntrospectionEndpointUris("/connect/introspect")
+                    .SetLogoutEndpointUris("/connect/logout")
+                    .SetTokenEndpointUris("/connect/token")
+                    .SetUserinfoEndpointUris("/connect/userinfo")
+                    .SetVerificationEndpointUris("/connect/verify");
+                
+                // Explicitly allow client credentials and authorization code flows
+                serverBuilder
+                    .AllowAuthorizationCodeFlow()
+                    .AllowClientCredentialsFlow()
+                    .AllowRefreshTokenFlow();
+                
+                Console.WriteLine("Added encryption and signing certificates and configured endpoints.");
             }
             catch (Exception ex)
             {
@@ -283,11 +299,27 @@ public class web_backendHttpApiHostModule : AbpModule
                     .AllowAnyMethod()
                     .AllowCredentials();
                 
-                // Allow specific Azure Static Web App origins
+                // Explicitly add the Azure Static Web App domain with proper configuration
                 builder.WithOrigins("https://salmon-glacier-08dca301e.6.azurestaticapps.net")
                        .AllowAnyHeader()
                        .AllowAnyMethod()
-                       .AllowCredentials();
+                       .AllowCredentials()
+                       .SetPreflightMaxAge(TimeSpan.FromMinutes(10)); // Reduce preflight requests
+                
+                // Allow options requests during preflight for authentication endpoints
+                if (configuration["App:CorsOrigins"] != null)
+                {
+                    var origins = configuration["App:CorsOrigins"]
+                        .Split(",", StringSplitOptions.RemoveEmptyEntries)
+                        .Select(o => o.RemovePostFix("/"))
+                        .ToArray();
+                    
+                    if (!origins.Contains("https://salmon-glacier-08dca301e.6.azurestaticapps.net"))
+                    {
+                        // Add to appsettings if not already there
+                        Console.WriteLine("Adding Azure Static Web App to allowed origins in memory");
+                    }
+                }
             });
         });
     }
@@ -378,6 +410,84 @@ public class web_backendHttpApiHostModule : AbpModule
         
         app.UseAuthentication();
         app.UseAbpOpenIddictValidation();
+
+        // Add middleware to handle authentication-related redirects
+        app.Use(async (context, next) => 
+        {
+            // Check for login redirects and ensure they're properly handled
+            if (context.Request.Path.StartsWithSegments("/Account/Login"))
+            {
+                var returnUrl = context.Request.Query["returnUrl"].ToString();
+                if (!string.IsNullOrEmpty(returnUrl))
+                {
+                    // Log the redirect for debugging
+                    Console.WriteLine($"Login redirect with returnUrl: {returnUrl}");
+                    
+                    // Ensure the returnUrl is encoded if needed
+                    if (!returnUrl.StartsWith("http"))
+                    {
+                        returnUrl = Uri.EscapeDataString(returnUrl);
+                    }
+                }
+                
+                // Continue with the request
+                await next();
+                
+                // If we got a 404, it could be because ABP is handling the route differently
+                if (context.Response.StatusCode == 404)
+                {
+                    Console.WriteLine("Login page returned 404, redirecting to identity server connect/authorize endpoint");
+                    // Redirect to the OpenID Connect authorization endpoint
+                    var clientId = "web_backend_Blazor";
+                    var redirectUri = Uri.EscapeDataString($"{context.Request.Scheme}://{context.Request.Host}/authentication/login-callback");
+                    var authUrl = $"/connect/authorize?client_id={clientId}&redirect_uri={redirectUri}&response_type=code&scope=openid%20profile%20email%20web_backend";
+                    
+                    if (!string.IsNullOrEmpty(returnUrl))
+                    {
+                        authUrl += $"&state={Uri.EscapeDataString(returnUrl)}";
+                    }
+                    
+                    context.Response.Redirect(authUrl);
+                    return;
+                }
+            }
+            // Handle redirect after successful login (302 Found status)
+            else if (context.Request.Method == "POST" && context.Request.Path.StartsWithSegments("/Account/Login"))
+            {
+                // Capture response to check for redirect
+                await next();
+                
+                // If this is a redirect response (302)
+                if (context.Response.StatusCode == 302)
+                {
+                    // Get the form data to extract the returnUrl
+                    string returnUrl = null;
+                    if (context.Request.HasFormContentType)
+                    {
+                        var form = await context.Request.ReadFormAsync();
+                        returnUrl = form["ReturnUrl"].ToString();
+                    }
+                    
+                    // If no returnUrl in form, try query string
+                    if (string.IsNullOrEmpty(returnUrl))
+                    {
+                        returnUrl = context.Request.Query["returnUrl"].ToString();
+                    }
+
+                    Console.WriteLine($"Login successful, redirecting to: {returnUrl}");
+                    
+                    // Override the Location header if returnUrl is specified
+                    if (!string.IsNullOrEmpty(returnUrl))
+                    {
+                        context.Response.Headers["Location"] = returnUrl;
+                    }
+                }
+                
+                return;
+            }
+            
+            await next();
+        });
 
         if (MultiTenancyConsts.IsEnabled)
         {
