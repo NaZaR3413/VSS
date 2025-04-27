@@ -120,7 +120,21 @@ namespace web_backend.HttpApi.Host.Pages.Account
 
                 _logger.LogInformation("Login succeeded for user: {UserName}, redirecting to: {ReturnUrl}", 
                     LoginInput.UserNameOrEmailAddress, ReturnUrl ?? "/");
-                return LocalRedirect(ReturnUrl ?? "/");
+                
+                // Check if ReturnUrl is absolute (external) or relative
+                if (Uri.TryCreate(ReturnUrl, UriKind.Absolute, out var uri))
+                {
+                    // It's an absolute URL, use Redirect instead of LocalRedirect
+                    _logger.LogInformation("Using Redirect for external URL: {Url}", ReturnUrl);
+                    return Redirect(ReturnUrl);
+                }
+                else
+                {
+                    // It's a relative URL, use LocalRedirect
+                    var localUrl = ReturnUrl ?? "/";
+                    _logger.LogInformation("Using LocalRedirect for local URL: {Url}", localUrl);
+                    return LocalRedirect(localUrl);
+                }
             }
             catch (Exception ex)
             {
