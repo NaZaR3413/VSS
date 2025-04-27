@@ -8,6 +8,7 @@ using Microsoft.JSInterop;
 using web_backend.Blazor.Client.Services;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.AspNetCore.Components.WebAssembly.Authentication;
 
 namespace web_backend.Blazor.Client;
 
@@ -34,6 +35,34 @@ public class Program
         {
             BaseAddress = new Uri(remoteServiceBaseUrl ?? builder.HostEnvironment.BaseAddress),
             DefaultRequestVersion = new Version(2, 0)  // Use HTTP/2 for better performance
+        });
+
+        // Add OIDC authentication services
+        builder.Services.AddOidcAuthentication(options =>
+        {
+            builder.Configuration.Bind("AuthServer", options.ProviderOptions);
+            options.ProviderOptions.ResponseType = "code";
+            options.ProviderOptions.DefaultScopes.Add("openid");
+            options.ProviderOptions.DefaultScopes.Add("profile");
+            options.ProviderOptions.DefaultScopes.Add("email");
+            options.ProviderOptions.DefaultScopes.Add("web_backend");
+            
+            // Add a HTTP client with authentication capability
+            options.UserOptions.RoleClaim = "role";
+        });
+
+        // Configure authenticated HTTP client
+        builder.Services.AddHttpClient("web_backend.API", client => 
+        {
+            client.BaseAddress = new Uri(remoteServiceBaseUrl ?? builder.HostEnvironment.BaseAddress);
+        })
+        .AddHttpMessageHandler(sp => 
+        {
+            var handler = sp.GetRequiredService<AuthorizationMessageHandler>()
+                .ConfigureHandler(
+                    authorizedUrls: new[] { remoteServiceBaseUrl ?? builder.HostEnvironment.BaseAddress },
+                    scopes: new[] { "web_backend" });
+            return handler;
         });
 
         // Enable prerendering support (works with server prerendering)

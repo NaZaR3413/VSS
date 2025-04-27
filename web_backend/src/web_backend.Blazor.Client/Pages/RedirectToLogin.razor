@@ -1,18 +1,8 @@
 @inject NavigationManager Navigation
-@inject HttpClient HttpClient
 
 @code {
     protected override void OnInitialized()
     {
-        // Get the current URL as the return URL
-        var currentUri = Navigation.Uri;
-        var returnUrl = Uri.EscapeDataString(currentUri);
-        
-        // Instead of directly navigating to the API server's login page,
-        // use the built-in OIDC authentication flow
-        var loginUrl = $"/authentication/login?returnUrl={returnUrl}";
-        
-        // Use forceLoad: false to keep the SPA navigation
-        Navigation.NavigateTo(loginUrl);
+        Navigation.NavigateTo($"/authentication/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}");
     }
 }

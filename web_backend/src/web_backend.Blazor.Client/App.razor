@@ -9,7 +9,7 @@
                 <NotAuthorized Context="notAuthorizedContext">
                     @if (!notAuthorizedContext.User.Identity?.IsAuthenticated ?? true)
                     {
-                        <Volo.Abp.AspNetCore.Components.Web.BasicTheme.Themes.Basic.RedirectToLogin />
+                        <RedirectToLogin />
                     }
                     else
                     {
