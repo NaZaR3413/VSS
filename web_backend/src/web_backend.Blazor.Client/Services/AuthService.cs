@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -34,31 +35,29 @@ namespace web_backend.Blazor.Client.Services
         {
             try
             {
-                var authServerUrl = _configuration["AuthServer:Authority"];
-                var clientId = _configuration["AuthServer:ClientId"];
-                
-                if (string.IsNullOrEmpty(authServerUrl) || string.IsNullOrEmpty(clientId))
+                // Get base API URL from configuration
+                var apiBaseUrl = _configuration["RemoteServices:Default:BaseUrl"];
+                if (string.IsNullOrEmpty(apiBaseUrl))
                 {
-                    Console.Error.WriteLine("Auth server configuration is missing");
+                    Console.Error.WriteLine("API base URL is missing from configuration");
                     return false;
                 }
 
-                // Prepare the token endpoint URL
-                var tokenEndpoint = $"{authServerUrl}/connect/token";
+                // Use the correct login endpoint from your API
+                var loginEndpoint = $"{apiBaseUrl}/api/account/login";
                 
-                // Prepare the request content
-                var content = new FormUrlEncodedContent(new[]
+                // Create login request with credentials
+                var loginRequest = new
                 {
-                    new KeyValuePair<string, string>("client_id", clientId),
-                    new KeyValuePair<string, string>("grant_type", "password"),
-                    new KeyValuePair<string, string>("username", username),
-                    new KeyValuePair<string, string>("password", password),
-                    new KeyValuePair<string, string>("scope", "web_backend email openid profile role phone")
-                });
+                    UserNameOrEmailAddress = username,
+                    Password = password,
+                    RememberMe = true
+                };
 
-                // Send the token request
-                var response = await _httpClient.PostAsync(tokenEndpoint, content);
+                // Send the login request as JSON
+                var response = await _httpClient.PostAsJsonAsync(loginEndpoint, loginRequest);
                 
+                // Check if the request was successful
                 if (!response.IsSuccessStatusCode)
                 {
                     var errorContent = await response.Content.ReadAsStringAsync();
@@ -67,29 +66,46 @@ namespace web_backend.Blazor.Client.Services
                 }
 
                 // Parse the response
-                var responseString = await response.Content.ReadAsStringAsync();
-                var tokenResponse = JsonSerializer.Deserialize<TokenResponse>(responseString, new JsonSerializerOptions
+                var responseContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"Login response: {responseContent}");
+                
+                try
                 {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                });
+                    // Try to parse as token response
+                    var tokenResponse = JsonSerializer.Deserialize<TokenResponse>(responseContent, new JsonSerializerOptions
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                    });
 
-                if (tokenResponse == null || string.IsNullOrEmpty(tokenResponse.AccessToken))
+                    if (tokenResponse != null && !string.IsNullOrEmpty(tokenResponse.AccessToken))
+                    {
+                        // Store the tokens in local storage
+                        await _jsRuntime.InvokeVoidAsync(
+                            "authTokenManager.storeAuthData",
+                            tokenResponse.AccessToken,
+                            tokenResponse.RefreshToken ?? string.Empty,
+                            tokenResponse.ExpiresIn
+                        );
+                        
+                        // Log successful token storage
+                        Console.WriteLine("Token stored successfully");
+                    }
+                    else
+                    {
+                        Console.WriteLine("Login successful but no token in response. Cookie-based auth may be in use.");
+                    }
+                }
+                catch
                 {
-                    Console.Error.WriteLine("Invalid token response");
-                    return false;
+                    // If we can't parse as token response, it might be a success response without a token
+                    // This is fine in cookie-based auth
+                    Console.WriteLine("Login successful, using cookie-based authentication");
                 }
 
-                // Store the tokens in local storage using JavaScript
-                await _jsRuntime.InvokeVoidAsync(
-                    "authTokenManager.storeAuthData",
-                    tokenResponse.AccessToken,
-                    tokenResponse.RefreshToken,
-                    tokenResponse.ExpiresIn
-                );
-
-                // Notify authentication state changed
+                // Notify authentication state changed regardless of token or cookie auth
                 _authStateProvider.NotifyAuthenticationStateChanged();
-
+                await Task.Delay(100); // Small delay to ensure state is updated
+                
                 return true;
             }
             catch (Exception ex)

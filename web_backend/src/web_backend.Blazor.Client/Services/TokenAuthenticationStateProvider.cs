@@ -23,12 +23,9 @@ namespace web_backend.Blazor.Client.Services
 
         public override async Task<AuthenticationState> GetAuthenticationStateAsync()
         {
-            if (!_initialized)
-            {
-                _latestState = await GetAuthenticationStateFromJsAsync();
-                _initialized = true;
-            }
-
+            // Always check authentication state from JS storage
+            _latestState = await GetAuthenticationStateFromJsAsync();
+            _initialized = true;
             return _latestState;
         }
 
