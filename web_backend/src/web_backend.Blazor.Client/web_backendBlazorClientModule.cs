@@ -100,9 +100,6 @@ public class web_backendBlazorClientModule : AbpModule
             options.ProviderOptions.ResponseType = "code";
             options.ProviderOptions.ResponseMode = "query";
             
-            // Add offline_access to enable refresh tokens
-            options.ProviderOptions.DefaultScopes.Add("offline_access");
-            
             // Make sure we have appropriate redirects
             options.ProviderOptions.PostLogoutRedirectUri = "/";
         });
