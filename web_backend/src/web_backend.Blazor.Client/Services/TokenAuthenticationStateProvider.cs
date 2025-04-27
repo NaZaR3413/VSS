@@ -6,14 +6,18 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.JSInterop;
 using System.Text.Json;
+using Volo.Abp.DependencyInjection;
 
 namespace web_backend.Blazor.Client.Services
 {
-    public class TokenAuthenticationStateProvider : AuthenticationStateProvider
+    public class TokenAuthenticationStateProvider : AuthenticationStateProvider, ITransientDependency
     {
         private readonly IJSRuntime _jsRuntime;
-        private bool _initialized = false;
         private AuthenticationState _latestState;
+
+        // Event that allows components to subscribe to auth state changes
+        public event AuthenticationStateChangedHandler AuthenticationStateChanged;
+        public delegate void AuthenticationStateChangedHandler(Task<AuthenticationState> task);
 
         public TokenAuthenticationStateProvider(IJSRuntime jsRuntime)
         {
@@ -25,14 +29,16 @@ namespace web_backend.Blazor.Client.Services
         {
             // Always check authentication state from JS storage
             _latestState = await GetAuthenticationStateFromJsAsync();
-            _initialized = true;
             return _latestState;
         }
 
         public void NotifyAuthenticationStateChanged()
         {
-            _initialized = false;
-            NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
+            var authStateTask = GetAuthenticationStateAsync();
+            base.NotifyAuthenticationStateChanged(authStateTask);
+            
+            // Also notify our custom subscribers
+            AuthenticationStateChanged?.Invoke(authStateTask);
         }
 
         private async Task<AuthenticationState> GetAuthenticationStateFromJsAsync()

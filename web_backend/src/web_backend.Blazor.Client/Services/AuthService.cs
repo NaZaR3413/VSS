@@ -9,41 +9,47 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.JSInterop;
+using Volo.Abp.DependencyInjection;
 
 namespace web_backend.Blazor.Client.Services
 {
-    public class AuthService
+    public class AuthService : ITransientDependency
     {
         private readonly HttpClient _httpClient;
         private readonly IJSRuntime _jsRuntime;
         private readonly IConfiguration _configuration;
         private readonly TokenAuthenticationStateProvider _authStateProvider;
+        private readonly DebugService _debugService;
 
         public AuthService(
             HttpClient httpClient, 
             IJSRuntime jsRuntime, 
             IConfiguration configuration,
-            TokenAuthenticationStateProvider authStateProvider)
+            TokenAuthenticationStateProvider authStateProvider,
+            DebugService debugService)
         {
             _httpClient = httpClient;
             _jsRuntime = jsRuntime;
             _configuration = configuration;
             _authStateProvider = authStateProvider;
+            _debugService = debugService;
         }
 
         public async Task<bool> LoginAsync(string username, string password)
         {
             try
             {
+                await _debugService.LogAsync("Starting login process...");
+                
                 // Get base API URL from configuration
                 var apiBaseUrl = _configuration["RemoteServices:Default:BaseUrl"];
                 if (string.IsNullOrEmpty(apiBaseUrl))
                 {
-                    Console.Error.WriteLine("API base URL is missing from configuration");
+                    await _debugService.LogAsync("API base URL is missing from configuration");
                     return false;
                 }
 
-                // Use the correct login endpoint from your API
+                // Use the ABP account login endpoint
                 var loginEndpoint = $"{apiBaseUrl}/api/account/login";
                 
                 // Create login request with credentials
@@ -54,24 +60,31 @@ namespace web_backend.Blazor.Client.Services
                     RememberMe = true
                 };
 
-                // Send the login request as JSON
-                var response = await _httpClient.PostAsJsonAsync(loginEndpoint, loginRequest);
+                await _debugService.LogAsync($"Sending login request to {loginEndpoint}");
+                
+                // Add XSRF header if needed
+                var requestMessage = new HttpRequestMessage(HttpMethod.Post, loginEndpoint);
+                requestMessage.Content = JsonContent.Create(loginRequest);
+                requestMessage.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                
+                // Send the login request
+                var response = await _httpClient.SendAsync(requestMessage);
                 
                 // Check if the request was successful
                 if (!response.IsSuccessStatusCode)
                 {
                     var errorContent = await response.Content.ReadAsStringAsync();
-                    Console.Error.WriteLine($"Login failed: {errorContent}");
+                    await _debugService.LogAsync($"Login failed: {errorContent}");
                     return false;
                 }
 
                 // Parse the response
                 var responseContent = await response.Content.ReadAsStringAsync();
-                Console.WriteLine($"Login response: {responseContent}");
+                await _debugService.LogAsync($"Login response received with status: {response.StatusCode}");
                 
+                // Try to parse as token response (in case the API returns a token)
                 try
                 {
-                    // Try to parse as token response
                     var tokenResponse = JsonSerializer.Deserialize<TokenResponse>(responseContent, new JsonSerializerOptions
                     {
                         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -87,30 +100,49 @@ namespace web_backend.Blazor.Client.Services
                             tokenResponse.ExpiresIn
                         );
                         
-                        // Log successful token storage
-                        Console.WriteLine("Token stored successfully");
+                        await _debugService.LogAsync("Token stored successfully");
                     }
                     else
                     {
-                        Console.WriteLine("Login successful but no token in response. Cookie-based auth may be in use.");
+                        await _debugService.LogAsync("No token in response, using cookie-based auth");
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
                     // If we can't parse as token response, it might be a success response without a token
-                    // This is fine in cookie-based auth
-                    Console.WriteLine("Login successful, using cookie-based authentication");
+                    await _debugService.LogAsync($"Using cookie-based auth. Parse error: {ex.Message}");
                 }
 
-                // Notify authentication state changed regardless of token or cookie auth
+                // For ABP cookie-based auth, get and store user info
+                try
+                {
+                    await _debugService.LogAsync("Fetching current user info after login");
+                    var userInfoResponse = await _httpClient.GetAsync($"{apiBaseUrl}/api/account/my-profile");
+                    
+                    if (userInfoResponse.IsSuccessStatusCode)
+                    {
+                        var userInfo = await userInfoResponse.Content.ReadAsStringAsync();
+                        await _jsRuntime.InvokeVoidAsync("localStorage.setItem", "currentUser", userInfo);
+                        await _debugService.LogAsync("User profile stored in local storage");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    await _debugService.LogAsync($"Error fetching user profile: {ex.Message}");
+                }
+
+                // Notify authentication state changed
+                await _debugService.LogAsync("Notifying authentication state changed");
                 _authStateProvider.NotifyAuthenticationStateChanged();
-                await Task.Delay(100); // Small delay to ensure state is updated
+                
+                // Small delay to ensure UI updates
+                await Task.Delay(200); 
                 
                 return true;
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Login exception: {ex.Message}");
+                await _debugService.LogAsync($"Login exception: {ex.Message}");
                 return false;
             }
         }
