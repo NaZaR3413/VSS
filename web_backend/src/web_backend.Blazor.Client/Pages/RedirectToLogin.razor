@@ -1,26 +1,17 @@
+@page "/authentication/login"
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
 @inject NavigationManager Navigation
-@inject HttpClient HttpClient
-@using System.Configuration
+@inject IJSRuntime JS
+
+<div class="alert alert-info">
+    <p>Redirecting to login...</p>
+</div>
 
 @code {
     protected override void OnInitialized()
     {
-        // Determine the API base URL
-        var apiBaseUrl = DetermineApiBaseUrl();
-        
-        var currentUri = Navigation.Uri;
-        var returnUrl = Uri.EscapeDataString(currentUri);
-        
-        // Navigate to the login page on the API server
-        var loginUrl = $"{apiBaseUrl}/Account/Login?returnUrl={returnUrl}";
-        
-        // Use forceLoad to ensure browser navigation
-        Navigation.NavigateTo(loginUrl, forceLoad: true);
-    }
-    
-    private string DetermineApiBaseUrl()
-    {
-        // This should be the URL of your HttpApi.Host project where the authentication pages are hosted
-        return "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
+        // Use the built-in NavigationManager.NavigateToLogin method which properly handles
+        // the OIDC authentication flow for Blazor WebAssembly
+        Navigation.NavigateToLogin("authentication/login-callback");
     }
 }

@@ -1,0 +1,43 @@
+@page "/authentication/login-callback"
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@using Microsoft.Extensions.Configuration 
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject IConfiguration Configuration
+
+<div class="vss-page vss-page-layout--default">
+    <main class="vss-main">
+        <div class="container text-center py-5">
+            <div class="spinner-border text-primary mb-3" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <h3>Processing login...</h3>
+            <p>Please wait while we complete your authentication.</p>
+        </div>
+    </main>
+</div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await JS.InvokeVoidAsync("console.log", "Login callback page initialized");
+        
+        // This page handles the OIDC login callback
+        // The RemoteAuthenticationService will automatically process the authentication response
+        
+        // After authentication, navigate to a landing page
+        var targetUrl = Configuration.GetValue<string>("AuthServer:RedirectUri") ?? "/landing";
+        
+        // If we have a saved return URL, navigate there instead
+        var savedReturnUrl = await JS.InvokeAsync<string>("localStorage.getItem", "vss_auth_return_url");
+        if (!string.IsNullOrEmpty(savedReturnUrl))
+        {
+            await JS.InvokeVoidAsync("localStorage.removeItem", "vss_auth_return_url");
+            await JS.InvokeVoidAsync("console.log", $"Using saved return URL: {savedReturnUrl}");
+            targetUrl = savedReturnUrl;
+        }
+        
+        await Task.Delay(1000); // Small delay to ensure the auth flow completes
+        Navigation.NavigateTo(targetUrl);
+    }
+}

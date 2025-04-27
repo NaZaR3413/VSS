@@ -17,6 +17,7 @@
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="js/hlsPlayer.js"></script>
     <script src="js/notifications.js"></script>
+    <script src="js/auth-utilities.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
 </HeadContent>
 
@@ -266,27 +267,30 @@
         await JS.InvokeVoidAsync("showBannerNotification", "No active livestreams available at the moment. Please check back later.");
     }
 
-    private void LoginClick()
+    private async Task LoginClick()
     {
-        // Direct to the authentication pages on the API server
-        var apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
-        var returnUrl = Uri.EscapeDataString(NavigationManager.Uri);
-        NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Login?returnUrl={returnUrl}", forceLoad: true);
+        // Save current URL for return after login
+        await JS.InvokeVoidAsync("saveReturnUrl");
+        
+        // Use the Blazor WebAssembly authentication mechanism
+        NavigationManager.NavigateTo("/authentication/login");
     }
 
-    private void RegisterClick()
+    private async Task RegisterClick()
     {
-        // Direct to the authentication pages on the API server
+        // Save current URL for return after registration
+        await JS.InvokeVoidAsync("saveReturnUrl");
+        
+        // Direct to the authentication pages on the API server with proper return URL
         var apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
-        var returnUrl = Uri.EscapeDataString(NavigationManager.Uri);
+        var returnUrl = Uri.EscapeDataString($"{NavigationManager.BaseUri}authentication/login-callback");
         NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Register?returnUrl={returnUrl}", forceLoad: true);
     }
 
     private void LogoutClick()
     {
-        // Direct to the authentication pages on the API server
-        var apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
-        NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Logout", forceLoad: true);
+        // Use the built-in logout mechanism
+        NavigationManager.NavigateTo("authentication/logout");
     }
 
     public void Dispose()
