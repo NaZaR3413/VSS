@@ -120,6 +120,29 @@ namespace web_backend.HttpApi.Host.Pages.Account
 
                 _logger.LogInformation("Login succeeded for user: {UserName}, redirecting to: {ReturnUrl}", 
                     LoginInput.UserNameOrEmailAddress, ReturnUrl ?? "/");
+                
+                // Check if the ReturnUrl is absolute (points to an external domain)
+                if (!string.IsNullOrEmpty(ReturnUrl) && Uri.TryCreate(ReturnUrl, UriKind.Absolute, out var uri))
+                {
+                    // For security, you might want to validate the domains you allow redirects to
+                    // This is a list of trusted domains that we allow redirects to
+                    var allowedDomains = new[] { 
+                        "salmon-glacier-08dca301e.6.azurestaticapps.net",
+                        "vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net"
+                        // Add any other domains you want to allow redirects to
+                    };
+                    
+                    if (allowedDomains.Any(domain => uri.Host.Equals(domain, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        _logger.LogInformation("Redirecting to external URL: {ReturnUrl}", ReturnUrl);
+                        return Redirect(ReturnUrl);
+                    }
+                    
+                    _logger.LogWarning("Attempted redirect to non-allowed external domain: {Host}", uri.Host);
+                    return Redirect("/"); // Fallback to home page if domain is not allowed
+                }
+                
+                // For local URLs, use LocalRedirect
                 return LocalRedirect(ReturnUrl ?? "/");
             }
             catch (Exception ex)
