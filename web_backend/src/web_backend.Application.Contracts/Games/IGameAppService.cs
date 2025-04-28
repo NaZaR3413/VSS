@@ -14,5 +14,7 @@ namespace web_backend.Games
         Task<GameDto> CreateAsync(CreateGameDto input);
         Task<GameDto> UpdateAsync(Guid id, UpdateGameDto input);
         Task DeleteAsync(Guid id);
+        Task<List<GameDto>> GetFilteredListAsync(GameFilterDto input);
+
     }
 }

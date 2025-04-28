@@ -134,6 +134,37 @@ namespace web_backend.Games
             }
         }
 
+        /// <summary>
+        /// Retrieves a list of games based on the provided filters.
+        /// Supports filtering by EventType, HomeTeam, AwayTeam, Broadcasters, and EventDate.
+        /// </summary>
+        /// <param name="input">
+        /// Filter parameters for querying games.
+        /// - Visit <see cref="GameFilterDto"/> for details on available filters.
+        /// - Dates should be provided in ISO 8601 format: YYYY-MM-DDTHH:MM:SS (e.g., 2025-05-01T19:30:00).
+        /// </param>
+        /// <returns>
+        /// A list of matching <see cref="GameDto"/> objects.
+        /// </returns>
+        public async Task<List<GameDto>> GetFilteredListAsync(GameFilterDto input)
+        {
+            using (_dataFilter.Disable<IMultiTenant>())
+            {
+                var filteredGames = await _gameRepository.GetFilteredListAsync(
+                    input.EventType,
+                    input.HomeTeam,
+                    input.AwayTeam,
+                    input.Broadcasters,
+                    input.EventDate
+                );
+
+                var result = ObjectMapper.Map<List<Game>, List<GameDto>>(filteredGames);
+
+                return result;
+            }
+        }
+
+
 
     }
 }

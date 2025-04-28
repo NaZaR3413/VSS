@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Volo.Abp.Domain.Repositories.EntityFrameworkCore;
 using Volo.Abp.EntityFrameworkCore;
 using web_backend.EntityFrameworkCore;
+using web_backend.Enums;
 
 namespace web_backend.Games
 {
@@ -46,5 +47,22 @@ namespace web_backend.Games
         {
             await base.DeleteAsync(id);
         }
+
+        public async Task<List<Game>> GetFilteredListAsync(EventType? eventType, string? homeTeam, string? awayTeam, string? broadcasters, DateTime? eventDate)
+        {
+            var query = await GetQueryableAsync();
+            
+            query = new List<Func<IQueryable<Game>, IQueryable<Game>>>
+                {
+                    q => eventType.HasValue ? q.Where(g => g.EventType == eventType) : q,
+                    q => !string.IsNullOrWhiteSpace(homeTeam) ? q.Where(g => g.HomeTeam.Contains(homeTeam)) : q,
+                    q => !string.IsNullOrWhiteSpace(awayTeam) ? q.Where(g => g.AwayTeam.Contains(awayTeam)) : q,
+                    q => !string.IsNullOrWhiteSpace(broadcasters) ? q.Where(g => g.Broadcasters.Contains(broadcasters)) : q,
+                    q => eventDate.HasValue ? q.Where(g => g.EventDate.Date == eventDate.Value.Date) : q
+                }.Aggregate(query, (current, filter) => filter(current));
+            
+            return await query.ToListAsync();
+        }
+
     }
 }

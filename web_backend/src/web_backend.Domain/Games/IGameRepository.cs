@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using web_backend.Enums;
 
 namespace web_backend.Games
 {
@@ -13,5 +14,6 @@ namespace web_backend.Games
         Task<Game> CreateAsync(Game game);
         Task<Game> UpdateAsync(Game game);
         Task DeleteAsync(Guid id);
+        Task<List<Game>> GetFilteredListAsync(EventType? eventType, string? homeTeam, string? awayTeam, string? broadcasters, DateTime? eventDate);
     }
 }
