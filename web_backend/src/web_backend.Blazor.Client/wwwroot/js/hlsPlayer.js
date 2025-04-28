@@ -129,15 +129,11 @@ window.PaywallManager = {
 window.loadHlsStream = (videoUrl, videoElementId = "videoPlayer", streamId = null) => {
     console.log("Attempting to load video:", videoUrl);
 
-    // Don't automatically convert HTTP to HTTPS as the streaming server doesn't support SSL
-    // Instead, maintain the original protocol to prevent SSL errors
-    // If needed in the future, uncomment the code below:
-    /*
+
     if (window.location.protocol === 'https:' && videoUrl.startsWith('http:')) {
         console.log("Converting HTTP stream URL to HTTPS to avoid mixed content blocking");
         videoUrl = videoUrl.replace('http:', 'https:');
     }
-    */
 
     const video = document.getElementById(videoElementId);
     if (!video) {
