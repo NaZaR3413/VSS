@@ -254,9 +254,8 @@
 
     private void LogoutClick()
     {
-        var api = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
-        var returnUrl = Uri.EscapeDataString(NavigationManager.Uri);
-        NavigationManager.NavigateTo($"{api}/Account/Logout?returnUrl={returnUrl}", true);
+        var redirectUri = Uri.EscapeDataString("/landing");
+        NavigationManager.NavigateTo($"authentication/logout?redirectUri={redirectUri}", forceLoad: true);
     }
 
     public void Dispose()
