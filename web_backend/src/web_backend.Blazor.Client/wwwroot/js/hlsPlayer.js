@@ -103,7 +103,7 @@ window.PaywallManager = {
                 <h2>Free Preview Ended</h2>
                 <p>Your free preview period has ended. Sign in or create an account to continue watching.</p>
                 <div style="display: flex; gap: 10px; margin-top: 20px;">
-                    <a href="/authentication/Login" class="btn btn-primary">Login</a>
+                    <a href="/Account/Login" class="btn btn-primary">Login</a>
                     <a href="/Account/Register" class="btn btn-success">Register</a>
                 </div>
             `;

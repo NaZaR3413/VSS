@@ -150,12 +150,11 @@
         @Body
     </main>
     
-    <!-- Startup Status Indicator -->
 </div>
 
 @code {
     private AuthenticationState? authState;
-    private List<LivestreamDto> activeLivestreams = new List<LivestreamDto>();
+    private List<LivestreamDto> activeLivestreams = new();
     private System.Threading.Timer? refreshTimer;
     private DateTimeOffset lastRefreshTime = DateTimeOffset.MinValue;
 
@@ -164,22 +163,20 @@
 
     protected override async Task OnInitializedAsync()
     {
-        
+        authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
 
-            authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (LivestreamState != null)
+        {
+            LivestreamState.OnLivestreamStatusChanged += HandleLivestreamStatusChanged;
+        }
 
-            if (LivestreamState != null)
-            {
-                LivestreamState.OnLivestreamStatusChanged += HandleLivestreamStatusChanged;
-            }
+        refreshTimer = new System.Threading.Timer(async _ =>
+        {
+            await RefreshLivestreams(force: false);
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
 
-            refreshTimer = new System.Threading.Timer(async _ =>
-            {
-                await RefreshLivestreams(force: false);
-                await InvokeAsync(StateHasChanged);
-            }, null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
-
-            await RefreshLivestreams(force: true);
+        await RefreshLivestreams(force: true);
     }
 
     private async void HandleLivestreamStatusChanged(object? sender, EventArgs e)
@@ -198,24 +195,8 @@
                 return;
             }
 
-            await JS.InvokeVoidAsync("console.log", "Refreshing livestreams list...");
-
-            if (force)
-            {
-                await JS.InvokeVoidAsync("console.log", "Forced refresh - skipping cache");
-            }
-
             var allStreams = await LivestreamService.GetListAsync();
             lastRefreshTime = DateTimeOffset.UtcNow;
-
-            await JS.InvokeVoidAsync("console.log", $"Total streams: {allStreams.Count}");
-
-            foreach (var stream in allStreams)
-            {
-                await JS.InvokeVoidAsync("console.log",
-                    $"Stream ID: {stream.Id}, Status: {stream.StreamStatus} ({(int)stream.StreamStatus}), " +
-                    $"Teams: '{stream.HomeTeam ?? "null"}' vs '{stream.AwayTeam ?? "null"}'");
-            }
 
             var newLiveStreams = allStreams
                 .Where(l => l.StreamStatus == StreamStatus.Live)
@@ -227,12 +208,9 @@
 
             if (hasChanged)
             {
-                await JS.InvokeVoidAsync("console.log", $"Livestream list has changed, updating UI");
                 activeLivestreams = newLiveStreams;
                 await InvokeAsync(StateHasChanged);
             }
-
-            await JS.InvokeVoidAsync("console.log", $"Found {activeLivestreams.Count} LIVE streams");
         }
         catch (Exception ex)
         {
@@ -242,39 +220,30 @@
 
     private void NavigateToLivestream(string livestreamId)
     {
-        var url = $"/livestream/{livestreamId}";
-        JS.InvokeVoidAsync("console.log", $"Navigating to livestream: {url}");
-        NavigationManager.NavigateTo(url, forceLoad: true);
+        NavigationManager.NavigateTo($"/livestream/{livestreamId}", forceLoad: true);
     }
 
     private async Task ShowNoLivestreamsNotification()
     {
-        await JS.InvokeVoidAsync("console.log", "No active livestreams to navigate to");
-
         await JS.InvokeVoidAsync("showBannerNotification", "No active livestreams available at the moment. Please check back later.");
     }
 
     private void LoginClick()
     {
-        // Direct to the authentication pages on the API server
-        var apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
         var returnUrl = Uri.EscapeDataString(NavigationManager.Uri);
-        NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Login?returnUrl={returnUrl}", forceLoad: true);
+        NavigationManager.NavigateTo($"/authentication/login?redirectUri={returnUrl}");
     }
 
     private void RegisterClick()
     {
-        // Direct to the authentication pages on the API server
-        var apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
         var returnUrl = Uri.EscapeDataString(NavigationManager.Uri);
-        NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Register?returnUrl={returnUrl}", forceLoad: true);
+        NavigationManager.NavigateTo($"/authentication/register?redirectUri={returnUrl}");
     }
 
     private void LogoutClick()
     {
-        // Direct to the authentication pages on the API server
-        var apiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
-        NavigationManager.NavigateTo($"{apiBaseUrl}/Account/Logout", forceLoad: true);
+        var postLogoutRedirect = Uri.EscapeDataString("/landing");
+        NavigationManager.NavigateTo($"/authentication/logout?redirectUri={postLogoutRedirect}");
     }
 
     public void Dispose()
@@ -289,37 +258,12 @@
 
     private string GetUserDisplayName(System.Security.Claims.ClaimsPrincipal user)
     {
-
-        var name = user.FindFirst("name")?.Value;
-
-        if (string.IsNullOrEmpty(name))
-            name = user.Identity?.Name;
-
-        if (string.IsNullOrEmpty(name))
-            name = user.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
-
-        if (string.IsNullOrEmpty(name))
-        {
-            var firstName = user.FindFirst(System.Security.Claims.ClaimTypes.GivenName)?.Value;
-            var lastName = user.FindFirst(System.Security.Claims.ClaimTypes.Surname)?.Value;
-
-            if (!string.IsNullOrEmpty(firstName))
-            {
-                name = !string.IsNullOrEmpty(lastName)
-                    ? $"{firstName} {lastName}"
-                    : firstName;
-            }
-        }
-
-        if (string.IsNullOrEmpty(name))
-            name = user.FindFirst("given_name")?.Value;
-
-        if (string.IsNullOrEmpty(name))
-            name = user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
-
-        if (string.IsNullOrEmpty(name))
-            name = user.FindFirst("preferred_username")?.Value;
-
-        return !string.IsNullOrEmpty(name) ? name : "User";
+        return user.FindFirst("name")?.Value
+               ?? user.Identity?.Name
+               ?? user.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value
+               ?? user.FindFirst(System.Security.Claims.ClaimTypes.GivenName)?.Value
+               ?? user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
+               ?? user.FindFirst("preferred_username")?.Value
+               ?? "User";
     }
 }
