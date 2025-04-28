@@ -38,338 +38,274 @@ using Volo.Abp.Identity;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Http;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.CookiePolicy;
+using AbpIdentityUser = Volo.Abp.Identity.IdentityUser;
 
-namespace web_backend;
 
-[DependsOn(
-    typeof(web_backendHttpApiModule),
-    typeof(AbpAutofacModule),
-    typeof(AbpAspNetCoreMultiTenancyModule),
-    typeof(web_backendApplicationModule),
-    typeof(web_backendEntityFrameworkCoreModule),
-    typeof(AbpAspNetCoreMvcUiBasicThemeModule),
-    typeof(AbpAccountWebOpenIddictModule),
-    typeof(AbpAspNetCoreSerilogModule),
-    typeof(AbpSwashbuckleModule)
-)]
-public class web_backendHttpApiHostModule : AbpModule
+namespace web_backend
 {
-    public override void PreConfigureServices(ServiceConfigurationContext context)
+    [DependsOn(
+        typeof(web_backendHttpApiModule),
+        typeof(AbpAutofacModule),
+        typeof(AbpAspNetCoreMultiTenancyModule),
+        typeof(web_backendApplicationModule),
+        typeof(web_backendEntityFrameworkCoreModule),
+        typeof(AbpAspNetCoreMvcUiBasicThemeModule),
+        typeof(AbpAccountWebOpenIddictModule),
+        typeof(AbpAspNetCoreSerilogModule),
+        typeof(AbpSwashbuckleModule)
+    )]
+    public class web_backendHttpApiHostModule : AbpModule
     {
-        var hostingEnvironment = context.Services.GetHostingEnvironment();
-
-        Console.WriteLine($"Hosting Environment: {hostingEnvironment.EnvironmentName}");
-
-        // Only run production config in a non-Development environment
-        if (!hostingEnvironment.IsDevelopment())
+        public override void PreConfigureServices(ServiceConfigurationContext context)
         {
-            Console.WriteLine("Running production OpenIddict configuration...");
+            var hostingEnvironment = context.Services.GetHostingEnvironment();
 
-            PreConfigure<AbpOpenIddictAspNetCoreOptions>(options =>
-            {
-                // Disable automatic development certificates individually.
-                options.AddDevelopmentEncryptionAndSigningCertificate = false;
-            });
+            Console.WriteLine($"Hosting Environment: {hostingEnvironment.EnvironmentName}");
 
-            PreConfigure<OpenIddictServerBuilder>(serverBuilder =>
+            if (!hostingEnvironment.IsDevelopment())
             {
-                try
+                Console.WriteLine("Running production OpenIddict configuration...");
+
+                PreConfigure<AbpOpenIddictAspNetCoreOptions>(options =>
                 {
-                    var configuration = context.Services.GetConfiguration();
-                    var pfxPassword = configuration["OpenIddict:Certificates:Default:Password"];
-
-                    Console.WriteLine("Retrieved PFX password from configuration.");
-                    
-                    var certPath = Path.Combine(AppContext.BaseDirectory, "openiddict.pfx");
-
-                    Console.WriteLine($"Looking for certificate at: {certPath}");
-                    if (!File.Exists(certPath))
-                    {
-                        Console.WriteLine("Certificate file not found! Falling back to development certificate.");
-                        // Instead of throwing an exception, fall back to development certificate
-                        PreConfigure<AbpOpenIddictAspNetCoreOptions>(fallbackOptions =>
-                        {
-                            fallbackOptions.AddDevelopmentEncryptionAndSigningCertificate = true;
-                        });
-                        return;
-                    }
-
-                    var certificate = new X509Certificate2(
-                        certPath,
-                        "Varsity2024",
-                        X509KeyStorageFlags.MachineKeySet
-                    );
-
-                    Console.WriteLine("Certificate loaded successfully.");
-
-                    serverBuilder.AddEncryptionCertificate(certificate);
-                    serverBuilder.AddSigningCertificate(certificate);
-                    Console.WriteLine("Added encryption and signing certificates.");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("Exception while loading certificate:");
-                    Console.WriteLine(ex.ToString());
-                    // Instead of throwing, fall back to development certificate
-                    Console.WriteLine("Falling back to development certificate due to error.");
-                    PreConfigure<AbpOpenIddictAspNetCoreOptions>(fallbackOptions =>
-                    {
-                        fallbackOptions.AddDevelopmentEncryptionAndSigningCertificate = true;
-                    });
-                }
-            });
-        }
-        else
-        {
-            Console.WriteLine("Development environment detected, using development certificates.");
-            PreConfigure<AbpOpenIddictAspNetCoreOptions>(options =>
-            {
-                options.AddDevelopmentEncryptionAndSigningCertificate = true;
-            });
-        }
-
-        PreConfigure<OpenIddictBuilder>(builder =>
-        {
-            builder.AddValidation(options =>
-            {
-                options.AddAudiences("web_backend");
-                options.UseLocalServer();
-                options.UseAspNetCore();
-                Console.WriteLine("OpenIddict validation configured.");
-            });
-        });
-        ObjectExtensionManager.Instance
-        .MapEfCoreProperty<IdentityUser, string>(
-            "Name",
-            (entityBuilder, propertyBuilder) =>
-            {
-                propertyBuilder.HasMaxLength(IdentityUserConsts.MaxUserNameLength);
-            });
-
-        ObjectExtensionManager.Instance
-            .MapEfCoreProperty<IdentityUser, string>(
-                "PhoneNumber",
-                (entityBuilder, propertyBuilder) =>
-                {
-                    propertyBuilder.HasMaxLength(IdentityUserConsts.MaxPhoneNumberLength);
+                    options.AddDevelopmentEncryptionAndSigningCertificate = false;
                 });
-    }
 
-
-
-    public override void ConfigureServices(ServiceConfigurationContext context)
-    {
-        var configuration = context.Services.GetConfiguration();
-        var hostingEnvironment = context.Services.GetHostingEnvironment();
-
-        ConfigureAuthentication(context);
-        ConfigureBundles();
-        ConfigureUrls(configuration);
-        ConfigureConventionalControllers();
-        ConfigureVirtualFileSystem(context);
-        ConfigureCors(context, configuration);
-        ConfigureSwaggerServices(context, configuration);
-    }
-
-    private void ConfigureAuthentication(ServiceConfigurationContext context)
-    {
-        context.Services.ForwardIdentityAuthenticationForBearer(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
-        context.Services.Configure<AbpClaimsPrincipalFactoryOptions>(options =>
-        {
-            options.IsDynamicClaimsEnabled = true;
-        });
-    }
-
-    private void ConfigureBundles()
-    {
-        Configure<AbpBundlingOptions>(options =>
-        {
-            options.StyleBundles.Configure(
-                BasicThemeBundles.Styles.Global,
-                bundle =>
+                PreConfigure<OpenIddictServerBuilder>(serverBuilder =>
                 {
-                    bundle.AddFiles("/global-styles.css");
-                }
-            );
-        });
-    }
-
-    private void ConfigureUrls(IConfiguration configuration)
-    {
-        Configure<AppUrlOptions>(options =>
-        {
-            options.Applications["MVC"].RootUrl = configuration["App:SelfUrl"];
-            options.RedirectAllowedUrls.AddRange(configuration["App:RedirectAllowedUrls"]?.Split(',') ?? Array.Empty<string>());
-
-            options.Applications["Angular"].RootUrl = configuration["App:ClientUrl"];
-            options.Applications["Angular"].Urls[AccountUrlNames.PasswordReset] = "account/reset-password";
-        });
-    }
-
-    private void ConfigureVirtualFileSystem(ServiceConfigurationContext context)
-    {
-        var hostingEnvironment = context.Services.GetHostingEnvironment();
-
-        if (hostingEnvironment.IsDevelopment())
-        {
-            Configure<AbpVirtualFileSystemOptions>(options =>
-            {
-                options.FileSets.ReplaceEmbeddedByPhysical<web_backendDomainSharedModule>(
-                    Path.Combine(hostingEnvironment.ContentRootPath,
-                        $"..{Path.DirectorySeparatorChar}web_backend.Domain.Shared"));
-                options.FileSets.ReplaceEmbeddedByPhysical<web_backendDomainModule>(
-                    Path.Combine(hostingEnvironment.ContentRootPath,
-                        $"..{Path.DirectorySeparatorChar}web_backend.Domain"));
-                options.FileSets.ReplaceEmbeddedByPhysical<web_backendApplicationContractsModule>(
-                    Path.Combine(hostingEnvironment.ContentRootPath,
-                        $"..{Path.DirectorySeparatorChar}web_backend.Application.Contracts"));
-                options.FileSets.ReplaceEmbeddedByPhysical<web_backendApplicationModule>(
-                    Path.Combine(hostingEnvironment.ContentRootPath,
-                        $"..{Path.DirectorySeparatorChar}web_backend.Application"));
-            });
-        }
-    }
-
-    private void ConfigureConventionalControllers()
-    {
-        Configure<AbpAspNetCoreMvcOptions>(options =>
-        {
-            options.ConventionalControllers.Create(typeof(web_backendApplicationModule).Assembly);
-        });
-    }
-
-    private static void ConfigureSwaggerServices(ServiceConfigurationContext context, IConfiguration configuration)
-    {
-        context.Services.AddAbpSwaggerGenWithOAuth(
-            configuration["AuthServer:Authority"]!,
-            new Dictionary<string, string>
-            {
-                    {"web_backend", "web_backend API"}
-            },
-            options =>
-            {
-                options.SwaggerDoc("v1", new OpenApiInfo { Title = "web_backend API", Version = "v1" });
-                options.DocInclusionPredicate((docName, description) => true);
-                options.CustomSchemaIds(type => type.FullName);
-            });
-    }
-
-    private void ConfigureCors(ServiceConfigurationContext context, IConfiguration configuration)
-    {
-        context.Services.AddCors(options =>
-        {
-            options.AddDefaultPolicy(builder =>
-            {
-                // Get the CORS origins from configuration
-                var corsOrigins = configuration["App:CorsOrigins"]?
-                    .Split(",", StringSplitOptions.RemoveEmptyEntries)
-                    .Select(o => o.RemovePostFix("/"))
-                    .ToArray() ?? Array.Empty<string>();
-
-                // Log the configured CORS origins for debugging
-                Console.WriteLine("Configured CORS origins:");
-                foreach (var origin in corsOrigins)
-                {
-                    Console.WriteLine($"  - {origin}");
-                }
-
-                // Add wildcard for development environments
-                var env = context.Services.GetHostingEnvironment();
-                if (env.IsDevelopment())
-                {
-                    Console.WriteLine("Development environment detected, adding '*' to CORS origins");
-                    corsOrigins = corsOrigins.Append("*").ToArray();
-                }
-
-                builder
-                    .WithOrigins(corsOrigins)
-                    .WithAbpExposedHeaders()
-                    .SetIsOriginAllowedToAllowWildcardSubdomains()
-                    .AllowAnyHeader()
-                    .AllowAnyMethod()
-                    .AllowCredentials();
-            });
-        });
-    }
-
-    public override void OnApplicationInitialization(ApplicationInitializationContext context)
-    {
-        var app = context.GetApplicationBuilder();
-        var env = context.GetEnvironment();
-
-        if (env.IsDevelopment())
-        {
-            app.UseDeveloperExceptionPage();
-        }
-        else
-        {
-            // Custom error handler for production to see detailed errors
-            app.UseExceptionHandler(errorApp =>
-            {
-                errorApp.Run(async appContext =>
-                {
-                    appContext.Response.StatusCode = 500;
-                    appContext.Response.ContentType = "text/html";
-                    
-                    var errorFeature = appContext.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
-                    if (errorFeature != null)
+                    try
                     {
-                        var exception = errorFeature.Error;
-                        
-                        // Log the error
-                        var logger = appContext.RequestServices.GetService<Microsoft.Extensions.Logging.ILogger<web_backendHttpApiHostModule>>();
-                        logger?.LogError(exception, "Unhandled exception");
-                        
-                        // Write detailed error for troubleshooting
-                        await appContext.Response.WriteAsync("<html><body>\n");
-                        await appContext.Response.WriteAsync("<h1>Error 500: Internal Server Error</h1>\n");
-                        await appContext.Response.WriteAsync("<hr>\n");
-                        await appContext.Response.WriteAsync($"<p><strong>Error Message:</strong> {exception.Message}</p>\n");
-                        await appContext.Response.WriteAsync($"<p><strong>Exception Type:</strong> {exception.GetType().FullName}</p>\n");
-                        
-                        if (exception.InnerException != null)
+                        var certPath = Path.Combine(AppContext.BaseDirectory, "openiddict.pfx");
+
+                        if (!File.Exists(certPath))
                         {
-                            await appContext.Response.WriteAsync($"<p><strong>Inner Exception:</strong> {exception.InnerException.Message}</p>\n");
+                            Console.WriteLine("Certificate not found. Using development certificate.");
+                            PreConfigure<AbpOpenIddictAspNetCoreOptions>(f => f.AddDevelopmentEncryptionAndSigningCertificate = true);
+                            return;
                         }
-                        
-                        await appContext.Response.WriteAsync("<pre>");
-                        await appContext.Response.WriteAsync(exception.StackTrace ?? "No stack trace available");
-                        await appContext.Response.WriteAsync("</pre>");
-                        await appContext.Response.WriteAsync("</body></html>");
+
+                        var certificate = new X509Certificate2(
+                            certPath,
+                            "Varsity2024",
+                            X509KeyStorageFlags.MachineKeySet);
+
+                        serverBuilder.AddEncryptionCertificate(certificate);
+                        serverBuilder.AddSigningCertificate(certificate);
                     }
+                    catch
+                    {
+                        PreConfigure<AbpOpenIddictAspNetCoreOptions>(f => f.AddDevelopmentEncryptionAndSigningCertificate = true);
+                    }
+                });
+            }
+            else
+            {
+                PreConfigure<AbpOpenIddictAspNetCoreOptions>(o =>
+                {
+                    o.AddDevelopmentEncryptionAndSigningCertificate = true;
+                });
+            }
+
+            PreConfigure<OpenIddictBuilder>(b =>
+            {
+                b.AddValidation(o =>
+                {
+                    o.AddAudiences("web_backend");
+                    o.UseLocalServer();
+                    o.UseAspNetCore();
+                });
+            });
+
+            ObjectExtensionManager.Instance.MapEfCoreProperty<AbpIdentityUser, string>(
+    "Name",
+    (eb, pb) => pb.HasMaxLength(IdentityUserConsts.MaxUserNameLength));
+
+ObjectExtensionManager.Instance.MapEfCoreProperty<AbpIdentityUser, string>(
+    "PhoneNumber",
+    (eb, pb) => pb.HasMaxLength(IdentityUserConsts.MaxPhoneNumberLength));
+
+        }
+
+        public override void ConfigureServices(ServiceConfigurationContext context)
+        {
+            var configuration = context.Services.GetConfiguration();
+
+            ConfigureAuthentication(context);
+            ConfigureBundles();
+            ConfigureUrls(configuration);
+            ConfigureConventionalControllers();
+            ConfigureVirtualFileSystem(context);
+            ConfigureCors(context, configuration);
+            ConfigureSwaggerServices(context, configuration);
+        }
+
+        private void ConfigureAuthentication(ServiceConfigurationContext context)
+        {
+            context.Services.ForwardIdentityAuthenticationForBearer(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
+            context.Services.Configure<AbpClaimsPrincipalFactoryOptions>(o => o.IsDynamicClaimsEnabled = true);
+
+            // Cross-origin-friendly auth cookie
+            context.Services.Configure<CookieAuthenticationOptions>(
+                IdentityConstants.ApplicationScheme,
+                opts =>
+                {
+                    opts.Cookie.SameSite = SameSiteMode.None;
+                    opts.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                });
+        }
+
+        private void ConfigureBundles()
+        {
+            Configure<AbpBundlingOptions>(o =>
+            {
+                o.StyleBundles.Configure(
+                    BasicThemeBundles.Styles.Global,
+                    b => b.AddFiles("/global-styles.css"));
+            });
+        }
+
+        private void ConfigureUrls(IConfiguration configuration)
+        {
+            Configure<AppUrlOptions>(o =>
+            {
+                o.Applications["MVC"].RootUrl = configuration["App:SelfUrl"];
+                o.RedirectAllowedUrls.AddRange(configuration["App:RedirectAllowedUrls"]?.Split(',') ?? Array.Empty<string>());
+                o.Applications["Angular"].RootUrl = configuration["App:ClientUrl"];
+                o.Applications["Angular"].Urls[AccountUrlNames.PasswordReset] = "account/reset-password";
+            });
+        }
+
+        private void ConfigureVirtualFileSystem(ServiceConfigurationContext context)
+        {
+            var env = context.Services.GetHostingEnvironment();
+            if (env.IsDevelopment())
+            {
+                Configure<AbpVirtualFileSystemOptions>(o =>
+                {
+                    o.FileSets.ReplaceEmbeddedByPhysical<web_backendDomainSharedModule>(Path.Combine(env.ContentRootPath, "..", "web_backend.Domain.Shared"));
+                    o.FileSets.ReplaceEmbeddedByPhysical<web_backendDomainModule>(Path.Combine(env.ContentRootPath, "..", "web_backend.Domain"));
+                    o.FileSets.ReplaceEmbeddedByPhysical<web_backendApplicationContractsModule>(Path.Combine(env.ContentRootPath, "..", "web_backend.Application.Contracts"));
+                    o.FileSets.ReplaceEmbeddedByPhysical<web_backendApplicationModule>(Path.Combine(env.ContentRootPath, "..", "web_backend.Application"));
+                });
+            }
+        }
+
+        private void ConfigureConventionalControllers()
+        {
+            Configure<AbpAspNetCoreMvcOptions>(o =>
+            {
+                o.ConventionalControllers.Create(typeof(web_backendApplicationModule).Assembly);
+            });
+        }
+
+        private static void ConfigureSwaggerServices(ServiceConfigurationContext context, IConfiguration configuration)
+        {
+            context.Services.AddAbpSwaggerGenWithOAuth(
+                configuration["AuthServer:Authority"]!,
+                new Dictionary<string, string> { { "web_backend", "web_backend API" } },
+                o =>
+                {
+                    o.SwaggerDoc("v1", new OpenApiInfo { Title = "web_backend API", Version = "v1" });
+                    o.DocInclusionPredicate((_, __) => true);
+                    o.CustomSchemaIds(t => t.FullName);
+                });
+        }
+
+        private void ConfigureCors(ServiceConfigurationContext context, IConfiguration configuration)
+        {
+            context.Services.AddCors(o =>
+            {
+                o.AddDefaultPolicy(b =>
+                {
+                    var corsOrigins = configuration["App:CorsOrigins"]?
+                        .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(origin => origin.RemovePostFix("/"))
+                        .ToArray() ?? Array.Empty<string>();
+
+                    var env = context.Services.GetHostingEnvironment();
+                    if (env.IsDevelopment())
+                    {
+                        corsOrigins = corsOrigins.Append("*").ToArray();
+                    }
+
+                    b.WithOrigins(corsOrigins)
+                     .WithAbpExposedHeaders()
+                     .SetIsOriginAllowedToAllowWildcardSubdomains()
+                     .AllowAnyHeader()
+                     .AllowAnyMethod()
+                     .AllowCredentials();
                 });
             });
         }
 
-        app.UseAbpRequestLocalization();
-
-        app.UseCorrelationId();
-        app.UseStaticFiles();
-        app.UseRouting();
-        app.UseCors();
-        app.UseAuthentication();
-        app.UseAbpOpenIddictValidation();
-
-        if (MultiTenancyConsts.IsEnabled)
+        public override void OnApplicationInitialization(ApplicationInitializationContext context)
         {
-            app.UseMultiTenancy();
+            var app = context.GetApplicationBuilder();
+            var env = context.GetEnvironment();
+
+            if (env.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+            }
+            else
+            {
+                app.UseExceptionHandler(errorApp =>
+                {
+                    errorApp.Run(async ctx =>
+                    {
+                        ctx.Response.StatusCode = 500;
+                        ctx.Response.ContentType = "text/html";
+                        var ex = ctx.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
+                        if (ex != null)
+                        {
+                            var logger = ctx.RequestServices.GetService<ILogger<web_backendHttpApiHostModule>>();
+                            logger?.LogError(ex, "Unhandled exception");
+                            await ctx.Response.WriteAsync($"<h1>{ex.Message}</h1><pre>{ex.StackTrace}</pre>");
+                        }
+                    });
+                });
+            }
+
+            app.UseAbpRequestLocalization();
+            app.UseCorrelationId();
+            app.UseStaticFiles();
+            app.UseRouting();
+            app.UseCors();
+
+            // cookie policy for cross-origin requests
+            app.UseCookiePolicy(new CookiePolicyOptions
+            {
+                MinimumSameSitePolicy = SameSiteMode.None,
+                Secure = CookieSecurePolicy.Always
+            });
+
+            app.UseAuthentication();
+            app.UseAbpOpenIddictValidation();
+
+            if (MultiTenancyConsts.IsEnabled)
+            {
+                app.UseMultiTenancy();
+            }
+
+            app.UseUnitOfWork();
+            app.UseDynamicClaims();
+            app.UseAuthorization();
+
+            app.UseSwagger();
+            app.UseAbpSwaggerUI(c =>
+            {
+                c.SwaggerEndpoint("/swagger/v1/swagger.json", "web_backend API");
+                var configuration = context.ServiceProvider.GetRequiredService<IConfiguration>();
+                c.OAuthClientId(configuration["AuthServer:SwaggerClientId"]);
+                c.OAuthScopes("web_backend");
+            });
+
+            app.UseAuditing();
+            app.UseAbpSerilogEnrichers();
+            app.UseConfiguredEndpoints();
         }
-        app.UseUnitOfWork();
-        app.UseDynamicClaims();
-        app.UseAuthorization();
-
-        app.UseSwagger();
-        app.UseAbpSwaggerUI(c =>
-        {
-            c.SwaggerEndpoint("/swagger/v1/swagger.json", "web_backend API");
-
-            var configuration = context.ServiceProvider.GetRequiredService<IConfiguration>();
-            c.OAuthClientId(configuration["AuthServer:SwaggerClientId"]);
-            c.OAuthScopes("web_backend");
-        });
-
-        app.UseAuditing();
-        app.UseAbpSerilogEnrichers();
-        app.UseConfiguredEndpoints();
     }
 }
