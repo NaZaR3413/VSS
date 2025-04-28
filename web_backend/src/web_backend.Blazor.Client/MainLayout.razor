@@ -254,8 +254,7 @@
 
     private void LogoutClick()
     {
-        var redirectUri = Uri.EscapeDataString("/landing");
-        NavigationManager.NavigateTo($"authentication/logout?redirectUri={redirectUri}", forceLoad: true);
+        NavigationManager.NavigateTo("authentication/logout?redirectUri=/landing",  /*forceLoad*/ true);
     }
 
     public void Dispose()
