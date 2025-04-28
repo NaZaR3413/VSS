@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Azure.Storage.Sas;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,15 +21,19 @@ namespace web_backend.Games
         private readonly IGameRepository _gameRepository;
         private readonly IDataFilter _dataFilter;
         private readonly BlobStorageService _blobStorageService;
+        private readonly ILogger<GameAppService> _logger;
+
         public GameAppService(
             IGameRepository gameRepository,
             IDataFilter dataFilter,
-            BlobStorageService blobStorageService
+            BlobStorageService blobStorageService,
+            ILogger<GameAppService> logger
             ) 
         { 
             _gameRepository = gameRepository;
             _dataFilter = dataFilter;
             _blobStorageService = blobStorageService;
+            _logger = logger;
         }
 
         /// <summary>
@@ -44,6 +50,8 @@ namespace web_backend.Games
 
                 // map information onto dto
                 var result = ObjectMapper.Map<Game, GameDto>(game);
+
+                result.PlaybackUrl = await GeneratePlaybackUrlAsync(game);
 
                 return result;
 
@@ -157,6 +165,20 @@ namespace web_backend.Games
                 {
                     throw new EntityNotFoundException(typeof(Game), id);
                 }
+
+                var blobName = BlobStorageName(game.EventType, game.EventDate, game.HomeTeam, game.AwayTeam, game.Id);
+                var blobClient = _blobStorageService.GetBlobClient(blobName);
+
+                var exists = await blobClient.ExistsAsync();
+                if (exists.Value)
+                {
+                    await blobClient.DeleteAsync();
+                    _logger.LogInformation("Deleted video blob: {BlobName}", blobName);
+                }
+                else
+                {
+                    _logger.LogWarning("Video blob not found during delete: {BlobName}", blobName);
+                }
                 await _gameRepository.DeleteAsync(id);
             }
         }
@@ -205,6 +227,31 @@ namespace web_backend.Games
 
             return $"{dateString}/{eventTypeString}/{matchupString}/{gameId}.mp4";
         }
+
+        private async Task<string> GeneratePlaybackUrlAsync(Game game)
+        {
+            var blobName = BlobStorageName(game.EventType, game.EventDate, game.HomeTeam, game.AwayTeam, game.Id);
+            var blobClient = _blobStorageService.GetBlobClient(blobName);
+
+            var exists = await blobClient.ExistsAsync();
+            if (!exists.Value)
+            {
+                throw new UserFriendlyException("Video file not found for this game.");
+            }
+
+            var sasBuilder = new BlobSasBuilder
+            {
+                BlobContainerName = blobClient.BlobContainerName,
+                BlobName = blobName,
+                Resource = "b", // Blob
+                ExpiresOn = DateTimeOffset.UtcNow.AddHours(6) // adjust this expiration time as needed
+            };
+            sasBuilder.SetPermissions(BlobSasPermissions.Read);
+
+            var sasUri = blobClient.GenerateSasUri(sasBuilder);
+            return sasUri.ToString();
+        }
+
 
 
 

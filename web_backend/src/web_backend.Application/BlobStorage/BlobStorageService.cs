@@ -22,6 +22,12 @@ namespace web_backend.BlobStorage
             _containerClient = new BlobContainerClient(connectionString, containerName);
         }
 
+        public BlobClient GetBlobClient(string blobName)
+        {
+            return _containerClient.GetBlobClient(blobName);
+        }
+
+
         public async Task UploadAsync(string blobName, Stream fileStream)
         {
             var blobClient = _containerClient.GetBlobClient(blobName);

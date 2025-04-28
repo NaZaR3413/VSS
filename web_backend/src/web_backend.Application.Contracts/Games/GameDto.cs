@@ -7,6 +7,7 @@ namespace web_backend.Games
     public class GameDto : EntityDto<Guid>
     {
         public Guid Id { get; set; }
+        public string PlaybackUrl { get; set; }
         public string GameUrl { get; set; }
         public string HomeTeam { get; set; }
         public string AwayTeam { get; set; }
