@@ -1,27 +1,25 @@
 ﻿using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Diagnostics;
 using System.Linq;
-using System.Security.Claims;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.Hosting;
+using Volo.Abp;
 using Volo.Abp.Account.Settings;
+using Volo.Abp.Account.Web;
+using Volo.Abp.Account.Web.Pages.Account;
 using Volo.Abp.Auditing;
+using Volo.Abp.DependencyInjection;
 using Volo.Abp.Identity;
 using Volo.Abp.Identity.AspNetCore;
 using Volo.Abp.Security.Claims;
 using Volo.Abp.Settings;
 using Volo.Abp.Validation;
-using Volo.Abp.Account.Web.Pages.Account;
-using Volo.Abp.Account.Web;
-using Volo.Abp.DependencyInjection;
 
 namespace web_backend.HttpApi.Host.Pages.Account
 {
@@ -30,135 +28,100 @@ namespace web_backend.HttpApi.Host.Pages.Account
     public class CustomLoginModel : LoginModel
     {
         private readonly ILogger<CustomLoginModel> _logger;
+        private readonly string _frontEndRoot;
 
         public CustomLoginModel(
             IAuthenticationSchemeProvider schemeProvider,
             IOptions<AbpAccountOptions> accountOptions,
             IOptions<IdentityOptions> identityOptions,
             IdentityDynamicClaimsPrincipalContributorCache identityDynamicClaimsPrincipalContributorCache,
-            ILoggerFactory loggerFactory
-        ) : base(schemeProvider, accountOptions, identityOptions, identityDynamicClaimsPrincipalContributorCache)
+            ILoggerFactory loggerFactory,
+            IConfiguration configuration)                    // ⬅ inject configuration
+            : base(schemeProvider, accountOptions, identityOptions, identityDynamicClaimsPrincipalContributorCache)
         {
-            _logger = loggerFactory.CreateLogger<CustomLoginModel>();
+            _logger        = loggerFactory.CreateLogger<CustomLoginModel>();
+            _frontEndRoot  = configuration["App:ClientUrl"]        // e.g. https://salmon-glacier-…azurestaticapps.net
+                          ?? "https://salmon-glacier-08dca301e.6.azurestaticapps.net";
         }
 
         public override async Task<IActionResult> OnPostAsync(string action)
         {
             try
             {
-                _logger.LogInformation("Login attempt started for user: {UserName}", LoginInput?.UserNameOrEmailAddress);
-                
+                _logger.LogInformation("Login attempt started for user: {User}", LoginInput?.UserNameOrEmailAddress);
+
                 await CheckLocalLoginAsync();
-                _logger.LogInformation("CheckLocalLoginAsync completed");
-                
                 ValidateModel();
-                _logger.LogInformation("Model validation completed");
 
-                // External login providers
                 ExternalProviders = await GetExternalProviders();
-                EnableLocalLogin = await SettingProvider.IsTrueAsync(AccountSettingNames.EnableLocalLogin);
-
+                EnableLocalLogin  = await SettingProvider.IsTrueAsync(AccountSettingNames.EnableLocalLogin);
                 await ReplaceEmailToUsernameOfInputIfNeeds();
-                _logger.LogInformation("Email to username replacement completed");
-
                 await IdentityOptions.SetAsync();
-                _logger.LogInformation("IdentityOptions set completed");
 
-                _logger.LogInformation("Attempting password sign in for user: {UserName}", LoginInput.UserNameOrEmailAddress);
                 var result = await SignInManager.PasswordSignInAsync(
                     LoginInput.UserNameOrEmailAddress,
                     LoginInput.Password,
                     LoginInput.RememberMe,
-                    true
-                );
-                _logger.LogInformation("Password sign-in result: {Result}", result.ToString());
+                    true);
 
-                await IdentitySecurityLogManager.SaveAsync(new IdentitySecurityLogContext()
+                await IdentitySecurityLogManager.SaveAsync(new IdentitySecurityLogContext
                 {
-                    Identity = IdentitySecurityLogIdentityConsts.Identity,
-                    Action = result.ToIdentitySecurityLogAction(),
-                    UserName = LoginInput.UserNameOrEmailAddress
+                    Identity  = IdentitySecurityLogIdentityConsts.Identity,
+                    Action    = result.ToIdentitySecurityLogAction(),
+                    UserName  = LoginInput.UserNameOrEmailAddress
                 });
-                _logger.LogInformation("Security log saved");
 
-                if (result.RequiresTwoFactor)
+                if (result.RequiresTwoFactor)   return await TwoFactorLoginResultAsync();
+                if (result.IsLockedOut)        { Alerts.Warning(L["UserLockedOutMessage"]);   return Page(); }
+                if (result.IsNotAllowed)       { Alerts.Warning(L["LoginIsNotAllowed"]);      return Page(); }
+                if (!result.Succeeded)         { Alerts.Danger (L["InvalidUserNameOrPassword"]); return Page(); }
+
+                // ---------------- Final redirect logic ----------------
+                // 1️⃣ explicit ReturnUrl present?
+                if (!string.IsNullOrWhiteSpace(ReturnUrl))
                 {
-                    _logger.LogInformation("Two-factor authentication required");
-                    return await TwoFactorLoginResultAsync();
-                }
-
-                if (result.IsLockedOut)
-                {
-                    _logger.LogInformation("User account is locked out");
-                    Alerts.Warning(L["UserLockedOutMessage"]);
-                    return Page();
-                }
-
-                if (result.IsNotAllowed)
-                {
-                    _logger.LogInformation("Login is not allowed");
-                    Alerts.Warning(L["LoginIsNotAllowed"]);
-                    return Page();
-                }
-
-                if (!result.Succeeded)
-                {
-                    _logger.LogInformation("Invalid username or password");
-                    Alerts.Danger(L["InvalidUserNameOrPassword"]);
-                    return Page();
-                }
-
-                var user = await UserManager.FindByNameAsync(LoginInput.UserNameOrEmailAddress) ??
-                           await UserManager.FindByEmailAsync(LoginInput.UserNameOrEmailAddress);
-
-                if (user == null)
-                {
-                    _logger.LogInformation("User not found");
-                    Alerts.Danger(L["InvalidUserNameOrPassword"]);
-                    return Page();
-                }
-
-                _logger.LogInformation("Login succeeded for user: {UserName}, redirecting to: {ReturnUrl}", 
-                    LoginInput.UserNameOrEmailAddress, ReturnUrl ?? "/");
-                
-                // Check if the ReturnUrl is absolute (points to an external domain)
-                if (!string.IsNullOrEmpty(ReturnUrl) && Uri.TryCreate(ReturnUrl, UriKind.Absolute, out var uri))
-                {
-                    // For security, you might want to validate the domains you allow redirects to
-                    // This is a list of trusted domains that we allow redirects to
-                    var allowedDomains = new[] { 
-                        "salmon-glacier-08dca301e.6.azurestaticapps.net",
-                        "vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net"
-                        // Add any other domains you want to allow redirects to
-                    };
-                    
-                    if (allowedDomains.Any(domain => uri.Host.Equals(domain, StringComparison.OrdinalIgnoreCase)))
+                    // absolute URL?
+                    if (Uri.TryCreate(ReturnUrl, UriKind.Absolute, out var uri))
                     {
-                        _logger.LogInformation("Redirecting to external URL: {ReturnUrl}", ReturnUrl);
-                        return Redirect(ReturnUrl);
+                        var allowed = new[]
+                        {
+                            "salmon-glacier-08dca301e.6.azurestaticapps.net",
+                            "vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net"
+                        };
+
+                        if (allowed.Any(d => uri.Host.Equals(d, StringComparison.OrdinalIgnoreCase)))
+                            return Redirect(ReturnUrl);
+
+                        _logger.LogWarning("Blocked redirect to non-allowed host: {Host}", uri.Host);
+                        return Redirect(_frontEndRoot + "/landing");
                     }
-                    
-                    _logger.LogWarning("Attempted redirect to non-allowed external domain: {Host}", uri.Host);
-                    return Redirect("/"); // Fallback to home page if domain is not allowed
+
+                    // relative url → stay on back-end origin
+                    return LocalRedirect(ReturnUrl);
                 }
-                
-                // For local URLs, use LocalRedirect
-                return LocalRedirect(ReturnUrl ?? "/");
+
+                // 2️⃣ no ReturnUrl → send to front-end landing page
+                return Redirect(_frontEndRoot + "/landing");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during login process: {ErrorMessage}", ex.Message);
-                _logger.LogError("Stack trace: {StackTrace}", ex.StackTrace);
-                
-                if (ex.InnerException != null)
-                {
-                    _logger.LogError("Inner exception: {InnerExceptionMessage}", ex.InnerException.Message);
-                    _logger.LogError("Inner exception stack trace: {InnerExceptionStackTrace}", ex.InnerException.StackTrace);
-                }
-                
+                _logger.LogError(ex, "Error during login");
                 Alerts.Danger("An error occurred during login. Please try again later.");
                 return Page();
             }
+        }
+
+        // keep Input DTO as originally generated by Abp (no changes needed)
+        public class LoginInputModel
+        {
+            [Required]
+            public string UserNameOrEmailAddress { get; set; }
+
+            [Required]
+            [DataType(DataType.Password)]
+            public string Password { get; set; }
+
+            public bool RememberMe { get; set; }
         }
     }
 }
