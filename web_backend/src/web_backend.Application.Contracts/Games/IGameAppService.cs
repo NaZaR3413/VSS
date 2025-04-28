@@ -9,6 +9,6 @@ namespace web_backend.Games
 {
     public interface IGameAppService : IApplicationService
     {
-
+        Task<GameDto> GetAsync(Guid id);
     }
 }

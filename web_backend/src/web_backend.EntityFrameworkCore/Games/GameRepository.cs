@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.EntityFrameworkCore;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -18,7 +19,10 @@ namespace web_backend.Games
 
         public async Task<Game> GetAsync(Guid id)
         {
+            var query = await GetQueryableAsync();
+            var result = await query.FirstOrDefaultAsync(x => x.Id == id);
 
+            return result;
         }
     }
 }
