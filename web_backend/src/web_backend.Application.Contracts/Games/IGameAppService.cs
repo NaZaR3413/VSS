@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.AspNetCore.Mvc;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -11,7 +12,7 @@ namespace web_backend.Games
     {
         Task<GameDto> GetAsync(Guid id);
         Task<List<GameDto>> GetListAsync();
-        Task<GameDto> CreateAsync(CreateGameDto input);
+        Task<GameDto> CreateAsync([FromForm] CreateGameDto input);
         Task<GameDto> UpdateAsync(Guid id, UpdateGameDto input);
         Task DeleteAsync(Guid id);
         Task<List<GameDto>> GetFilteredListAsync(GameFilterDto input);

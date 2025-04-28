@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.AspNetCore.Http;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -18,5 +19,6 @@ namespace web_backend.Games
         public string Description { get; set; }
         public DateTime EventDate { get; set; }
         public EventType EventType { get; set; }
+        public IFormFile VideoFile { get; set; }
     }
 }
