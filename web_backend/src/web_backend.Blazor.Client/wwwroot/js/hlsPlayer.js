@@ -129,6 +129,12 @@ window.PaywallManager = {
 window.loadHlsStream = (videoUrl, videoElementId = "videoPlayer", streamId = null) => {
     console.log("Attempting to load video:", videoUrl);
 
+    // Fix for mixed content - convert HTTP to HTTPS if we're on an HTTPS page
+    if (window.location.protocol === 'https:' && videoUrl.startsWith('http:')) {
+        console.log("Converting HTTP stream URL to HTTPS to avoid mixed content blocking");
+        videoUrl = videoUrl.replace('http:', 'https:');
+    }
+
     const video = document.getElementById(videoElementId);
     if (!video) {
         console.error(`Video element with ID '${videoElementId}' not found!`);
