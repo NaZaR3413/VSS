@@ -14,7 +14,8 @@ namespace web_backend.Livestreams
         public string? HomeTeam { get; set; } 
         public string? AwayTeam { get; set; }  
         public int? HomeScore { get; set; }  
-        public int? AwayScore { get; set; }  
+        public int? AwayScore { get; set; }
+        public bool? FreeLivestream { get; set; } 
         public EventType? EventType { get; set; } 
         public StreamStatus? StreamStatus { get; set; } 
     }

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Volo.Abp.EntityFrameworkCore;
 using web_backend.EntityFrameworkCore;
@@ -12,9 +13,11 @@ using web_backend.EntityFrameworkCore;
 namespace web_backend.Migrations
 {
     [DbContext(typeof(web_backendDbContext))]
-    partial class web_backendDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250426201704_freeLivesteramTableUpdate")]
+    partial class freeLivesteramTableUpdate
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
