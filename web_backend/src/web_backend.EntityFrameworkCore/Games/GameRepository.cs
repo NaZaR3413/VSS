@@ -35,5 +35,16 @@ namespace web_backend.Games
         {
             return await InsertAsync(game);
         }
+
+        public async Task<Game> UpdateAsync(Game game)
+        {
+            var updatedGame = await base.UpdateAsync(game);
+            return updatedGame;
+        }
+
+        public async Task DeleteAsync(Guid id)
+        {
+            await base.DeleteAsync(id);
+        }
     }
 }

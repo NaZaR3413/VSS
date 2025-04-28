@@ -13,6 +13,8 @@ namespace web_backend.Games
         {
             CreateMap<Game, GameDto>();
             CreateMap<CreateGameDto, Game>();
+            CreateMap<UpdateGameDto, Game>().ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+
 
         }
     }

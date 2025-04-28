@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Data;
+using Volo.Abp.Domain.Entities;
 using Volo.Abp.MultiTenancy;
 
 namespace web_backend.Games
@@ -84,6 +85,52 @@ namespace web_backend.Games
 
                 var created = await _gameRepository.CreateAsync(game);
                 return ObjectMapper.Map<Game, GameDto>(created);
+            }
+        }
+
+        /// <summary>
+        /// update a game instance 
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="input"> updated information for the game</param>
+        /// <returns>no specific return, updates the game instance</returns>
+        /// <exception cref="EntityNotFoundException"></exception>
+        public async Task<GameDto> UpdateAsync(Guid id, UpdateGameDto input)
+        {
+            using (_dataFilter.Disable<IMultiTenant>())
+            {
+                var game = await _gameRepository.GetAsync(id);
+                if (game == null)
+                {
+                    throw new EntityNotFoundException(typeof(Game), id);
+                }
+
+                ObjectMapper.Map(input, game);
+
+                var updatedGame = await _gameRepository.UpdateAsync(game);
+
+                var result = ObjectMapper.Map<Game, GameDto>(updatedGame);
+
+                return result;
+            }
+        }
+
+        /// <summary>
+        /// deletes a game instance 
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        /// <exception cref="EntityNotFoundException"></exception>
+        public async Task DeleteAsync(Guid id)
+        {
+            using (_dataFilter.Disable<IMultiTenant>())
+            {
+                var game = await _gameRepository.GetAsync(id);
+                if (game == null)
+                {
+                    throw new EntityNotFoundException(typeof(Game), id);
+                }
+                await _gameRepository.DeleteAsync(id);
             }
         }
 
