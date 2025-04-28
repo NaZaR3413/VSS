@@ -10,5 +10,7 @@ namespace web_backend.Games
     public interface IGameAppService : IApplicationService
     {
         Task<GameDto> GetAsync(Guid id);
+        Task<List<GameDto>> GetListAsync();
+        Task<GameDto> CreateAsync(CreateGameDto input);
     }
 }

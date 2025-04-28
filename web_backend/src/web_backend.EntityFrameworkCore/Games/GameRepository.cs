@@ -24,5 +24,16 @@ namespace web_backend.Games
 
             return result;
         }
+
+        public async Task<List<Game>> GetListAsync()
+        {
+            var query = await GetQueryableAsync();
+            return await query.ToListAsync();
+        }
+
+        public async Task<Game> CreateAsync(Game game)
+        {
+            return await InsertAsync(game);
+        }
     }
 }

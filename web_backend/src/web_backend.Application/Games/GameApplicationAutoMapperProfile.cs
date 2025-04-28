@@ -12,7 +12,8 @@ namespace web_backend.Games
         public GameApplicationAutoMapperProfile() 
         {
             CreateMap<Game, GameDto>();
-        
+            CreateMap<CreateGameDto, Game>();
+
         }
     }
 }

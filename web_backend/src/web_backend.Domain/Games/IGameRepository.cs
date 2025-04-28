@@ -9,5 +9,7 @@ namespace web_backend.Games
     public interface IGameRepository
     {
         Task<Game> GetAsync(Guid id);
+        Task<List<Game>> GetListAsync();
+        Task<Game> CreateAsync(Game game);
     }
 }
