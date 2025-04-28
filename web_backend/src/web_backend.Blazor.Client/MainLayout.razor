@@ -137,19 +137,17 @@
         </nav>
     </header>
 
-    <!-- Livestream Notification Banner (will be shown/hidden via JS) -->
+    <!-- Livestream Notification Banner -->
     <div id="livestream-banner" class="alert alert-info text-center mb-0 py-3" style="display: none; border-radius: 0;">
         <i class="bi bi-info-circle-fill me-2"></i>
         <span id="livestream-banner-message">No active livestreams available at the moment. Please check back later.</span>
         <button type="button" class="btn-close float-end" onclick="document.getElementById('livestream-banner').style.display='none'"></button>
     </div>
 
-    <!-- Main Content Area -->
     <main class="vss-main">
         @Body
     </main>
-    
-    <!-- Startup Status Indicator -->
+
     <StartupStatus />
 </div>
 
@@ -254,12 +252,11 @@
         NavigationManager.NavigateTo($"{api}/Account/Register?returnUrl={returnUrl}", true);
     }
 
-    // 🔸 NEW: route to CustomLogout and force a full page-reload
     private void LogoutClick()
     {
         var api = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
         var returnUrl = Uri.EscapeDataString(NavigationManager.Uri);
-        NavigationManager.NavigateTo($"{api}/Account/CustomLogout?returnUrl={returnUrl}", true);
+        NavigationManager.NavigateTo($"{api}/Account/Logout?returnUrl={returnUrl}", true);
     }
 
     public void Dispose()
