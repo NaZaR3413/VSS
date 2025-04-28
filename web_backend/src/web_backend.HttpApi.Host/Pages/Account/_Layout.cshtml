@@ -2,7 +2,6 @@
 @addTagHelper *, Volo.Abp.AspNetCore.Mvc.UI
 @addTagHelper *, Volo.Abp.AspNetCore.Mvc.UI.Bootstrap
 @addTagHelper *, Volo.Abp.AspNetCore.Mvc.UI.Bundling
-@using Microsoft.AspNetCore.Http
 @using Microsoft.Extensions.Localization
 @using Microsoft.Extensions.Options
 @using Volo.Abp.AspNetCore.Mvc.UI.Components.LayoutHook
@@ -14,146 +13,42 @@
 @using Volo.Abp.Ui.LayoutHooks
 
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="utf-8" />
     <title>Varsity Sports Show</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-    <!-- 3rd-party libs used in MainLayout -->
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <script src="~/js/hlsPlayer.js"></script>
-    <script src="~/js/notifications.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-
-    <!-- ABP theme bundles + site CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
     <abp-style-bundle name="@BasicThemeBundles.Styles.Global" />
-    <link href="~/styles/vss-styles.css" rel="stylesheet" />
-
+    <link rel="stylesheet" href="~/styles/vss-styles.css" />
     @await RenderSectionAsync("styles", required: false)
 </head>
-
 <body class="vss-container">
-@* ————— BEGIN HEADER cloned from MainLayout ————— *@
-<header class="vss-header navbar navbar-expand-lg">
-    <!-- Logo -->
-    <a class="vss-header__logo navbar-brand" href="/landing">
-        <img src="~/images/varsitylogoempty.jpg" alt="VSS Company Header Logo" width="120" />
-    </a>
-
-    <!-- Navbar Toggler (mobile) -->
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
-            data-bs-target="#vssNavbar" aria-controls="vssNavbar" aria-expanded="false"
-            aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-    </button>
-
-    <!-- Nav Links -->
-    <nav class="collapse navbar-collapse vss-header" id="vssNavbar">
-        <ul class="vss-nav navbar-nav me-auto mb-2 mb-lg-0">
-            <li class="vss-nav__item nav-item">
-                <a class="vss-nav__link nav-link" href="/landing">
-                    Home
-                    <svg><rect x="0" y="0" width="100%" height="100%"></rect></svg>
-                </a>
-            </li>
-            <li class="vss-nav__item nav-item">
-                <a class="vss-nav__link nav-link" href="/livestreams">
-                    Livestreams
-                    <svg><rect x="0" y="0" width="100%" height="100%"></rect></svg>
-                </a>
-            </li>
-            <li class="vss-nav__item nav-item">
-                <a class="vss-nav__link nav-link" href="/schedule">
-                    Sport Schedules
-                    <svg><rect x="0" y="0" width="100%" height="100%"></rect></svg>
-                </a>
-            </li>
-            <li class="vss-nav__item nav-item">
-                <a class="vss-nav__link nav-link" href="/contact">
-                    Contact Us
-                    <svg><rect x="0" y="0" width="100%" height="100%"></rect></svg>
-                </a>
-            </li>
-            @* Render “Admin” menu only for authenticated admins *@
-            @if (User.Identity?.IsAuthenticated == true && User.IsInRole("admin"))
-            {
-                <li class="vss-nav__item nav-item dropdown">
-                    <a class="vss-nav__link nav-link dropdown-toggle" href="#" id="adminDropdown"
-                       role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        Admin
-                        <svg><rect x="0" y="0" width="100%" height="100%"></rect></svg>
-                    </a>
-                    <ul class="vss-dropdown dropdown-menu" aria-labelledby="adminDropdown">
-                        <li class="vss-dropdown__item">
-                            <a class="vss-dropdown__link dropdown-item" href="/admin/create-livestream">
-                                Create Livestream
-                            </a>
-                        </li>
-                        <li class="vss-dropdown__item">
-                            <a class="vss-dropdown__link dropdown-item" href="/admin/manage-livestreams">
-                                Manage Livestreams
-                            </a>
-                        </li>
-                    </ul>
-                </li>
-            }
-        </ul>
-
-        <!-- Right-side auth buttons -->
-        <div class="vss-auth d-flex">
-            @if (User.Identity?.IsAuthenticated == true)
-            {
-                <span class="vss-auth__username navbar-text me-3">
-                    Hello, @User.Identity.Name
-                </span>
-                <a class="vss-auth__link nav-link"
-                   asp-page="/Account/Logout"
-                   asp-route-returnUrl="/landing">Logout</a>
-            }
-            else
-            {
-                <a class="vss-auth__button btn me-3"
-                   asp-page="/Account/Login"
-                   asp-route-returnUrl="/landing">
-                    Login
-                    <svg><rect x="0" y="0" width="100%" height="100%"></rect></svg>
-                </a>
-                <a class="vss-auth__button btn"
-                   asp-page="/Account/Register"
-                   asp-route-returnUrl="/landing">
-                    Register
-                    <svg><rect x="0" y="0" width="100%" height="100%"></rect></svg>
-                </a>
-            }
-        </div>
-    </nav>
-</header>
-@* ————— END HEADER ————— *@
-
     @await Component.InvokeLayoutHookAsync(LayoutHooks.Body.First, StandardLayouts.Account)
+    <header class="vss-header navbar navbar-expand-lg">
+        <a href="https://salmon-glacier-08dca301e.6.azurestaticapps.net/landing" class="vss-header__logo navbar-brand text-white fw-bold ps-4">
+            Varsity Sports Show
+        </a>
+    </header>
 
     <div class="container mt-3">
         <div class="row justify-content-center">
             <div class="col-12 col-md-10 col-lg-8">
                 @(await Component.InvokeAsync<PageAlertsViewComponent>())
                 @await Component.InvokeLayoutHookAsync(LayoutHooks.PageContent.First, StandardLayouts.Account)
-
                 @RenderBody()
-
                 @await Component.InvokeLayoutHookAsync(LayoutHooks.PageContent.Last, StandardLayouts.Account)
             </div>
         </div>
     </div>
-
-    <!-- ABP & site scripts -->
     <abp-script-bundle name="@BasicThemeBundles.Scripts.Global" />
     <script src="~/Abp/ApplicationConfigurationScript"></script>
     <script src="~/Abp/ServiceProxyScript"></script>
 
-    @await RenderSectionAsync("scripts", required: false)
+    @await RenderSectionAsync("scripts", false)
+
     @await Component.InvokeAsync(typeof(WidgetScriptsViewComponent))
+
     @await Component.InvokeLayoutHookAsync(LayoutHooks.Body.Last, StandardLayouts.Account)
 </body>
 </html>
