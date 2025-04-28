@@ -10,7 +10,6 @@
 @inject NavigationManager NavigationManager
 @inject ILivestreamAppService LivestreamService
 @inject IJSRuntime JS
-@inject DebugService DebugService
 @implements IDisposable
 
 <HeadContent>
@@ -151,7 +150,6 @@
     </main>
     
     <!-- Startup Status Indicator -->
-    <StartupStatus />
 </div>
 
 @code {
@@ -165,18 +163,13 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await DebugService.Initialize();
-        await DebugService.LogAsync("MainLayout initialized");
         
-        try
-        {
+
             authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            await DebugService.LogAsync($"Authentication state loaded: {authState.User.Identity?.IsAuthenticated}");
 
             if (LivestreamState != null)
             {
                 LivestreamState.OnLivestreamStatusChanged += HandleLivestreamStatusChanged;
-                await DebugService.LogAsync("Registered livestream state handler");
             }
 
             refreshTimer = new System.Threading.Timer(async _ =>
@@ -186,12 +179,6 @@
             }, null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
 
             await RefreshLivestreams(force: true);
-            await DebugService.LogAsync("Initial livestream refresh completed");
-        }
-        catch (Exception ex)
-        {
-            await DebugService.LogAsync($"Error in MainLayout initialization: {ex.Message}");
-        }
     }
 
     private async void HandleLivestreamStatusChanged(object? sender, EventArgs e)

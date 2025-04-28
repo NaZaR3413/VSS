@@ -33,7 +33,6 @@ public class Program
         });
 
         // Register Debug Service first
-        builder.Services.AddSingleton<DebugService>();
 
         // Configure the application
         var application = await builder.AddApplicationAsync<web_backendBlazorClientModule>(options =>
@@ -48,14 +47,6 @@ public class Program
         });
 
         var host = builder.Build();
-
-        // Try to get debug service and log startup
-        var debugService = host.Services.GetService<DebugService>();
-        if (debugService != null)
-        {
-            await debugService.Initialize();
-            await debugService.LogAsync("Host built, starting application");
-        }
 
         var jsRuntime = host.Services.GetRequiredService<IJSRuntime>();
         await jsRuntime.InvokeVoidAsync("console.log", "About to initialize application...");
