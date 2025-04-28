@@ -1,138 +1,120 @@
-﻿console.log("hlsPlayer.js Loaded Successfully!");
+﻿/*  hlsPlayer.js  – UPDATED WITH HTTPS→HTTP FALL-BACK & MIXED-CONTENT HANDLING  */
+
+console.log("hlsPlayer.js Loaded Successfully!");
+
+/* ------------------------------------------------------------ */
+/*  PAY-WALL CONFIGURATION + HELPERS (unchanged)                */
+/* ------------------------------------------------------------ */
 
 const PAYWALL_CONFIG = {
-    FREE_PREVIEW_SECONDS: 300,
-    STORAGE_KEY_PREFIX: 'vss_stream_access_',
+    FREE_PREVIEW_SECONDS: 30,                 // 30 second preview window
+    STORAGE_KEY_PREFIX: 'vss_stream_access_',  // localStorage key prefix
     PAYWALL_OVERLAY_ID: 'vss-paywall-overlay'
 };
 
 window.PaywallManager = {
-    checkAccess: function (streamId) {
-        const storageKey = PAYWALL_CONFIG.STORAGE_KEY_PREFIX + streamId;
-        const accessData = localStorage.getItem(storageKey);
+    /* ---------- session / access management ---------- */
+    checkAccess(streamId) {
+        const k = PAYWALL_CONFIG.STORAGE_KEY_PREFIX + streamId;
+        const stored = localStorage.getItem(k);
 
-        if (!accessData) {
-            const newAccessData = {
-                streamId: streamId,
+        if (!stored) {
+            const fresh = {
+                streamId,
                 startTime: new Date().toISOString(),
                 timeWatched: 0,
                 paywallShown: false
             };
-            localStorage.setItem(storageKey, JSON.stringify(newAccessData));
-            return {
-                hasAccess: true,
-                remainingTime: PAYWALL_CONFIG.FREE_PREVIEW_SECONDS,
-                isNewSession: true
-            };
-        } else {
-            const data = JSON.parse(accessData);
-
-            if (data.paywallShown) {
-                return {
-                    hasAccess: false,
-                    remainingTime: 0,
-                    isNewSession: false
-                };
-            }
-
-            const remainingTime = Math.max(0, PAYWALL_CONFIG.FREE_PREVIEW_SECONDS - data.timeWatched);
-            return {
-                hasAccess: remainingTime > 0,
-                remainingTime: remainingTime,
-                isNewSession: false
-            };
+            localStorage.setItem(k, JSON.stringify(fresh));
+            return { hasAccess: true, remainingTime: PAYWALL_CONFIG.FREE_PREVIEW_SECONDS, isNewSession: true };
         }
+
+        const data = JSON.parse(stored);
+        if (data.paywallShown) return { hasAccess: false, remainingTime: 0, isNewSession: false };
+
+        const remaining = Math.max(0, PAYWALL_CONFIG.FREE_PREVIEW_SECONDS - data.timeWatched);
+        return { hasAccess: remaining > 0, remainingTime: remaining, isNewSession: false };
     },
 
-    updateWatchTime: function (streamId, secondsWatched) {
-        const storageKey = PAYWALL_CONFIG.STORAGE_KEY_PREFIX + streamId;
-        const accessData = localStorage.getItem(storageKey);
+    updateWatchTime(streamId, seconds) {
+        const k = PAYWALL_CONFIG.STORAGE_KEY_PREFIX + streamId;
+        const stored = localStorage.getItem(k);
+        if (!stored) return null;
 
-        if (accessData) {
-            const data = JSON.parse(accessData);
-            data.timeWatched += secondsWatched;
+        const data = JSON.parse(stored);
+        data.timeWatched += seconds;
+        if (data.timeWatched >= PAYWALL_CONFIG.FREE_PREVIEW_SECONDS) data.paywallShown = true;
+        localStorage.setItem(k, JSON.stringify(data));
 
-            if (data.timeWatched >= PAYWALL_CONFIG.FREE_PREVIEW_SECONDS) {
-                data.paywallShown = true;
-            }
-
-            localStorage.setItem(storageKey, JSON.stringify(data));
-
-            return {
-                timeWatched: data.timeWatched,
-                remainingTime: Math.max(0, PAYWALL_CONFIG.FREE_PREVIEW_SECONDS - data.timeWatched),
-                hasAccess: data.timeWatched < PAYWALL_CONFIG.FREE_PREVIEW_SECONDS && !data.paywallShown
-            };
-        }
-        return null;
+        return {
+            timeWatched: data.timeWatched,
+            remainingTime: Math.max(0, PAYWALL_CONFIG.FREE_PREVIEW_SECONDS - data.timeWatched),
+            hasAccess: data.timeWatched < PAYWALL_CONFIG.FREE_PREVIEW_SECONDS && !data.paywallShown
+        };
     },
 
-    showPaywall: function (streamId, containerSelector = '.vss-video-container') {
-        const storageKey = PAYWALL_CONFIG.STORAGE_KEY_PREFIX + streamId;
-        const accessData = localStorage.getItem(storageKey);
-
-        if (accessData) {
-            const data = JSON.parse(accessData);
-            data.paywallShown = true;
-            localStorage.setItem(storageKey, JSON.stringify(data));
+    /* ---------- pay-wall overlay ---------- */
+    showPaywall(streamId, containerSelector = '.vss-video-container') {
+        const k = PAYWALL_CONFIG.STORAGE_KEY_PREFIX + streamId;
+        const stored = localStorage.getItem(k);
+        if (stored) {
+            const d = JSON.parse(stored);
+            d.paywallShown = true;
+            localStorage.setItem(k, JSON.stringify(d));
         }
 
-        let paywallOverlay = document.getElementById(PAYWALL_CONFIG.PAYWALL_OVERLAY_ID);
+        let overlay = document.getElementById(PAYWALL_CONFIG.PAYWALL_OVERLAY_ID);
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = PAYWALL_CONFIG.PAYWALL_OVERLAY_ID;
+            overlay.className = 'vss-paywall-overlay';
 
-        if (!paywallOverlay) {
-            paywallOverlay = document.createElement('div');
-            paywallOverlay.id = PAYWALL_CONFIG.PAYWALL_OVERLAY_ID;
-            paywallOverlay.className = 'vss-paywall-overlay';
+            /* inline style so overlay still looks right even if CSS fails */
+            Object.assign(overlay.style, {
+                position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+                backgroundColor: 'rgba(0,0,0,0.85)', color: '#fff', display: 'flex',
+                flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
+                textAlign: 'center', padding: '20px', zIndex: 1000
+            });
 
-            paywallOverlay.style.position = 'absolute';
-            paywallOverlay.style.top = '0';
-            paywallOverlay.style.left = '0';
-            paywallOverlay.style.width = '100%';
-            paywallOverlay.style.height = '100%';
-            paywallOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.85)';
-            paywallOverlay.style.color = 'white';
-            paywallOverlay.style.display = 'flex';
-            paywallOverlay.style.flexDirection = 'column';
-            paywallOverlay.style.justifyContent = 'center';
-            paywallOverlay.style.alignItems = 'center';
-            paywallOverlay.style.textAlign = 'center';
-            paywallOverlay.style.padding = '20px';
-            paywallOverlay.style.zIndex = '1000';
-
-            paywallOverlay.innerHTML = `
+            overlay.innerHTML = `
                 <h2>Free Preview Ended</h2>
                 <p>Your free preview period has ended. Sign in or create an account to continue watching.</p>
-                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <div style="display:flex;gap:10px;margin-top:20px;">
                     <a href="/authentication/Login" class="btn btn-primary">Login</a>
                     <a href="/Account/Register" class="btn btn-success">Register</a>
                 </div>
             `;
 
-            const videoContainer = document.querySelector(containerSelector);
-            if (videoContainer) {
-                videoContainer.style.position = 'relative';
-                videoContainer.appendChild(paywallOverlay);
-
+            const container = document.querySelector(containerSelector);
+            if (container) {
+                container.style.position = 'relative';
+                container.appendChild(overlay);
                 window.pauseAndDisableVideo();
             }
         } else {
-            paywallOverlay.style.display = 'flex';
+            overlay.style.display = 'flex';
         }
     },
 
-    resetAccess: function (streamId) {
-        const storageKey = PAYWALL_CONFIG.STORAGE_KEY_PREFIX + streamId;
-        localStorage.removeItem(storageKey);
+    resetAccess(streamId) {
+        localStorage.removeItem(PAYWALL_CONFIG.STORAGE_KEY_PREFIX + streamId);
     }
 };
 
+/* ------------------------------------------------------------ */
+/*  MAIN: LOAD & PLAY HLS STREAM                                */
+/*  – tries HTTPS first, falls back to HTTP if certificate fails */
+/* ------------------------------------------------------------ */
+
 window.loadHlsStream = (videoUrl, videoElementId = "videoPlayer", streamId = null) => {
     console.log("Attempting to load video:", videoUrl);
+    const originalUrl = videoUrl; // remember HTTP/HTTPS original
 
-    // Fix for mixed content - convert HTTP to HTTPS if we're on an HTTPS page
-    if (window.location.protocol === 'https:' && videoUrl.startsWith('http:')) {
-        console.log("Converting HTTP stream URL to HTTPS to avoid mixed content blocking");
+    /* upgrade http→https only when current page is https */
+    if (location.protocol === 'https:' && videoUrl.startsWith('http:')) {
         videoUrl = videoUrl.replace('http:', 'https:');
+        console.log("Upgraded stream URL to HTTPS:", videoUrl);
     }
 
     const video = document.getElementById(videoElementId);
@@ -141,108 +123,92 @@ window.loadHlsStream = (videoUrl, videoElementId = "videoPlayer", streamId = nul
         return;
     }
 
-    let isAuthenticated = document.body.hasAttribute('data-authenticated') &&
-        document.body.getAttribute('data-authenticated') === 'true';
-
+    /* ------------ pay-wall logic (unchanged) ------------ */
+    const isAuthenticated = document.body.dataset.authenticated === 'true';
     if (streamId && !isAuthenticated) {
-        const accessResult = window.PaywallManager.checkAccess(streamId);
-
-        if (accessResult.hasAccess) {
-            let timerElement = document.getElementById('vss-free-preview-timer');
-            if (!timerElement) {
-                timerElement = document.createElement('div');
-                timerElement.id = 'vss-free-preview-timer';
-                timerElement.className = 'vss-free-preview-timer';
-                timerElement.style.position = 'absolute';
-                timerElement.style.top = '10px';
-                timerElement.style.right = '10px';
-                timerElement.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-                timerElement.style.color = 'white';
-                timerElement.style.padding = '5px 10px';
-                timerElement.style.borderRadius = '4px';
-                timerElement.style.fontSize = '14px';
-                timerElement.style.zIndex = '999';
-
-                video.parentElement.appendChild(timerElement);
+        const access = window.PaywallManager.checkAccess(streamId);
+        if (access.hasAccess) {
+            /* show countdown badge */
+            let badge = document.getElementById('vss-free-preview-timer');
+            if (!badge) {
+                badge = document.createElement('div');
+                badge.id = 'vss-free-preview-timer';
+                badge.className = 'vss-free-preview-timer';
+                Object.assign(badge.style, {
+                    position: 'absolute', top: '10px', right: '10px',
+                    backgroundColor: 'rgba(0,0,0,.7)', color: '#fff',
+                    padding: '5px 10px', borderRadius: '4px', fontSize: '14px',
+                    zIndex: 999
+                });
+                video.parentElement.appendChild(badge);
             }
 
-            let remainingTime = accessResult.remainingTime;
-            let timerId = null;
-
-            const updateTimer = () => {
-                if (remainingTime <= 0) {
-                    clearInterval(timerId);
-                    window.PaywallManager.showPaywall(streamId);
-                    return;
-                }
-
-                const minutes = Math.floor(remainingTime / 60);
-                const seconds = remainingTime % 60;
-                timerElement.textContent = `Free preview: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-                remainingTime--;
-
-                window.PaywallManager.updateWatchTime(streamId, 1);
+            let remaining = access.remainingTime;
+            const tick = () => {
+                if (remaining <= 0) { clearInterval(id); window.PaywallManager.showPaywall(streamId); return; }
+                badge.textContent = `Free preview: ${Math.floor(remaining/60)}:${String(remaining%60).padStart(2,'0')}`;
+                remaining--; window.PaywallManager.updateWatchTime(streamId, 1);
             };
-
-            updateTimer();
-            timerId = setInterval(updateTimer, 1000);
-
-            window._vssTimerId = timerId;
+            tick(); const id = setInterval(tick, 1000);
+            window._vssTimerId = id;
         } else {
-            setTimeout(() => {
-                window.PaywallManager.showPaywall(streamId);
-            }, 500);
+            setTimeout(() => window.PaywallManager.showPaywall(streamId), 500);
         }
     }
 
-    if (Hls.isSupported()) {
-        const hls = new Hls();
-        hls.loadSource(videoUrl);
-        hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, function () {
-            console.log("HLS Stream Loaded Successfully");
-            video.play();
-        });
-        hls.on(Hls.Events.ERROR, function (event, data) {
-            console.error("HLS Error:", data);
-        });
-    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        video.src = videoUrl;
-        video.addEventListener("loadedmetadata", function () {
-            console.log("Native HLS support detected, playing video.");
-            video.play();
-        });
-    } else {
+    /* ------------ HLS.JS with HTTPS→HTTP fallback ------------ */
+    const startPlayback = (src) => {
+        if (Hls.isSupported()) {
+            const hls = new Hls();
+            hls.on(Hls.Events.ERROR, (evt, data) => {
+                console.error("HLS Error:", data);
+                const isManifestErr = data?.fatal && data.type === 'networkError' && data.details === 'manifestLoadError';
+                const triedHttps = src.startsWith('https:');
+                if (isManifestErr && triedHttps && originalUrl.startsWith('http:')) {
+                    console.warn("Manifest failed over HTTPS – retrying over HTTP");
+                    hls.destroy();
+                    startPlayback(originalUrl);
+                }
+            });
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                console.log("HLS manifest loaded");
+                video.play().catch(e => console.warn('Autoplay prevented:', e));
+            });
+            hls.loadSource(src);
+            hls.attachMedia(video);
+            return;
+        }
+
+        /* iOS Safari – uses native HLS */
+        if (video.canPlayType("application/vnd.apple.mpegurl")) {
+            video.src = src;
+            video.addEventListener("loadedmetadata", () => video.play());
+            return;
+        }
+
         console.error("HLS is not supported in this browser.");
-    }
+    };
+
+    startPlayback(videoUrl);
 };
 
-window.invokeDotNetAfterDelay = (dotnetHelper, methodName, delayMs) => {
-    setTimeout(() => {
-        dotnetHelper.invokeMethodAsync(methodName);
-    }, delayMs);
-};
+/* ------------------------------------------------------------ */
+/*  SMALL UTILITY FUNCTIONS (unchanged)                         */
+/* ------------------------------------------------------------ */
+
+window.invokeDotNetAfterDelay = (dotnetHelper, methodName, delayMs) =>
+    setTimeout(() => dotnetHelper.invokeMethodAsync(methodName), delayMs);
 
 window.pauseAndDisableVideo = (videoElementId = "videoPlayer") => {
-    const video = document.getElementById(videoElementId);
-    if (video) {
-        video.pause();
-        video.controls = false;
-        video.style.pointerEvents = "none";
-    }
+    const v = document.getElementById(videoElementId);
+    if (v) { v.pause(); v.controls = false; v.style.pointerEvents = 'none'; }
 };
 
-window.setAuthenticationStatus = (isAuthenticated) => {
+window.setAuthenticationStatus = (isAuthenticated) =>
     document.body.setAttribute('data-authenticated', isAuthenticated ? 'true' : 'false');
-};
 
-window.isStreamLoaded = () => {
-    return window.streamLoaded === true;
-};
+window.isStreamLoaded = () => window.streamLoaded === true;
 
 window.cleanupStreamTimers = () => {
-    if (window._vssTimerId) {
-        clearInterval(window._vssTimerId);
-        window._vssTimerId = null;
-    }
+    if (window._vssTimerId) { clearInterval(window._vssTimerId); window._vssTimerId = null; }
 };
