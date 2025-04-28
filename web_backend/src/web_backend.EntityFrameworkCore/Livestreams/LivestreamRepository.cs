@@ -49,16 +49,21 @@ namespace web_backend.Livestreams
             EventType? eventType,
             StreamStatus? streamStatus,
             string? homeTeam,
-            string? awayTeam)
+            string? awayTeam,
+            bool? freeLivestream
+            )
         {
             var query = await GetQueryableAsync();
 
             query = new List<Func<IQueryable<Livestream>, IQueryable<Livestream>>>
-    {
-        q => eventType.HasValue ? q.Where(l => l.EventType == eventType) : q,
-        q => streamStatus.HasValue ? q.Where(l => l.StreamStatus == streamStatus) : q,
+            {
+                q => eventType.HasValue ? q.Where(l => l.EventType == eventType) : q,
+                q => streamStatus.HasValue ? q.Where(l => l.StreamStatus == streamStatus) : q,
+                q => freeLivestream.HasValue ? q.Where(l => l.FreeLivestream == freeLivestream) : q,
+                q => !string.IsNullOrWhiteSpace(homeTeam) ? q.Where(l => l.HomeTeam.Contains(homeTeam)) : q,
+                q => !string.IsNullOrWhiteSpace(awayTeam) ? q.Where(l => l.AwayTeam.Contains(awayTeam)) : q
 
-    }.Aggregate(query, (current, filter) => filter(current));
+            }.Aggregate(query, (current, filter) => filter(current));
 
             return await query.ToListAsync();
         }
