@@ -6,6 +6,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
+    <GenerateApplicationPartFactoryAttribute>false</GenerateApplicationPartFactoryAttribute>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,8 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
-		<PackageReference Include="Volo.Abp.AspNetCore.Components.WebAssembly.BasicTheme" Version="8.3.1" />
-
+    <PackageReference Include="Volo.Abp.AspNetCore.Components.WebAssembly.BasicTheme" Version="8.3.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -35,6 +35,5 @@
     <ProjectReference Include="..\..\src\web_backend.HttpApi.Client\web_backend.HttpApi.Client.csproj" />
 	<ProjectReference Include="..\web_backend.Domain.Shared\web_backend.Domain.Shared.csproj" />
   </ItemGroup>
-
 
 </Project>
