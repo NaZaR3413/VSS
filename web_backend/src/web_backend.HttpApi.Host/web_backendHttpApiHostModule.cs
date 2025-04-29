@@ -140,6 +140,8 @@ ObjectExtensionManager.Instance.MapEfCoreProperty<AbpIdentityUser, string>(
             ConfigureVirtualFileSystem(context);
             ConfigureCors(context, configuration);
             ConfigureSwaggerServices(context, configuration);
+            ConfigureHttpClients(context);
+
         }
 
         private void ConfigureAuthentication(ServiceConfigurationContext context)
@@ -192,6 +194,15 @@ ObjectExtensionManager.Instance.MapEfCoreProperty<AbpIdentityUser, string>(
                 });
             }
         }
+
+        private void ConfigureHttpClients(ServiceConfigurationContext context)
+        {
+            context.Services.AddHttpClient("StreamProxy", client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(10);
+            });
+        }
+
 
         private void ConfigureConventionalControllers()
         {

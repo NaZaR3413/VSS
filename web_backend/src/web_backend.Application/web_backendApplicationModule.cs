@@ -29,10 +29,5 @@ public class web_backendApplicationModule : AbpModule
         {
             options.AddMaps<web_backendApplicationModule>();
         });
-
-        context.Services.AddHttpClient("StreamProxy", client =>
-        {
-            client.Timeout = TimeSpan.FromSeconds(10);
-        });
     }
 }

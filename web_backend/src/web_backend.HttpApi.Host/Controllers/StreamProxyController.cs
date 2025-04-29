@@ -9,14 +9,18 @@ namespace web_backend.Controllers
 {
     [Route("hls")]
     [ApiController]
-    public class StreamProxyController : AbpController
+    public class StreamProxyController : AbpControllerBase
     {
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly string _streamServerBaseUrl = "http://20.3.254.14:8080";
+        private readonly ILogger<StreamProxyController> _logger;
 
-        public StreamProxyController(IHttpClientFactory httpClientFactory)
+        public StreamProxyController(
+            IHttpClientFactory httpClientFactory,
+            ILogger<StreamProxyController> logger)
         {
             _httpClientFactory = httpClientFactory;
+            _logger = logger;
         }
 
         [HttpGet("{**path}")]
@@ -31,14 +35,14 @@ namespace web_backend.Controllers
                 var fullUrl = $"{_streamServerBaseUrl}/hls/{path}";
 
                 // Log the request for debugging
-                Logger.LogInformation($"Proxying HLS request to: {fullUrl}");
+                _logger.LogInformation($"Proxying HLS request to: {fullUrl}");
 
                 // Forward the request to the stream server
                 var response = await httpClient.GetAsync(fullUrl);
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    Logger.LogWarning($"Failed to proxy stream: {response.StatusCode}");
+                    _logger.LogWarning($"Failed to proxy stream: {response.StatusCode}");
                     return StatusCode((int)response.StatusCode);
                 }
 
@@ -51,7 +55,7 @@ namespace web_backend.Controllers
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error proxying HLS stream");
+                _logger.LogError(ex, "Error proxying HLS stream");
                 return StatusCode(500, new { error = "Failed to proxy stream" });
             }
         }
