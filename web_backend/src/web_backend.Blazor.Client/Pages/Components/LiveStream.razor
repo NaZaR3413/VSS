@@ -186,21 +186,32 @@
         // Use the secure base URL from your configuration
         const string secureBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
 
-        if (originalUrl.Contains("/hls/") && originalUrl.EndsWith(".m3u8"))
+        // Handle IP-based URLs (exactly like the one in your error)
+        if (originalUrl.Contains("20.3.254.14:8080") || originalUrl.StartsWith("http://"))
         {
-            // URL is already in correct format, but ensure it uses the secure base URL.
-            if (originalUrl.StartsWith("http://"))
+            try
             {
-                var uri = new Uri(originalUrl);
-                string pathAndQuery = uri.PathAndQuery;
+                // Extract the path portion of the URL
+                Uri uri = new Uri(originalUrl);
+                string pathAndQuery = uri.PathAndQuery; // This will get "/hls/FBF7E695-FEF4-4E31-835B-944FCFCED63C.m3u8"
                 string newUrl = secureBaseUrl + pathAndQuery;
-                Console.WriteLine($"Updated URL scheme from HTTP to HTTPS: {newUrl}");
+                Console.WriteLine($"Converting insecure URL to secure URL: {newUrl}");
                 return newUrl;
             }
-            return originalUrl;
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error converting URL: {ex.Message}");
+                // Continue with the rest of the method if the Uri parsing fails
+            }
         }
 
-        // Check if there's another format like /hls/{streamKey}/index.m3u8
+        // Rest of your existing method's logic
+        if (originalUrl.Contains("/hls/") && originalUrl.EndsWith(".m3u8"))
+        {
+            return originalUrl; // Already in correct format and using HTTPS
+        }
+
+        // Handle the index.m3u8 format
         if (originalUrl.Contains("/hls/") && originalUrl.EndsWith("index.m3u8"))
         {
             // Extract the stream key
@@ -217,10 +228,9 @@
             }
         }
 
-        // If it doesn't match any known pattern, try to extract a GUID from the URL
+        // GUID extraction logic from your existing method
         try
         {
-            // Look for a GUID pattern in the URL
             var guidMatches = System.Text.RegularExpressions.Regex.Matches(
                 originalUrl,
                 @"[0-9a-fA-F]{8}[-]?[0-9a-fA-F]{4}[-]?[0-9a-fA-F]{4}[-]?[0-9a-fA-F]{4}[-]?[0-9a-fA-F]{12}"
@@ -242,6 +252,7 @@
             Console.WriteLine($"Error trying to parse URL: {ex.Message}");
         }
 
+        // If all else fails, return the original URL
         return originalUrl;
     }
 
