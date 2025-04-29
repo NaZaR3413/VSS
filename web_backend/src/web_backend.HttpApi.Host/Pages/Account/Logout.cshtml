@@ -1,100 +1,58 @@
-﻿using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Threading.Tasks;
-using Volo.Abp.Account.Web.Pages.Account;
-using Volo.Abp.DependencyInjection;
-using Volo.Abp.Identity;
-using Volo.Abp.Identity.AspNetCore;
+﻿@page
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@addTagHelper *, Volo.Abp.AspNetCore.Mvc.UI
+@addTagHelper *, Volo.Abp.AspNetCore.Mvc.UI.Bootstrap
+@addTagHelper *, Volo.Abp.AspNetCore.Mvc.UI.Bundling
 
-namespace web_backend.HttpApi.Host.Pages.Account
-{
-    [ExposeServices(typeof(LogoutModel), IncludeSelf = true)]
-    [Dependency(ReplaceServices = true)]
-    public class CustomLogoutModel : LogoutModel
-    {
-        private readonly SignInManager<IdentityUser>
-    _signInManager;
-    private readonly ILogger<CustomLogoutModel>
-        _logger;
-        private readonly string _frontEndRoot;
+@using Microsoft.AspNetCore.Mvc.Localization
+@using Volo.Abp.Account.Localization
+@using Volo.Abp.AspNetCore.Mvc.UI.Theming
+@model web_backend.HttpApi.Host.Pages.Account.CustomLogoutModel
 
-        public bool ShowLogoutPrompt { get; private set; } = true;
+@inject IHtmlLocalizer<AccountResource> L
+@inject IThemeManager ThemeManager
 
-        public CustomLogoutModel(
-        SignInManager<IdentityUser>
-            signInManager,
-            ILogger<CustomLogoutModel>
-                logger,
-                IConfiguration configuration)
-                : base()
+@{
+    Layout = "_Layout";
+}
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="card vss-login-card">
+            <!-- Logo -->
+            <img class="vss-img" src="/images/varsitylogoempty.jpg" alt="VSS Logo" />
+            <h4>@L["Logout"]</h4>
+
+            <div class="card-body" style="text-align:center;">
+                @if (Model.ShowLogoutPrompt)
                 {
-                _signInManager = signInManager;
-                _logger = logger;
-                _frontEndRoot = configuration["App:ClientUrl"] ??
-                "https://salmon-glacier-08dca301e.6.azurestaticapps.net";
+                    <form method="post">
+                        <p>@L["AreYouSureToLogout"]</p>
+                        <div class="d-grid gap-2">
+                            <abp-button button-type="Primary" type="submit" name="action" value="Logout" class="mt-2 mb-3 vss-submit-button">
+                                <i class="fas fa-sign-out-alt"></i> @L["Logout"]
+                            </abp-button>
+                            <abp-button button-type="Secondary" name="action" value="Cancel" class="mb-3">
+                                @L["Cancel"]
+                            </abp-button>
+                        </div>
+                    </form>
                 }
-
-                public async Task<IActionResult>
-                    OnGetAsync(string returnUrl = null)
-                    {
-                    // Check if external logout is supported
-                    if (await _signInManager.GetExternalAuthenticationSchemesAsync().AnyAsync())
-                    {
-                    // If external login is supported, show logout prompt
-                    ShowLogoutPrompt = true;
-                    return Page();
-                    }
-
-                    // No need to show the prompt if there's no external provider
-                    ShowLogoutPrompt = false;
-                    return await OnPostAsync("Logout", returnUrl);
-                    }
-
-                    public async Task<IActionResult>
-                        OnPostAsync(string action = null, string returnUrl = null)
-                        {
-                        if (action != "Logout")
-                        {
-                        // User chose not to logout
-                        return RedirectToPage("/Index");
-                        }
-
-                        _logger.LogInformation("User logged out");
-
-                        // Clear the existing external cookie
-                        await HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
-                        await _signInManager.SignOutAsync();
-
-                        // Verify returnUrl is allowed
-                        if (!string.IsNullOrEmpty(returnUrl))
-                        {
-                        // Make sure it's a valid absolute URL
-                        if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var uri))
-                        {
-                        var allowed = new[]
-                        {
-                        "salmon-glacier-08dca301e.6.azurestaticapps.net",
-                        "vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net"
-                        };
-
-                        if (allowed.Any(d => uri.Host.Equals(d, StringComparison.OrdinalIgnoreCase)))
-                        {
-                        // If it's allowed, redirect to it
-                        return Redirect(returnUrl);
-                        }
-
-                        // Otherwise redirect to front-end landing page
-                        _logger.LogWarning("Blocked redirect to non-allowed host: {Host}", uri.Host);
-                        return Redirect($"{_frontEndRoot}/landing");
-                        }
-                        }
-
-                        // Default to front-end landing
-                        return Redirect($"{_frontEndRoot}/landing");
-                        }
-                        }
-                        }
+                else
+                {
+                    <div>
+                        <div class="alert alert-success">
+                            <h5>@L["LoggedOut"]</h5>
+                            <p>@L["YouHaveSuccessfullyLoggedOut"]</p>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <a href="@(Model.ReturnUrl ?? "/")" class="btn btn-primary mt-2 mb-3 vss-submit-button">
+                                <i class="fas fa-home"></i> @L["BackToHomePage"]
+                            </a>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
