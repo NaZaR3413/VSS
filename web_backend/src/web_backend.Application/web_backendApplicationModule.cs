@@ -6,6 +6,8 @@ using Volo.Abp.Modularity;
 using Volo.Abp.PermissionManagement;
 using Volo.Abp.SettingManagement;
 using Volo.Abp.TenantManagement;
+using System;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace web_backend;
 
@@ -26,6 +28,11 @@ public class web_backendApplicationModule : AbpModule
         Configure<AbpAutoMapperOptions>(options =>
         {
             options.AddMaps<web_backendApplicationModule>();
+        });
+
+        context.Services.AddHttpClient("StreamProxy", client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(10);
         });
     }
 }
