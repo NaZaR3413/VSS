@@ -36,7 +36,8 @@ namespace web_backend.HttpApi.Host.Pages.Account
                           "https://salmon-glacier-08dca301e.6.azurestaticapps.net";
         }
 
-        public async Task<IActionResult> OnGetAsync(string returnUrl = null)
+        // Use 'new' keyword to explicitly hide the base implementation
+        public new async Task<IActionResult> OnGetAsync(string returnUrl = null)
         {
             ReturnUrl = returnUrl;
 
@@ -53,7 +54,8 @@ namespace web_backend.HttpApi.Host.Pages.Account
             return await OnPostAsync("Logout", returnUrl);
         }
 
-        public async Task<IActionResult> OnPostAsync(string action = null, string returnUrl = null)
+        // Use 'new' keyword to explicitly hide the base implementation
+        public new async Task<IActionResult> OnPostAsync(string action = null, string returnUrl = null)
         {
             if (action != "Logout")
             {
