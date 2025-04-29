@@ -22,6 +22,7 @@ namespace web_backend.Configurations
             builder.Property(cs => cs.EventType).IsRequired();
             builder.Property(cs => cs.StreamStatus).IsRequired();
             builder.Property(cs => cs.EventDate).IsRequired();
+            builder.Property(cs => cs.FreeLivestream).IsRequired();
         }
     }
 }

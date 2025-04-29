@@ -9,6 +9,7 @@ public class LivestreamDto
     public string AwayTeam { get; set; }
     public int HomeScore { get; set; } = 0;
     public int AwayScore { get; set; } = 0;
+    public bool FreeLivestream { get; set; } = false;
     public string GameScore
     {
         get

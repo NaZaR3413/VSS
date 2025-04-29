@@ -12,6 +12,7 @@ namespace web_backend.Livestreams
         // All set to nullable in order to allow for proper filtering
         public string? HomeTeam { get; set; }
         public string? AwayTeam { get; set; }
+        public bool? FreeLivestream { get; set; }
         public EventType? EventType { get; set; }
         public StreamStatus? StreamStatus { get; set; }
     }

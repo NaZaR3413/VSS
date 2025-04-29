@@ -13,7 +13,7 @@ namespace web_backend.Livestreams
         Task<List<Livestream>> GetListAsync();
         Task<Livestream> CreateAsync(Livestream livestream);
         Task<Livestream> UpdateAsync(Livestream livestream);
-        Task<List<Livestream>> GetFilteredListAsync(EventType? eventType, StreamStatus? streamStatus, string? homeTeam, string? awayTeam);
+        Task<List<Livestream>> GetFilteredListAsync(EventType? eventType, StreamStatus? streamStatus, string? homeTeam, string? awayTeam, bool? freeLivesteram);
         Task DeleteAsync(Guid id);
     }
 }
