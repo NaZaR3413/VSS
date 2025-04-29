@@ -2,14 +2,16 @@
 
   <Import Project="..\..\common.props" />
 
-  <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
-    <GenerateApplicationPartFactoryAttribute>false</GenerateApplicationPartFactoryAttribute>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
+		<GenerateApplicationPartFactoryAttribute>false</GenerateApplicationPartFactoryAttribute>
+		<GenerateMvcApplicationPartsAssemblyAttributes>false</GenerateMvcApplicationPartsAssemblyAttributes>
+	</PropertyGroup>
 
-  <ItemGroup>
+
+	<ItemGroup>
     <PackageReference Include="Blazorise.Bootstrap5" Version="1.5.2" />
     <PackageReference Include="Blazorise.Icons.FontAwesome" Version="1.5.2" />
     <PackageReference Include="CsvHelper" Version="33.0.1" />
