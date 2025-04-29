@@ -183,13 +183,20 @@
 
     private async Task<string> FixStreamUrlIfNeeded(string originalUrl)
     {
-        // The URL from error log shows http://localhost:8080/hls/8D18E19C-5E27-49AD-A56B-13DDA3AC9747.m3u8
-        // This is the pattern we need to match
+        // Use the secure base URL from your configuration
+        const string secureBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
 
-        // Check if we're being given a HLS URL in one format but need another
         if (originalUrl.Contains("/hls/") && originalUrl.EndsWith(".m3u8"))
         {
-            // URL is already in correct format, return as is
+            // URL is already in correct format, but ensure it uses the secure base URL.
+            if (originalUrl.StartsWith("http://"))
+            {
+                var uri = new Uri(originalUrl);
+                string pathAndQuery = uri.PathAndQuery;
+                string newUrl = secureBaseUrl + pathAndQuery;
+                Console.WriteLine($"Updated URL scheme from HTTP to HTTPS: {newUrl}");
+                return newUrl;
+            }
             return originalUrl;
         }
 
@@ -203,9 +210,8 @@
             if (startIndex >= 5 && endIndex > startIndex)
             {
                 string streamKey = originalUrl.Substring(startIndex, endIndex - startIndex);
-
-                // Try different HLS URL formats
-                string newUrl = $"http://localhost:8080/hls/{streamKey.ToUpper()}.m3u8";
+                // Use the secure base URL and format the stream key in uppercase
+                string newUrl = $"{secureBaseUrl}/hls/{streamKey.ToUpper()}.m3u8";
                 Console.WriteLine($"Converted URL from {originalUrl} to {newUrl}");
                 return newUrl;
             }
@@ -225,7 +231,7 @@
                 string extractedGuid = guidMatches[0].Value;
                 if (Guid.TryParse(extractedGuid, out Guid streamGuid))
                 {
-                    string newUrl = $"http://localhost:8080/hls/{streamGuid.ToString().ToUpper()}.m3u8";
+                    string newUrl = $"{secureBaseUrl}/hls/{streamGuid.ToString().ToUpper()}.m3u8";
                     Console.WriteLine($"Extracted GUID and created URL: {newUrl}");
                     return newUrl;
                 }
@@ -238,6 +244,7 @@
 
         return originalUrl;
     }
+
 
     private async Task LoadLiveStreamDataAsync()
     {
