@@ -235,9 +235,9 @@
     private async Task LogoutClick()
     {
         await JS.InvokeVoidAsync("authHelpers.clearAuthTokens");
-
         NavigationManager.NavigateTo("/authentication/logout", true);
     }
+
 
     public void Dispose()
     {

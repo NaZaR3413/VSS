@@ -1,0 +1,18 @@
+﻿@page "/authentication/logout-callback"
+@inject NavigationManager NavigationManager
+
+<div class="text-center mt-5">
+    <div class="alert alert-success">
+        <h4>Logout successful</h4>
+        <p>You have been successfully logged out.</p>
+    </div>
+    <p>Redirecting you to landing page...</p>
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        // After a short delay, redirect to the landing page
+        NavigationManager.NavigateTo("/landing", true);
+    }
+}

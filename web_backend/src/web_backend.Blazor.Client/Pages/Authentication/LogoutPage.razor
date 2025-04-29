@@ -1,0 +1,35 @@
+﻿@page "/authentication/logout"
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+
+<div class="text-center mt-5">
+    <div class="spinner-border mb-3" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+    <h3>Logging you out...</h3>
+    <p>Please wait while we complete your logout.</p>
+</div>
+
+@code {
+    private const string ApiBaseUrl = "https://vss-backend-api-fmbjgachhph9byce.westus2-01.azurewebsites.net";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Clear local tokens and cookies
+            await JS.InvokeVoidAsync("authHelpers.clearAuthTokens");
+
+            // Redirect to server-side logout endpoint
+            var returnUrl = Uri.EscapeDataString(NavigationManager.BaseUri + "landing");
+            NavigationManager.NavigateTo($"{ApiBaseUrl}/Account/Logout?returnUrl={returnUrl}", true);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error during logout: {ex.Message}");
+            // Fallback to direct navigation in case of error
+            NavigationManager.NavigateTo("/landing", true);
+        }
+    }
+}
