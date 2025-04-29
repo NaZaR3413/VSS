@@ -234,7 +234,7 @@
 
     private void LogoutClick()
     {
-        var returnUrl = Uri.EscapeDataString("/landing");
+        var returnUrl = Uri.EscapeDataString(NavigationManager.Uri);
         NavigationManager.NavigateTo($"{ApiBaseUrl}/Account/Logout?returnUrl={returnUrl}", true);
     }
 
