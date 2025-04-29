@@ -232,10 +232,11 @@
         NavigationManager.NavigateTo($"{ApiBaseUrl}/Account/Register?returnUrl={returnUrl}", true);
     }
 
-    private void LogoutClick()
+    private async Task LogoutClick()
     {
-        var returnUrl = Uri.EscapeDataString(NavigationManager.Uri);
-        NavigationManager.NavigateTo($"{ApiBaseUrl}/Account/Logout?returnUrl={returnUrl}", true);
+        await JS.InvokeVoidAsync("authHelpers.clearAuthTokens");
+
+        NavigationManager.NavigateTo("/authentication/logout", true);
     }
 
     public void Dispose()

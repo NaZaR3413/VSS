@@ -128,18 +128,22 @@
     {
         try
         {
-            // Create a new ID that will be used both as the stream key and the livestream ID
-            Guid id = Guid.NewGuid();
-            streamKey = id.ToString().ToUpper(); // Match the uppercase format in your example
-
-            // Set the HLS URL with the exact format from your database example
-            newLivestream.HlsUrl = $"http://localhost:8080/hls/{streamKey}.m3u8";
-
-            // Create the livestream in the database
+            // Create the livestream in the database first
             var result = await LivestreamService.CreateAsync(newLivestream);
 
-            // Store the ID for future updates
+            // Store the ID returned from the service
             livestreamId = result.Id;
+
+            // Use the actual livestream ID as the stream key
+            streamKey = livestreamId.ToString().ToUpper();
+
+            // Use HTTPS for the HLS URL instead of HTTP (this is the key change)
+            var updateDto = new UpdateLivestreamDto
+                {
+                    HlsUrl = $"https://20.3.254.14:8080/hls/{streamKey}.m3u8"
+                };
+
+            await LivestreamService.UpdateAsync(livestreamId, updateDto);
 
             // Build the livestream URL for viewing
             livestreamUrl = $"{NavigationManager.BaseUri}livestream/{livestreamId}";
