@@ -7,12 +7,12 @@
 @inherits LiveStreamBase
 @implements IDisposable
 
-<div class="vss-page">
+<div class="vss-page livestream-page">
     <header class="vss-header py-4">
         <div class="container">
             <h1 class="vss-header__title">@StreamTitle</h1>
             <p class="vss-subheading">
-                Your home for Arizona high school sports – live, on-demand, and in-depth.
+                Your home for high school and college sports – live, on-demand, and in-depth.
             </p>
         </div>
     </header>
@@ -20,50 +20,60 @@
     <main class="vss-main">
         <div class="container">
             <!-- Video Player -->
-            <section class="vss-featured mb-5">
+            <section class="vss-featured mb-5 player-card">
                 <div class="vss-video-container position-relative">
-                    <span class="badge bg-@statusBadgeColor position-absolute top-0 start-0 m-2">@statusText</span>
+                    <span class="badge bg-@statusBadgeColor position-absolute top-0 start-0 m-3 status-badge">@statusText</span>
                     <video id="videoPlayer" class="vss-video-player" controls autoplay></video>
                     <div class="vss-video-title mt-3">
-                        <h2>@StreamTitle</h2>
+                        <h2 class="stream-title">@StreamTitle</h2>
                     </div>
                 </div>
             </section>
 
             @if (!isAuthenticated)
             {
-                <div class="alert alert-info">
-                    <h5><i class="bi bi-info-circle me-2"></i>Limited Access</h5>
-                    <p>Non-registered users can watch 30 seconds of each live stream. <strong>Sign in or create an account</strong> for unlimited access to all our content.</p>
-                    <div class="d-flex gap-2">
-                        <a href="/authentication/Login" class="btn btn-primary">Login</a>
-                        <a href="/Account/Register" class="btn btn-success">Register</a>
+                <div class="alert alert-info access-alert">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h5><i class="bi bi-info-circle me-2"></i>Limited Access</h5>
+                            <p>Non-registered users can watch 30 seconds of each live stream. <strong>Sign in or create an account</strong> for unlimited access to all our content.</p>
+                        </div>
+                        <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                            <div class="d-flex justify-content-md-end gap-2">
+                                <a href="/authentication/Login" class="btn btn-primary">Login</a>
+                                <a href="/Account/Register" class="btn btn-success">Register</a>
+                            </div>
+                        </div>
                     </div>
                 </div>
             }
 
             <!-- Stream Info -->
-            <section class="mb-5">
-                <h2 class="text-start">Game Information</h2>
-                <div class="row">
-                    <div class="col-md-6">
-                        <ul class="list-unstyled">
-                            <li><strong>Date:</strong> @DateTime.Now.ToString("MMMM dd, yyyy")</li>
-                            <li><strong>Time:</strong> @DateTime.Now.ToString("h:mm tt")</li>
-                            <li><strong>Status:</strong> <span class="text-@statusColor">@statusText</span></li>
-                            <li><strong>Event Type:</strong> @eventType</li>
-                        </ul>
-                    </div>
-                    <div class="col-md-6">
-                        <p>Welcome to the official live broadcast of today's featured matchup. Stay tuned for all the action, commentary, and analysis directly from the Varsity Sports Show team.</p>
+            <section class="mb-5 game-info-section">
+                <h2 class="text-start section-title">Game Information</h2>
+                <div class="game-info-card">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <ul class="list-unstyled game-details">
+                                <li><strong><i class="bi bi-calendar3 me-2"></i>Date:</strong> @DateTime.Now.ToString("MMMM dd, yyyy")</li>
+                                <li><strong><i class="bi bi-clock me-2"></i>Time:</strong> @DateTime.Now.ToString("h:mm tt")</li>
+                                <li><strong><i class="bi bi-broadcast me-2"></i>Status:</strong> <span class="text-@statusColor status-text">@statusText</span></li>
+                                <li><strong><i class="bi bi-trophy me-2"></i>Event Type:</strong> @eventType</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="event-description">
+                                <p>Welcome to the official live broadcast of today's featured matchup. Stay tuned for all the action, commentary, and analysis directly from the Varsity Sports Show team.</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
 
             @if (authState != null && authState.User.IsInRole("admin"))
             {
-                <div class="alert alert-warning mt-3">
-                    <strong>Admin Controls</strong>
+                <div class="alert alert-warning mt-3 admin-controls">
+                    <strong><i class="bi bi-shield-lock me-2"></i>Admin Controls</strong>
                     <div class="d-flex justify-content-between align-items-center mt-2">
                         <span>Stream Status: <span class="badge bg-@statusBadgeColor">@statusText</span></span>
                         <button class="btn btn-danger" @onclick="EndStream">
@@ -75,8 +85,8 @@
 
             @if (HasLoadErrors)
             {
-                <div class="alert alert-warning">
-                    <h4>Stream Currently Unavailable</h4>
+                <div class="alert alert-warning error-container">
+                    <h4><i class="bi bi-exclamation-triangle me-2"></i>Stream Currently Unavailable</h4>
                     <p>The stream server at <code>@VideoUrl</code> appears to be unavailable or the stream hasn't started yet.</p>
                     <p>This could be because:</p>
                     <ul>
@@ -88,7 +98,7 @@
             }
 
             <!-- Contact Support -->
-            <section class="text-center">
+            <section class="text-center support-section">
                 <h4>Need Help?</h4>
                 <p>If you're experiencing issues with playback or need assistance, <a class="vss-auth__link" href="mailto:info@varsitysportsshow.com">contact our support team</a>.</p>
             </section>

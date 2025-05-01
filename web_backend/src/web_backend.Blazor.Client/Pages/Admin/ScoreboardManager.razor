@@ -1,0 +1,446 @@
+@page "/admin/scoreboards"
+@using web_backend.Blazor.Client.Pages.Scoreboard
+@using System.Text.Json
+@inherits web_backendComponentBase
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<AuthorizeView Roles="admin" Context="auth">
+    <Authorized>
+        <h3>Scoreboard Manager</h3>
+        <p>Create and manage scoreboards for OBS Studio</p>
+
+        <div class="scoreboard-templates">
+            <h4>Your Scoreboards</h4>
+            
+            <div class="scoreboard-template-list">
+                @if (_savedScoreboards.Count == 0)
+                {
+                    <p>You haven't created any scoreboards yet. Create your first one below!</p>
+                }
+                else
+                {
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Sport</th>
+                                <th>Teams</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var scoreboard in _savedScoreboards)
+                            {
+                                <tr>
+                                    <td>@scoreboard.Name</td>
+                                    <td>@scoreboard.SportType</td>
+                                    <td>@scoreboard.HomeTeamName vs @scoreboard.AwayTeamName</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary" @onclick="() => LoadSavedScoreboard(scoreboard)">Edit</button>
+                                        <button class="btn btn-sm btn-secondary" @onclick="() => GetOBSUrl(scoreboard)">Get OBS URL</button>
+                                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteScoreboard(scoreboard)">Delete</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+
+        <div class="scoreboard-editor">
+            <h4>@(_editingExisting ? "Edit Scoreboard" : "Create New Scoreboard")</h4>
+            
+            <div class="form-group mb-3">
+                <label>Scoreboard Name</label>
+                <input type="text" class="form-control" @bind="_currentScoreboard.Name" placeholder="Enter a name for this scoreboard" />
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card mb-3">
+                        <div class="card-header">General Settings</div>
+                        <div class="card-body">
+                            <div class="form-group mb-3">
+                                <label>Sport Type</label>
+                                <select class="form-control" @bind="_currentScoreboard.SportType">
+                                    <option value="Basketball">Basketball</option>
+                                    <option value="Football">Football</option>
+                                    <option value="Soccer">Soccer</option>
+                                    <option value="Hockey">Hockey</option>
+                                    <option value="Baseball">Baseball</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group mb-3">
+                                <label>Event Title</label>
+                                <input type="text" class="form-control" @bind="_currentScoreboard.EventTitle" placeholder="Tournament or Event Name" />
+                            </div>
+                            
+                            <div class="form-group mb-3">
+                                <label>Scoreboard Shape</label>
+                                <select class="form-control" @bind="_currentScoreboard.ScoreboardShape">
+                                    <option value="Rectangle">Rectangle</option>
+                                    <option value="Rounded">Rounded</option>
+                                    <option value="Pill">Pill</option>
+                                    <option value="Modern">Modern</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header">Visual Settings</div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group mb-3">
+                                        <label>Background Color</label>
+                                        <input type="color" class="form-control" @bind="_currentScoreboard.BackgroundColor" />
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group mb-3">
+                                        <label>Text Color</label>
+                                        <input type="color" class="form-control" @bind="_currentScoreboard.TextColor" />
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group mb-3">
+                                        <label>Border Color</label>
+                                        <input type="color" class="form-control" @bind="_currentScoreboard.BorderColor" />
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group mb-3">
+                                        <label>Header Color</label>
+                                        <input type="color" class="form-control" @bind="_currentScoreboard.HeaderColor" />
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" @bind="_currentScoreboard.ShowTimeouts" id="showTimeouts" />
+                                <label class="form-check-label" for="showTimeouts">Show Timeouts</label>
+                            </div>
+                            
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" @bind="_currentScoreboard.ShowAdditionalStats" id="showAdditionalStats" />
+                                <label class="form-check-label" for="showAdditionalStats">Show Additional Stats</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card mb-3">
+                        <div class="card-header">Home Team</div>
+                        <div class="card-body">
+                            <div class="form-group mb-3">
+                                <label>Team Name</label>
+                                <input type="text" class="form-control" @bind="_currentScoreboard.HomeTeamName" placeholder="Home Team" />
+                            </div>
+                            
+                            <div class="form-group mb-3">
+                                <label>Team Logo URL</label>
+                                <input type="text" class="form-control" @bind="_currentScoreboard.HomeTeamLogo" placeholder="https://example.com/logo.png" />
+                                <small class="form-text text-muted">Enter a URL to your team's logo image (PNG or SVG recommended)</small>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group mb-3">
+                                        <label>Background Color</label>
+                                        <input type="color" class="form-control" @bind="_currentScoreboard.HomeTeamBackgroundColor" />
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group mb-3">
+                                        <label>Text Color</label>
+                                        <input type="color" class="form-control" @bind="_currentScoreboard.HomeTeamTextColor" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header">Away Team</div>
+                        <div class="card-body">
+                            <div class="form-group mb-3">
+                                <label>Team Name</label>
+                                <input type="text" class="form-control" @bind="_currentScoreboard.AwayTeamName" placeholder="Away Team" />
+                            </div>
+                            
+                            <div class="form-group mb-3">
+                                <label>Team Logo URL</label>
+                                <input type="text" class="form-control" @bind="_currentScoreboard.AwayTeamLogo" placeholder="https://example.com/logo.png" />
+                                <small class="form-text text-muted">Enter a URL to your team's logo image (PNG or SVG recommended)</small>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group mb-3">
+                                        <label>Background Color</label>
+                                        <input type="color" class="form-control" @bind="_currentScoreboard.AwayTeamBackgroundColor" />
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group mb-3">
+                                        <label>Text Color</label>
+                                        <input type="color" class="form-control" @bind="_currentScoreboard.AwayTeamTextColor" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <button class="btn btn-primary" @onclick="SaveScoreboard">Save Scoreboard</button>
+                @if (_editingExisting)
+                {
+                    <button class="btn btn-secondary" @onclick="CreateNewScoreboard">Create New</button>
+                }
+            </div>
+        </div>
+
+        @if (_showPreviewModal)
+        {
+            <div class="modal fade show" style="display: block;">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">OBS Browser Source URL</h5>
+                            <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>Use this URL in an OBS Browser Source:</p>
+                            <div class="input-group">
+                                <input type="text" class="form-control" readonly value="@_obsUrl" />
+                                <button class="btn btn-outline-secondary" @onclick="CopyOBSUrl">Copy</button>
+                            </div>
+                            <hr />
+                            <p>Browser Source settings to use in OBS:</p>
+                            <ul>
+                                <li>Width: 600 (recommended)</li>
+                                <li>Height: Auto or 200-250</li>
+                                <li>Check "Refresh browser when scene becomes active"</li>
+                                <li>Uncheck "Shutdown source when not visible"</li>
+                            </ul>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-primary" @onclick="OpenScoreboardPreview">Preview Scoreboard</button>
+                            <button type="button" class="btn btn-secondary" @onclick="CloseModal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-backdrop fade show"></div>
+        }
+    </Authorized>
+
+    <NotAuthorized>
+        <p>You do not have permission to view this page.</p>
+    </NotAuthorized>
+</AuthorizeView>
+
+<style>
+    .scoreboard-template-list {
+        margin-bottom: 30px;
+    }
+    
+    .scoreboard-editor {
+        padding-top: 20px;
+        border-top: 1px solid #ddd;
+    }
+</style>
+
+@code {
+    private List<SavedScoreboard> _savedScoreboards = new();
+    private SavedScoreboard _currentScoreboard = new();
+    private bool _editingExisting = false;
+    private bool _showPreviewModal = false;
+    private string _obsUrl = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSavedScoreboards();
+        CreateNewScoreboard();
+    }
+
+    private async Task LoadSavedScoreboards()
+    {
+        var json = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "savedScoreboards");
+        
+        if (!string.IsNullOrEmpty(json))
+        {
+            try
+            {
+                _savedScoreboards = JsonSerializer.Deserialize<List<SavedScoreboard>>(json) ?? new List<SavedScoreboard>();
+            }
+            catch
+            {
+                _savedScoreboards = new List<SavedScoreboard>();
+            }
+        }
+    }
+
+    private void CreateNewScoreboard()
+    {
+        _editingExisting = false;
+        _currentScoreboard = new SavedScoreboard
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = "New Scoreboard",
+            SportType = "Basketball",
+            ScoreboardShape = "Rounded",
+            EventTitle = "Game Title",
+            HomeTeamName = "Home",
+            AwayTeamName = "Away",
+            BackgroundColor = "#1a1a1a",
+            TextColor = "#ffffff",
+            BorderColor = "#333333",
+            HeaderColor = "#333333",
+            HomeTeamBackgroundColor = "#3366cc",
+            HomeTeamTextColor = "#ffffff",
+            AwayTeamBackgroundColor = "#cc3333",
+            AwayTeamTextColor = "#ffffff",
+            ShowTimeouts = true,
+            ShowAdditionalStats = true
+        };
+    }
+
+    private void LoadSavedScoreboard(SavedScoreboard scoreboard)
+    {
+        _editingExisting = true;
+        _currentScoreboard = new SavedScoreboard
+        {
+            Id = scoreboard.Id,
+            Name = scoreboard.Name,
+            SportType = scoreboard.SportType,
+            ScoreboardShape = scoreboard.ScoreboardShape,
+            EventTitle = scoreboard.EventTitle,
+            HomeTeamName = scoreboard.HomeTeamName,
+            AwayTeamName = scoreboard.AwayTeamName,
+            HomeTeamLogo = scoreboard.HomeTeamLogo,
+            AwayTeamLogo = scoreboard.AwayTeamLogo,
+            BackgroundColor = scoreboard.BackgroundColor,
+            TextColor = scoreboard.TextColor,
+            BorderColor = scoreboard.BorderColor,
+            HeaderColor = scoreboard.HeaderColor,
+            HomeTeamBackgroundColor = scoreboard.HomeTeamBackgroundColor,
+            HomeTeamTextColor = scoreboard.HomeTeamTextColor,
+            AwayTeamBackgroundColor = scoreboard.AwayTeamBackgroundColor,
+            AwayTeamTextColor = scoreboard.AwayTeamTextColor,
+            ShowTimeouts = scoreboard.ShowTimeouts,
+            ShowAdditionalStats = scoreboard.ShowAdditionalStats
+        };
+    }
+
+    private async Task SaveScoreboard()
+    {
+        if (string.IsNullOrWhiteSpace(_currentScoreboard.Name))
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Please enter a name for the scoreboard");
+            return;
+        }
+
+        var existingIndex = _savedScoreboards.FindIndex(s => s.Id == _currentScoreboard.Id);
+        if (existingIndex >= 0)
+        {
+            _savedScoreboards[existingIndex] = _currentScoreboard;
+        }
+        else
+        {
+            _savedScoreboards.Add(_currentScoreboard);
+        }
+
+        await SaveScoreboardsToLocalStorage();
+        
+        await JSRuntime.InvokeVoidAsync("alert", "Scoreboard saved successfully!");
+    }
+
+    private async Task DeleteScoreboard(SavedScoreboard scoreboard)
+    {
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", $"Are you sure you want to delete the scoreboard '{scoreboard.Name}'?");
+        
+        if (confirmed)
+        {
+            _savedScoreboards.RemoveAll(s => s.Id == scoreboard.Id);
+            await SaveScoreboardsToLocalStorage();
+            
+            if (_currentScoreboard.Id == scoreboard.Id)
+            {
+                CreateNewScoreboard();
+            }
+        }
+    }
+
+    private async Task SaveScoreboardsToLocalStorage()
+    {
+        var json = JsonSerializer.Serialize(_savedScoreboards);
+        await JSRuntime.InvokeVoidAsync("localStorage.setItem", "savedScoreboards", json);
+    }
+
+    private void GetOBSUrl(SavedScoreboard scoreboard)
+    {
+        var baseUrl = NavigationManager.BaseUri.TrimEnd('/');
+        var queryParams = new List<string>
+        {
+            "admin=false",
+            $"sport={scoreboard.SportType}",
+            $"shape={scoreboard.ScoreboardShape}"
+        };
+        
+        // Add scoreboard ID to load settings
+        queryParams.Add($"id={scoreboard.Id}");
+        
+        _obsUrl = $"{baseUrl}/scoreboard/overlay?{string.Join("&", queryParams)}";
+        _showPreviewModal = true;
+    }
+
+    private async Task CopyOBSUrl()
+    {
+        await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", _obsUrl);
+        await JSRuntime.InvokeVoidAsync("alert", "URL copied to clipboard!");
+    }
+
+    private void OpenScoreboardPreview()
+    {
+        NavigationManager.NavigateTo(_obsUrl, true);
+    }
+
+    private void CloseModal()
+    {
+        _showPreviewModal = false;
+    }
+
+    public class SavedScoreboard
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string SportType { get; set; } = "Basketball";
+        public string ScoreboardShape { get; set; } = "Rounded";
+        public string EventTitle { get; set; } = "Game Title";
+        public string HomeTeamName { get; set; } = "Home";
+        public string AwayTeamName { get; set; } = "Away";
+        public string HomeTeamLogo { get; set; } = "";
+        public string AwayTeamLogo { get; set; } = "";
+        public string BackgroundColor { get; set; } = "#1a1a1a";
+        public string TextColor { get; set; } = "#ffffff";
+        public string BorderColor { get; set; } = "#333333";
+        public string HeaderColor { get; set; } = "#333333";
+        public string HomeTeamBackgroundColor { get; set; } = "#3366cc";
+        public string HomeTeamTextColor { get; set; } = "#ffffff";
+        public string AwayTeamBackgroundColor { get; set; } = "#cc3333";
+        public string AwayTeamTextColor { get; set; } = "#ffffff";
+        public bool ShowTimeouts { get; set; } = true;
+        public bool ShowAdditionalStats { get; set; } = true;
+    }
+}

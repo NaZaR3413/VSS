@@ -1,4 +1,6 @@
 ﻿@page "/contact"
+@using System.ComponentModel.DataAnnotations
+@inject IJSRuntime JSRuntime
 
 <div class="vss-page vss-page-layout--default">
     <main class="vss-main">
@@ -6,26 +8,44 @@
             <section class="vss-contact text-center mb-5">
                 <h1 class="display-5 fw-bold mb-3">Contact Us</h1>
                 <p class="lead mb-4">
-                    For questions, collaborations, or general inquiries, feel free to reach out to us.
+                    Have questions, feedback, or want to collaborate with Varsity Sports Show? We'd love to hear from you!
                 </p>
 
-                <div class="row justify-content-center">
-                    <div class="col-md-6">
-                        <div class="vss-contact-card p-4 border rounded shadow-sm bg-light">
-                            <h4 class="mb-3">Contact Information</h4>
-                            <p class="mb-1"><strong>Name:</strong> Vincenzo D'Aliesio</p>
-                            <p class="mb-1 text-dark">
-                                <strong>Email:</strong>
-                                <span class="text-dark">
-                                    <a href="mailto:info@varsitysportsshow.com" class="text-decoration-underline text-dark">
-                                        info@varsitysportsshow.com
-                                    </a>
-                                </span>
+                <div class="row justify-content-center mb-5">
+                    <div class="col-md-12 mb-4 mb-md-4">
+                        <div class="vss-contact-card p-4 border rounded shadow bg-white">
+                            <div class="contact-icon mb-3">
+                                <i class="bi bi-envelope-fill fs-1 text-primary"></i>
+                            </div>
+                            <h4 class="mb-3">Email Us</h4>
+                            <p class="mb-3">For general inquiries and support:</p>
+                            <p class="mb-1">
+                                <a href="mailto:info@varsitysportsshow.com" class="vss-contact-link">
+                                    info@varsitysportsshow.com
+                                </a>
                             </p>
+                        </div>
+                    </div>
+                </div>
 
-                            <a href="mailto:info@varsitysportsshow.com" class="vss-auth__button mt-3 d-inline-block">
-                                📧 Email Us
-                            </a>
+                <div class="row justify-content-center mt-5">
+                    <div class="col-lg-8">
+                        <div class="vss-contact-social p-4 border rounded shadow bg-white">
+                            <h3 class="mb-4">Connect With Us</h3>
+                            <div class="d-flex justify-content-center social-icons">
+                                <a href="https://www.facebook.com/varsitysportsshow/" class="mx-2 vss-social-icon" aria-label="Facebook" target="_blank" rel="noopener noreferrer">
+                                    <i class="bi bi-facebook fs-2"></i>
+                                </a>
+                                <a href="https://x.com/VarsityShow?ref_src=twsrc%5Egoogle%7Ctwcamp%5Eserp%7Ctwgr%5Eauthor" class="mx-2 vss-social-icon" aria-label="Twitter" target="_blank" rel="noopener noreferrer">
+                                    <i class="bi bi-twitter-x fs-2"></i>
+                                </a>
+                                <a href="https://www.instagram.com/varsitysportsshow/?hl=en" class="mx-2 vss-social-icon" aria-label="Instagram" target="_blank" rel="noopener noreferrer">
+                                    <i class="bi bi-instagram fs-2"></i>
+                                </a>
+                                <a href="https://www.youtube.com/@@varsitysportsshow" class="mx-2 vss-social-icon" aria-label="YouTube" target="_blank" rel="noopener noreferrer">
+                                    <i class="bi bi-youtube fs-2"></i>
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
