@@ -1,0 +1,304 @@
+@page "/games"
+@using web_backend.Games
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IGameAppService GameService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+
+<PageTitle>Game Library - VSS</PageTitle>
+
+<div class="games-container">
+    <h1 class="mb-4">Game Library</h1>
+
+    <!-- Filter Section -->
+    <div class="card mb-4 filter-card">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-2">
+                    <div class="form-group mb-3">
+                        <label for="homeTeam">Home Team</label>
+                        <input type="text" class="form-control" id="homeTeam" @bind="filter.HomeTeam" placeholder="Home Team..." />
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-group mb-3">
+                        <label for="awayTeam">Away Team</label>
+                        <input type="text" class="form-control" id="awayTeam" @bind="filter.AwayTeam" placeholder="Away Team..." />
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-group mb-3">
+                        <label for="fromDate">From Date</label>
+                        <input type="date" class="form-control" id="fromDate" @bind="filter.FromDate" />
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-group mb-3">
+                        <label for="toDate">To Date</label>
+                        <input type="date" class="form-control" id="toDate" @bind="filter.ToDate" />
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-group mb-3">
+                        <label for="eventType">Event Type</label>
+                        <input type="text" class="form-control" id="eventType" @bind="filter.EventType" placeholder="Event Type..." />
+                    </div>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button class="btn btn-primary w-100 mb-3" @onclick="ApplyFilters">Apply Filters</button>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-12 text-end">
+                    <button class="btn btn-outline-secondary" @onclick="ClearFilters">Clear Filters</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (isAdmin)
+    {
+        <div class="mb-4 text-end">
+            <a href="/admin/games/create" class="btn btn-success">
+                <i class="bi bi-plus-circle me-2"></i>Upload New Game
+            </a>
+        </div>
+    }
+    
+    @if (loading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading games...</p>
+        </div>
+    }
+    else if (games == null || games.Count == 0)
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle-fill me-2"></i>
+            No games available in the library. Please check back later or try different filters.
+        </div>
+    }
+    else
+    {
+        <!-- Game Categories (by Event Type) -->
+        @foreach (var category in gamesByCategory.Keys)
+        {
+            <div class="game-category mb-5">
+                <h2 class="mb-3">@category</h2>
+                <div class="game-row">
+                    @foreach (var game in gamesByCategory[category])
+                    {
+                        <div class="game-card" @onclick="() => NavigateToGameDetails(game.Id)">
+                            <div class="game-thumbnail">
+                                <div class="game-thumbnail-overlay">
+                                    <i class="bi bi-play-circle-fill play-icon"></i>
+                                </div>
+                                <div class="game-info-overlay">
+                                    <div class="teams">@game.HomeTeam vs @game.AwayTeam</div>
+                                    @if (game.HomeScore.HasValue && game.AwayScore.HasValue)
+                                    {
+                                        <div class="score">@game.HomeScore - @game.AwayScore</div>
+                                    }
+                                    <div class="date">@game.EventDate.ToString("MMM dd, yyyy")</div>
+                                </div>
+                            </div>
+                            <div class="game-title">
+                                @game.HomeTeam vs @game.AwayTeam
+                            </div>
+                            <div class="game-details">
+                                @game.EventDate.ToString("MMM dd, yyyy")
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private List<GameDto> games;
+    private Dictionary<string, List<GameDto>> gamesByCategory = new Dictionary<string, List<GameDto>>();
+    private GameFilterDto filter = new GameFilterDto();
+    private bool loading = true;
+    private bool isAdmin = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        isAdmin = authState.User.IsInRole("admin");
+        
+        await LoadGamesAsync();
+    }
+
+    private async Task LoadGamesAsync()
+    {
+        loading = true;
+        try
+        {
+            // Load all games or filtered games
+            if (HasAnyFilter())
+            {
+                games = await GameService.GetFilteredListAsync(filter);
+            }
+            else
+            {
+                games = await GameService.GetListAsync();
+            }
+            
+            // Group games by event type for category-based display
+            gamesByCategory = games
+                .GroupBy(g => string.IsNullOrEmpty(g.EventType) ? "Other Events" : g.EventType)
+                .ToDictionary(g => g.Key, g => g.ToList());
+        }
+        catch (Exception ex)
+        {
+            // In a real app, you would log this error
+            await JS.InvokeVoidAsync("console.error", $"Error loading games: {ex.Message}");
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task ApplyFilters()
+    {
+        await LoadGamesAsync();
+    }
+
+    private async Task ClearFilters()
+    {
+        filter = new GameFilterDto();
+        await LoadGamesAsync();
+    }
+
+    private bool HasAnyFilter()
+    {
+        return !string.IsNullOrEmpty(filter.HomeTeam) ||
+               !string.IsNullOrEmpty(filter.AwayTeam) ||
+               filter.FromDate.HasValue ||
+               filter.ToDate.HasValue ||
+               !string.IsNullOrEmpty(filter.EventType);
+    }
+
+    private void NavigateToGameDetails(Guid id)
+    {
+        NavigationManager.NavigateTo($"/games/{id}");
+    }
+}
+
+<style>
+    .games-container {
+        padding: 20px;
+        max-width: 1600px;
+        margin: 0 auto;
+    }
+    
+    .filter-card {
+        background-color: #f8f9fa;
+        border: none;
+        border-radius: 8px;
+    }
+    
+    .game-row {
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        gap: 16px;
+        padding-bottom: 16px;
+    }
+    
+    .game-card {
+        flex: 0 0 auto;
+        width: 300px;
+        cursor: pointer;
+        transition: transform 0.3s;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    .game-card:hover {
+        transform: scale(1.05);
+    }
+    
+    .game-thumbnail {
+        position: relative;
+        height: 168px;
+        background-color: #000;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    .game-thumbnail::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.7));
+    }
+    
+    .game-thumbnail-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+    
+    .game-card:hover .game-thumbnail-overlay {
+        opacity: 1;
+    }
+    
+    .play-icon {
+        font-size: 48px;
+        color: white;
+    }
+    
+    .game-info-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        padding: 10px;
+        color: white;
+    }
+    
+    .game-title {
+        font-weight: bold;
+        margin-top: 8px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .game-details {
+        font-size: 14px;
+        color: #6c757d;
+    }
+    
+    .teams {
+        font-weight: bold;
+    }
+    
+    .score {
+        font-size: 14px;
+    }
+    
+    .date {
+        font-size: 12px;
+        opacity: 0.8;
+    }
+</style>

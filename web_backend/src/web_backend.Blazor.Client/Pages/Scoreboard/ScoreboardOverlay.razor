@@ -1,94 +1,182 @@
 @page "/scoreboard"
 @page "/scoreboard/overlay"
 @inherits web_backendComponentBase
-@implements IDisposable
-@using System.Timers
-@using System.Text.Json
 
-<div class="scoreboard-container @ScoreboardShape.ToLower()" style="background-color: @BackgroundColor; color: @TextColor; border-color: @BorderColor;">
-    <div class="header" style="background-color: @HeaderColor;">
-        <div class="event-info">@EventTitle</div>
-        <div class="period-indicator">@GetPeriodLabel(): @CurrentPeriod</div>
-    </div>
-    <div class="teams-container">
-        <div class="team home @(PossessionTeam == "home" ? "possession" : "")" 
-             style="background-color: @HomeTeamBackgroundColor; color: @HomeTeamTextColor;">
-            <div class="team-logo">
-                @if (!string.IsNullOrEmpty(HomeTeamLogo))
-                {
-                    <img src="@HomeTeamLogo" alt="@HomeTeamName Logo" />
-                }
-            </div>
-            <div class="team-name">@HomeTeamName</div>
-            <div class="team-score">@HomeTeamScore</div>
-        </div>
-        <div class="team away @(PossessionTeam == "away" ? "possession" : "")"
-             style="background-color: @AwayTeamBackgroundColor; color: @AwayTeamTextColor;">
-            <div class="team-logo">
-                @if (!string.IsNullOrEmpty(AwayTeamLogo))
-                {
-                    <img src="@AwayTeamLogo" alt="@AwayTeamName Logo" />
-                }
-            </div>
-            <div class="team-name">@AwayTeamName</div>
-            <div class="team-score">@AwayTeamScore</div>
-        </div>
-    </div>
-    <div class="clock-container">
-        <div class="game-clock">@FormattedGameClock</div>
-        <div class="shot-clock @(_shotClockWarning ? "warning" : "")">@ShotClock</div>
-    </div>
-    
-    @if (ShowTimeouts)
-    {
-        <div class="timeout-container">
-            <div class="home-timeouts">
-                @for (int i = 0; i < MaxTimeouts; i++)
-                {
-                    <div class="timeout-indicator @(i < HomeTimeouts ? "active" : "")"></div>
-                }
-            </div>
-            <div class="away-timeouts">
-                @for (int i = 0; i < MaxTimeouts; i++)
-                {
-                    <div class="timeout-indicator @(i < AwayTimeouts ? "active" : "")"></div>
-                }
-            </div>
-        </div>
-    }
-    
-    @if (ShowAdditionalStats)
-    {
-        <div class="additional-stats">
-            @if (SportType == "Basketball")
-            {
-                <div class="foul-count">
-                    <span>Fouls: @HomeTeamFouls - @AwayTeamFouls</span>
-                </div>
-            }
-            else if (SportType == "Football" || SportType == "Soccer")
-            {
-                <div class="stats-row">
-                    <span>@HomeTeamStats</span>
-                    <span>@AwayTeamStats</span>
-                </div>
-            }
-            else if (SportType == "Baseball")
-            {
-                <div class="baseball-stats">
-                    <div class="inning-indicator">
-                        <span>@(TopInning ? "▲" : "▼") @CurrentInning</span>
+@if (!AdminMode)
+{
+    <!-- For OBS use, clean overlay with no extra page elements -->
+    <div class="obs-overlay @ScoreboardShape.ToLower()">
+        <div class="scoreboard-container @ScoreboardShape.ToLower()" style="background-color: @BackgroundColor; color: @TextColor; border-color: @BorderColor;">
+            <div class="teams-container">
+                <div class="team home @(PossessionTeam == "home" ? "possession" : "")" 
+                     style="background-color: @HomeTeamBackgroundColor; color: @HomeTeamTextColor;">
+                    <div class="team-logo">
+                        @if (!string.IsNullOrEmpty(HomeTeamLogo))
+                        {
+                            <img src="@HomeTeamLogo" alt="@HomeTeamName Logo" />
+                        }
                     </div>
-                    <div class="count">
-                        <span>B: @Balls S: @Strikes O: @Outs</span>
+                    <div class="team-name">@HomeTeamName</div>
+                    <div class="team-score">@HomeTeamScore</div>
+                </div>
+                
+                <div class="game-info">
+                    <div class="period-indicator">@GetPeriodLabel(): @CurrentPeriod</div>
+                    <div class="game-clock">@FormattedGameClock</div>
+                    @if (!string.IsNullOrEmpty(ShotClock))
+                    {
+                        <div class="shot-clock @(_shotClockWarning ? "warning" : "")">@ShotClock</div>
+                    }
+                </div>
+                
+                <div class="team away @(PossessionTeam == "away" ? "possession" : "")"
+                     style="background-color: @AwayTeamBackgroundColor; color: @AwayTeamTextColor;">
+                    <div class="team-logo">
+                        @if (!string.IsNullOrEmpty(AwayTeamLogo))
+                        {
+                            <img src="@AwayTeamLogo" alt="@AwayTeamName Logo" />
+                        }
+                    </div>
+                    <div class="team-name">@AwayTeamName</div>
+                    <div class="team-score">@AwayTeamScore</div>
+                </div>
+            </div>
+            
+            @if (ShowTimeouts)
+            {
+                <div class="timeout-container">
+                    <div class="home-timeouts">
+                        @for (int i = 0; i < MaxTimeouts; i++)
+                        {
+                            <div class="timeout-indicator @(i < HomeTimeouts ? "active" : "")"></div>
+                        }
+                    </div>
+                    <div class="away-timeouts">
+                        @for (int i = 0; i < MaxTimeouts; i++)
+                        {
+                            <div class="timeout-indicator @(i < AwayTimeouts ? "active" : "")"></div>
+                        }
                     </div>
                 </div>
             }
+            
+            @if (ShowAdditionalStats)
+            {
+                <div class="additional-stats">
+                    @if (SportType == "Basketball")
+                    {
+                        <div class="foul-count">
+                            <span>Fouls: @HomeTeamFouls - @AwayTeamFouls</span>
+                        </div>
+                    }
+                    else if (SportType == "Football" || SportType == "Soccer")
+                    {
+                        <div class="stats-row">
+                            <span>@HomeTeamStats</span>
+                            <span>@AwayTeamStats</span>
+                        </div>
+                    }
+                    else if (SportType == "Baseball")
+                    {
+                        <div class="baseball-stats">
+                            <div class="inning-indicator">
+                                <span>@(TopInning ? "▲" : "▼") @CurrentInning</span>
+                            </div>
+                            <div class="count">
+                                <span>B: @Balls S: @Strikes O: @Outs</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
         </div>
-    }
-    
-    @if (AdminMode)
-    {
+    </div>
+}
+else
+{
+    <!-- Original layout for admin mode -->
+    <div class="scoreboard-container @ScoreboardShape.ToLower()" style="background-color: @BackgroundColor; color: @TextColor; border-color: @BorderColor;">
+        <div class="header" style="background-color: @HeaderColor;">
+            <div class="event-info">@EventTitle</div>
+            <div class="period-indicator">@GetPeriodLabel(): @CurrentPeriod</div>
+        </div>
+        <div class="teams-container">
+            <div class="team home @(PossessionTeam == "home" ? "possession" : "")" 
+                 style="background-color: @HomeTeamBackgroundColor; color: @HomeTeamTextColor;">
+                <div class="team-logo">
+                    @if (!string.IsNullOrEmpty(HomeTeamLogo))
+                    {
+                        <img src="@HomeTeamLogo" alt="@HomeTeamName Logo" />
+                    }
+                </div>
+                <div class="team-name">@HomeTeamName</div>
+                <div class="team-score">@HomeTeamScore</div>
+            </div>
+            <div class="team away @(PossessionTeam == "away" ? "possession" : "")"
+                 style="background-color: @AwayTeamBackgroundColor; color: @AwayTeamTextColor;">
+                <div class="team-logo">
+                    @if (!string.IsNullOrEmpty(AwayTeamLogo))
+                    {
+                        <img src="@AwayTeamLogo" alt="@AwayTeamName Logo" />
+                    }
+                </div>
+                <div class="team-name">@AwayTeamName</div>
+                <div class="team-score">@AwayTeamScore</div>
+            </div>
+        </div>
+        <div class="clock-container">
+            <div class="game-clock">@FormattedGameClock</div>
+            <div class="shot-clock @(_shotClockWarning ? "warning" : "")">@ShotClock</div>
+        </div>
+        
+        @if (ShowTimeouts)
+        {
+            <div class="timeout-container">
+                <div class="home-timeouts">
+                    @for (int i = 0; i < MaxTimeouts; i++)
+                    {
+                        <div class="timeout-indicator @(i < HomeTimeouts ? "active" : "")"></div>
+                    }
+                </div>
+                <div class="away-timeouts">
+                    @for (int i = 0; i < MaxTimeouts; i++)
+                    {
+                        <div class="timeout-indicator @(i < AwayTimeouts ? "active" : "")"></div>
+                    }
+                </div>
+            </div>
+        }
+        
+        @if (ShowAdditionalStats)
+        {
+            <div class="additional-stats">
+                @if (SportType == "Basketball")
+                {
+                    <div class="foul-count">
+                        <span>Fouls: @HomeTeamFouls - @AwayTeamFouls</span>
+                    </div>
+                }
+                else if (SportType == "Football" || SportType == "Soccer")
+                {
+                    <div class="stats-row">
+                        <span>@HomeTeamStats</span>
+                        <span>@AwayTeamStats</span>
+                    </div>
+                }
+                else if (SportType == "Baseball")
+                {
+                    <div class="baseball-stats">
+                        <div class="inning-indicator">
+                            <span>@(TopInning ? "▲" : "▼") @CurrentInning</span>
+                        </div>
+                        <div class="count">
+                            <span>B: @Balls S: @Strikes O: @Outs</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        
         <div class="admin-controls">
             <div class="clock-controls">
                 <button @onclick="ToggleGameClock">@(_gameClockRunning ? "Pause" : "Start")</button>
@@ -141,6 +229,7 @@
                     <option value="Rounded" selected="@(ScoreboardShape == "Rounded")">Rounded</option>
                     <option value="Pill" selected="@(ScoreboardShape == "Pill")">Pill</option>
                     <option value="Modern" selected="@(ScoreboardShape == "Modern")">Modern</option>
+                    <option value="Slim" selected="@(ScoreboardShape == "Slim")">Slim</option>
                 </select>
                 
                 <input type="color" @bind="BackgroundColor" title="Background Color" />
@@ -152,76 +241,12 @@
                 <button @onclick="LoadSettings">Load Settings</button>
             </div>
         </div>
-    }
-</div>
+    </div>
 
-@if (AdminMode)
-{
     <div class="admin-panel">
         <div class="admin-form">
             <div class="form-group">
                 <label>Event Title:</label>
-                <input type="text" @bind="EventTitle" />
-            </div>
-            
-            <div class="team-editor">
-                <h3>Home Team</h3>
-                <div class="form-group">
-                    <label>Name:</label>
-                    <input type="text" @bind="HomeTeamName" />
-                </div>
-                <div class="form-group">
-                    <label>Logo URL:</label>
-                    <input type="text" @bind="HomeTeamLogo" />
-                </div>
-                <div class="form-group">
-                    <label>Team Colors:</label>
-                    <input type="color" @bind="HomeTeamBackgroundColor" title="Background Color" />
-                    <input type="color" @bind="HomeTeamTextColor" title="Text Color" />
-                </div>
-            </div>
-            
-            <div class="team-editor">
-                <h3>Away Team</h3>
-                <div class="form-group">
-                    <label>Name:</label>
-                    <input type="text" @bind="AwayTeamName" />
-                </div>
-                <div class="form-group">
-                    <label>Logo URL:</label>
-                    <input type="text" @bind="AwayTeamLogo" />
-                </div>
-                <div class="form-group">
-                    <label>Team Colors:</label>
-                    <input type="color" @bind="AwayTeamBackgroundColor" title="Background Color" />
-                    <input type="color" @bind="AwayTeamTextColor" title="Text Color" />
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label>Game Clock (MM:SS):</label>
-                <input type="text" @bind="_gameClockInput" placeholder="MM:SS" />
-                <button @onclick="SetGameClockFromInput">Set</button>
-            </div>
-            
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" @bind="ShowAdditionalStats" />
-                    Show Additional Stats
-                </label>
-            </div>
-            
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" @bind="ShowTimeouts" />
-                    Show Timeouts
-                </label>
-            </div>
-            
-            <div class="form-group">
-                <label>URL for OBS Browser Source:</label>
-                <input type="text" readonly value="@GetOverlayUrl()" />
-                <button @onclick="CopyOverlayUrl">Copy</button>
             </div>
         </div>
     </div>
@@ -241,216 +266,190 @@
         overflow: hidden;
     }
     
+    /* OBS Overlay Specific Styles */
+    .obs-overlay {
+        /* Full reset for OBS browser source */
+        margin: 0;
+        padding: 0;
+        background: transparent !important;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        overflow: hidden;
+    }
+    
+    body {
+        background: transparent !important;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+    }
+    
+    /* Only applied to non-admin mode */
+    .obs-overlay .scoreboard-container {
+        margin: 0;
+        max-width: none;
+        width: 100%;
+        height: 80px; /* Thinner scoreboard */
+        box-shadow: none;
+        flex-direction: row;
+        border-width: 0;
+    }
+    
+    .obs-overlay .teams-container {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    .obs-overlay .team {
+        height: 100%;
+        padding: 0 15px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-width: 180px;
+    }
+    
+    .obs-overlay .team-logo {
+        width: 32px;
+        height: 32px;
+    }
+    
+    .obs-overlay .team-name {
+        font-size: 1em;
+        font-weight: bold;
+        margin: 0 10px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .obs-overlay .team-score {
+        font-size: 2em;
+        font-weight: bold;
+        min-width: 50px;
+        text-align: center;
+    }
+    
+    .obs-overlay .game-info {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background-color: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 0 15px;
+        height: 100%;
+        min-width: 100px;
+    }
+    
+    .obs-overlay .period-indicator {
+        font-size: 0.75em;
+        margin-bottom: 3px;
+    }
+    
+    .obs-overlay .game-clock {
+        font-size: 1.4em;
+        font-weight: bold;
+    }
+    
+    .obs-overlay .shot-clock {
+        font-size: 0.75em;
+        margin-top: 3px;
+    }
+    
+    .obs-overlay .shot-clock.warning {
+        color: red;
+        animation: blinking 1s infinite;
+    }
+    
+    .obs-overlay .timeout-container {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: space-between;
+        padding: 2px 10px;
+        background-color: rgba(0,0,0,0.3);
+        height: 10px;
+    }
+    
+    .obs-overlay .timeout-indicator {
+        width: 6px;
+        height: 6px;
+        margin: 0 2px;
+    }
+    
+    .obs-overlay .additional-stats {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        font-size: 0.7em;
+        padding: 2px 10px;
+        background-color: rgba(0,0,0,0.3);
+    }
+    
     /* Shape Variations */
     .scoreboard-container.rectangle {
         border-radius: 0;
     }
     
     .scoreboard-container.rounded {
-        border-radius: 12px;
+        border-radius: 8px;
     }
     
     .scoreboard-container.pill {
-        border-radius: 30px;
+        border-radius: 40px;
     }
     
     .scoreboard-container.modern {
-        border-radius: 8px 8px 30px 30px;
+        border-radius: 4px;
     }
     
-    .header {
-        display: flex;
-        justify-content: space-between;
-        padding: 8px 12px;
-        font-weight: bold;
+    .scoreboard-container.slim {
+        border-radius: 0;
+        height: 60px !important; /* Even thinner */
     }
     
-    .teams-container {
-        display: flex;
-        justify-content: space-between;
+    .obs-overlay.slim .team-name {
+        font-size: 0.9em;
     }
     
-    .team {
-        display: flex;
-        align-items: center;
-        padding: 10px;
-        flex: 1;
-        position: relative;
+    .obs-overlay.slim .team-score {
+        font-size: 1.8em;
     }
     
-    .team.possession::after {
+    .obs-overlay.slim .game-clock {
+        font-size: 1.2em;
+    }
+    
+    /* Ensure possession indicator is visible but not too big */
+    .obs-overlay .team.possession::after {
         content: "\2022";
         position: absolute;
         left: 5px;
-        top: 50%;
-        transform: translateY(-50%);
+        font-size: 18px;
+        color: yellow;
     }
     
-    .team-logo {
-        width: 36px;
-        height: 36px;
-        margin-right: 8px;
+    .obs-overlay .team.home.possession::after {
+        left: 5px;
     }
     
-    .team-logo img {
-        width: 100%;
-        height: 100%;
-        object-fit: contain;
+    .obs-overlay .team.away.possession::after {
+        right: 5px;
+        left: auto;
     }
-    
-    .team-name {
-        flex: 1;
-        font-weight: bold;
-        font-size: 1.1em;
-    }
-    
-    .team-score {
-        font-size: 1.8em;
-        font-weight: bold;
-        min-width: 50px;
-        text-align: center;
-    }
-    
-    .clock-container {
-        display: flex;
-        justify-content: center;
-        padding: 10px;
-        font-size: 1.5em;
-        font-weight: bold;
-    }
-    
-    .game-clock {
-        margin-right: 15px;
-    }
-    
-    .shot-clock {
-        font-size: 0.8em;
-        padding: 2px 8px;
-        background-color: rgba(0, 0, 0, 0.2);
-        border-radius: 4px;
-    }
-    
-    .shot-clock.warning {
-        color: red;
-        animation: blinking 1s infinite;
-    }
-    
+
+    /* Animation */
     @@keyframes blinking {
         50% { opacity: 0.5; }
-    }
-    
-    .timeout-container {
-        display: flex;
-        justify-content: space-between;
-        padding: 5px 10px;
-    }
-    
-    .timeout-indicator {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        background-color: rgba(255, 255, 255, 0.3);
-        display: inline-block;
-        margin: 0 2px;
-    }
-    
-    .timeout-indicator.active {
-        background-color: rgb(255, 215, 0);
-    }
-    
-    .additional-stats {
-        padding: 5px 10px;
-        font-size: 0.9em;
-        display: flex;
-        justify-content: center;
-    }
-    
-    .baseball-stats {
-        display: flex;
-        justify-content: space-between;
-        width: 100%;
-    }
-    
-    /* Admin Controls */
-    .admin-controls {
-        margin-top: 20px;
-        padding: 10px;
-        background-color: #f5f5f5;
-        border-top: 1px solid #ddd;
-    }
-    
-    .admin-controls > div {
-        margin-bottom: 10px;
-    }
-    
-    .admin-controls button {
-        margin: 2px;
-        padding: 5px 10px;
-        background-color: #2c3e50;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-    }
-    
-    .admin-controls button:hover {
-        background-color: #34495e;
-    }
-    
-    .admin-controls select, .admin-controls input[type="color"] {
-        margin: 0 5px;
-        padding: 5px;
-    }
-    
-    .admin-panel {
-        margin-top: 20px;
-        padding: 20px;
-        background-color: #f9f9f9;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-    
-    .admin-form {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 20px;
-    }
-    
-    .form-group {
-        margin-bottom: 15px;
-        min-width: 200px;
-    }
-    
-    .form-group label {
-        display: block;
-        margin-bottom: 5px;
-        font-weight: bold;
-    }
-    
-    .form-group input[type="text"],
-    .form-group select {
-        width: 100%;
-        padding: 8px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-    }
-    
-    .team-editor {
-        flex: 1;
-        min-width: 250px;
-        padding: 15px;
-        background-color: #f0f0f0;
-        border-radius: 6px;
-    }
-    
-    /* Responsive Design */
-    @@media (max-width: 768px) {
-        .admin-form {
-            flex-direction: column;
-        }
-        
-        .team-editor {
-            min-width: auto;
-        }
     }
 </style>

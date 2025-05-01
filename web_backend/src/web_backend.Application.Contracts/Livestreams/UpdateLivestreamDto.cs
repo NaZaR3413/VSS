@@ -17,5 +17,6 @@ namespace web_backend.Livestreams
         public int? AwayScore { get; set; }  
         public EventType? EventType { get; set; } 
         public StreamStatus? StreamStatus { get; set; } 
+        public DateTime? EventDate { get; set; }
     }
 }

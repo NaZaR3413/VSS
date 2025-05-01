@@ -7,19 +7,27 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Timers;
 using Microsoft.JSInterop;
+using web_backend.Livestreams;
+using Microsoft.AspNetCore.SignalR.Client;
 
 namespace web_backend.Blazor.Client.Pages.Scoreboard
 {
-    public partial class ScoreboardOverlay : web_backendComponentBase
+    public partial class ScoreboardOverlay : web_backendComponentBase, IAsyncDisposable
     {
         private Timer _gameClockTimer;
         private Timer _shotClockTimer;
+        private Timer _autoRefreshTimer;
         private double _gameClock = 12 * 60; // Default 12 minutes
         private double _shotClock = 24; // Default 24 seconds
         private bool _gameClockRunning = false;
         private bool _shotClockRunning = false;
         private bool _shotClockWarning = false;
         private string _gameClockInput = "12:00";
+        private HubConnection hubConnection;
+        private bool _syncWithLivestream = false;
+        private Guid? _livestreamId;
+        private LivestreamDto _linkedLivestream;
+        private DateTime _lastScoreSync = DateTime.MinValue;
 
         [Parameter]
         [SupplyParameterFromQuery(Name = "admin")]
@@ -37,11 +45,18 @@ namespace web_backend.Blazor.Client.Pages.Scoreboard
         [SupplyParameterFromQuery(Name = "id")]
         public string? ScoreboardId { get; set; }
 
+        [Parameter]
+        [SupplyParameterFromQuery(Name = "livestreamId")]
+        public string? LivestreamIdParam { get; set; }
+
         [Inject]
         private IJSRuntime JSRuntime { get; set; }
 
         [Inject]
         private NavigationManager NavigationManager { get; set; }
+        
+        [Inject]
+        private ILivestreamAppService LivestreamService { get; set; }
 
         #region Scoreboard Properties
         // Event Info
@@ -121,9 +136,24 @@ namespace web_backend.Blazor.Client.Pages.Scoreboard
 
             _shotClockTimer = new Timer(1000);
             _shotClockTimer.Elapsed += OnShotClockTick;
+            
+            // Setup auto refresh timer for OBS mode (non-admin mode)
+            if (!AdminMode)
+            {
+                _autoRefreshTimer = new Timer(5000); // Check for updates every 5 seconds
+                _autoRefreshTimer.Elapsed += OnAutoRefreshTick;
+                _autoRefreshTimer.Start();
+            }
 
+            // Check if we have a direct livestream ID to link with
+            if (!string.IsNullOrEmpty(LivestreamIdParam) && Guid.TryParse(LivestreamIdParam, out Guid livestreamGuid))
+            {
+                _livestreamId = livestreamGuid;
+                _syncWithLivestream = true;
+                await SyncWithLivestreamData();
+            }
             // Check if we have a scoreboard ID to load
-            if (!string.IsNullOrEmpty(ScoreboardId))
+            else if (!string.IsNullOrEmpty(ScoreboardId))
             {
                 await LoadScoreboardById(ScoreboardId);
             }
@@ -134,6 +164,83 @@ namespace web_backend.Blazor.Client.Pages.Scoreboard
             }
             
             InitializeSportDefaults();
+            
+            // Set up SignalR connection for real-time updates
+            await SetupSignalRConnection();
+        }
+
+        private async Task SetupSignalRConnection()
+        {
+            try
+            {
+                hubConnection = new HubConnectionBuilder()
+                    .WithUrl(NavigationManager.ToAbsoluteUri("/signalr/scoreboard"))
+                    .WithAutomaticReconnect()
+                    .Build();
+
+                hubConnection.On<string, int, int>("UpdateScore", (gameId, homeScore, awayScore) =>
+                {
+                    if (_syncWithLivestream && _livestreamId.HasValue && gameId == _livestreamId.ToString())
+                    {
+                        HomeTeamScore = homeScore;
+                        AwayTeamScore = awayScore;
+                        InvokeAsync(StateHasChanged);
+                    }
+                });
+
+                hubConnection.On<string>("RefreshScoreboard", (gameId) =>
+                {
+                    if (_syncWithLivestream && _livestreamId.HasValue && gameId == _livestreamId.ToString())
+                    {
+                        InvokeAsync(SyncWithLivestreamData);
+                    }
+                });
+
+                await hubConnection.StartAsync();
+            }
+            catch (Exception ex)
+            {
+                await JSRuntime.InvokeVoidAsync("console.error", "Error setting up SignalR connection: " + ex.Message);
+            }
+        }
+
+        private async void OnAutoRefreshTick(object sender, ElapsedEventArgs e)
+        {
+            if (_syncWithLivestream && _livestreamId.HasValue)
+            {
+                // Only sync if it's been more than 5 seconds since the last sync
+                if ((DateTime.Now - _lastScoreSync).TotalSeconds > 5)
+                {
+                    await InvokeAsync(SyncWithLivestreamData);
+                }
+            }
+        }
+
+        private async Task SyncWithLivestreamData()
+        {
+            if (!_livestreamId.HasValue) return;
+            
+            try
+            {
+                _linkedLivestream = await LivestreamService.GetAsync(_livestreamId.Value);
+                
+                if (_linkedLivestream != null)
+                {
+                    HomeTeamName = _linkedLivestream.HomeTeam;
+                    AwayTeamName = _linkedLivestream.AwayTeam;
+                    HomeTeamScore = _linkedLivestream.HomeScore;
+                    AwayTeamScore = _linkedLivestream.AwayScore;
+                    SportType = _linkedLivestream.EventType.ToString();
+                    EventTitle = $"{_linkedLivestream.HomeTeam} vs {_linkedLivestream.AwayTeam}";
+                    
+                    _lastScoreSync = DateTime.Now;
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+            catch (Exception ex)
+            {
+                await JSRuntime.InvokeVoidAsync("console.error", "Error syncing with livestream: " + ex.Message);
+            }
         }
 
         private async Task LoadScoreboardById(string id)
@@ -167,6 +274,14 @@ namespace web_backend.Blazor.Client.Pages.Scoreboard
                         AwayTeamTextColor = scoreboard.AwayTeamTextColor;
                         ShowTimeouts = scoreboard.ShowTimeouts;
                         ShowAdditionalStats = scoreboard.ShowAdditionalStats;
+                        
+                        // Check if there's a linked livestream
+                        if (!string.IsNullOrEmpty(scoreboard.LivestreamId) && Guid.TryParse(scoreboard.LivestreamId, out Guid livestreamGuid))
+                        {
+                            _livestreamId = livestreamGuid;
+                            _syncWithLivestream = true;
+                            await SyncWithLivestreamData();
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -197,6 +312,7 @@ namespace web_backend.Blazor.Client.Pages.Scoreboard
             public string AwayTeamTextColor { get; set; } = "#ffffff";
             public bool ShowTimeouts { get; set; } = true;
             public bool ShowAdditionalStats { get; set; } = true;
+            public string LivestreamId { get; set; } = null;
         }
 
         private void InitializeSportDefaults()
@@ -344,7 +460,7 @@ namespace web_backend.Blazor.Client.Pages.Scoreboard
                 _gameClock = 0;
         }
 
-        public void UpdateScore(string team, int points)
+        public async Task UpdateScore(string team, int points)
         {
             if (team == "home")
             {
@@ -355,6 +471,37 @@ namespace web_backend.Blazor.Client.Pages.Scoreboard
             {
                 AwayTeamScore += points;
                 if (AwayTeamScore < 0) AwayTeamScore = 0;
+            }
+            
+            // If connected to a livestream, update the database
+            if (_syncWithLivestream && _livestreamId.HasValue)
+            {
+                await UpdateLivestreamScore();
+            }
+        }
+        
+        private async Task UpdateLivestreamScore()
+        {
+            try
+            {
+                var updateDto = new UpdateLivestreamDto
+                {
+                    HomeScore = HomeTeamScore,
+                    AwayScore = AwayTeamScore
+                };
+                
+                await LivestreamService.UpdateAsync(_livestreamId.Value, updateDto);
+                _lastScoreSync = DateTime.Now;
+                
+                // Notify other instances of the scoreboard that the score has changed
+                if (hubConnection != null && hubConnection.State == HubConnectionState.Connected)
+                {
+                    await hubConnection.SendAsync("UpdateScore", _livestreamId.ToString(), HomeTeamScore, AwayTeamScore);
+                }
+            }
+            catch (Exception ex)
+            {
+                await JSRuntime.InvokeVoidAsync("console.error", "Error updating livestream score: " + ex.Message);
             }
         }
 
@@ -580,8 +727,20 @@ namespace web_backend.Blazor.Client.Pages.Scoreboard
 
         public string GetOverlayUrl()
         {
-            var uri = NavigationManager.ToAbsoluteUri($"/scoreboard/overlay?admin=false&sport={SportType}&shape={ScoreboardShape}");
-            return uri.ToString();
+            if (_syncWithLivestream && _livestreamId.HasValue)
+            {
+                var uri = NavigationManager.ToAbsoluteUri($"/scoreboard/overlay?admin=false&livestreamId={_livestreamId}");
+                return uri.ToString();
+            }
+            
+            if (!string.IsNullOrEmpty(ScoreboardId))
+            {
+                var uri = NavigationManager.ToAbsoluteUri($"/scoreboard/overlay?admin=false&id={ScoreboardId}");
+                return uri.ToString();
+            }
+            
+            var baseUri = NavigationManager.ToAbsoluteUri("/scoreboard/overlay");
+            return $"{baseUri}?admin=false&sport={SportType}&shape={ScoreboardShape}";
         }
 
         public async Task CopyOverlayUrl()
@@ -590,10 +749,23 @@ namespace web_backend.Blazor.Client.Pages.Scoreboard
             await JSRuntime.InvokeVoidAsync("alert", "URL copied to clipboard!");
         }
 
+        public async ValueTask DisposeAsync()
+        {
+            _gameClockTimer?.Dispose();
+            _shotClockTimer?.Dispose();
+            _autoRefreshTimer?.Dispose();
+            
+            if (hubConnection != null)
+            {
+                await hubConnection.DisposeAsync();
+            }
+        }
+        
         public void Dispose()
         {
             _gameClockTimer?.Dispose();
             _shotClockTimer?.Dispose();
+            _autoRefreshTimer?.Dispose();
         }
     }
 }
