@@ -55,7 +55,8 @@ namespace web_backend
         typeof(AbpAspNetCoreMvcUiBasicThemeModule),
         typeof(AbpAccountWebOpenIddictModule),
         typeof(AbpAspNetCoreSerilogModule),
-        typeof(AbpSwashbuckleModule)
+        typeof(AbpSwashbuckleModule),
+        typeof(AbpIdentityHttpApiModule)
     )]
     public class web_backendHttpApiHostModule : AbpModule
     {
