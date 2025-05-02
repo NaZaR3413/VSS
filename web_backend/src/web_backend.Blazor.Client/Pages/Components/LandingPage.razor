@@ -16,39 +16,6 @@
                 <p class="lead">Your home for Arizona high school sports – live, on-demand, and in-depth.</p>
             </section>
 
-            @if (!string.IsNullOrEmpty(VideoUrl))
-            {
-                <!-- FEATURED GAME -->
-                <section class="vss-featured mb-5 p-4 bg-white rounded shadow-sm">
-                    <h2 class="text-start mb-4 border-bottom pb-2">Featured Game</h2>
-                    <div class="row align-items-center g-4">
-                        <div class="col-lg-7">
-                            <div class="vss-video-container position-relative">
-                                @if (IsLive)
-                                {
-                                    <span class="badge bg-danger position-absolute top-0 start-0 m-2">LIVE</span>
-                                }
-                                <video id="videoPlayer" class="vss-video-player" controls autoplay></video>
-
-                                @if (ShowPreviewOverlay)
-                                {
-                                    <div class="vss-preview-overlay d-flex flex-column justify-content-center align-items-center">
-                                        <h4>Subscribe to Watch the Full Stream</h4>
-                                        <p class="mb-3">You've reached the end of the preview.</p>
-                                        <a class="vss-auth__button" href="/account/login">Log In / Subscribe</a>
-                                    </div>
-                                }
-                            </div>
-                        </div>
-                        <div class="col-lg-5">
-                            <h3 class="fw-bold">@StreamTitle</h3>
-                            <p class="text-muted">@StreamStatusText</p>
-                            <a class="vss-auth__button" href="/livestream/@FeaturedStreamId">Watch Full Stream</a>
-                        </div>
-                    </div>
-                </section>
-            }
-
             <!-- UPCOMING GAMES -->
             <section id="livestreams" class="mb-5">
                 <h2 class="text-start mb-3">Upcoming Live Streams</h2>
