@@ -14,7 +14,7 @@
         <div class="row mb-4">
             <div class="col">
                 <h2>@game.HomeTeam vs @game.AwayTeam</h2>
-                <h4>@game.EventDate.ToLongDateString() - Final Score: @(game.HomeScore ?? 0) - @(game.AwayScore ?? 0)</h4>
+                <h4>@game.EventDate.ToLongDateString() - Final Score: @game.HomeScore - @game.AwayScore</h4>
                 <p>@game.Description</p>
                 <p><strong>Broadcasters:</strong> @game.Broadcasters</p>
             </div>

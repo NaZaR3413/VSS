@@ -1,5 +1,6 @@
 @page "/games"
 @using web_backend.Games
+@using web_backend.Enums
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Components.Authorization
 @inject IGameAppService GameService
@@ -30,20 +31,20 @@
                 </div>
                 <div class="col-md-2">
                     <div class="form-group mb-3">
-                        <label for="fromDate">From Date</label>
-                        <input type="date" class="form-control" id="fromDate" @bind="filter.FromDate" />
-                    </div>
-                </div>
-                <div class="col-md-2">
-                    <div class="form-group mb-3">
-                        <label for="toDate">To Date</label>
-                        <input type="date" class="form-control" id="toDate" @bind="filter.ToDate" />
+                        <label for="eventDate">Event Date</label>
+                        <input type="date" class="form-control" id="eventDate" @bind="filter.EventDate" />
                     </div>
                 </div>
                 <div class="col-md-2">
                     <div class="form-group mb-3">
                         <label for="eventType">Event Type</label>
-                        <input type="text" class="form-control" id="eventType" @bind="filter.EventType" placeholder="Event Type..." />
+                        <select class="form-control" id="eventType" @bind="filter.EventType">
+                            <option value="">-- All --</option>
+                            @foreach (EventType type in Enum.GetValues(typeof(EventType)))
+                            {
+                                <option value="@type">@type</option>
+                            }
+                        </select>
                     </div>
                 </div>
                 <div class="col-md-2 d-flex align-items-end">
@@ -66,7 +67,7 @@
             </a>
         </div>
     }
-    
+
     @if (loading)
     {
         <div class="text-center py-5">
@@ -100,10 +101,7 @@
                                 </div>
                                 <div class="game-info-overlay">
                                     <div class="teams">@game.HomeTeam vs @game.AwayTeam</div>
-                                    @if (game.HomeScore.HasValue && game.AwayScore.HasValue)
-                                    {
-                                        <div class="score">@game.HomeScore - @game.AwayScore</div>
-                                    }
+                                    <div class="score">@game.HomeScore - @game.AwayScore</div>
                                     <div class="date">@game.EventDate.ToString("MMM dd, yyyy")</div>
                                 </div>
                             </div>
@@ -128,11 +126,15 @@
     private bool loading = true;
     private bool isAdmin = false;
 
+    // Local date variables to use instead of FromDate/ToDate
+    private DateTime? localFromDate;
+    private DateTime? localToDate;
+
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         isAdmin = authState.User.IsInRole("admin");
-        
+
         await LoadGamesAsync();
     }
 
@@ -145,15 +147,28 @@
             if (HasAnyFilter())
             {
                 games = await GameService.GetFilteredListAsync(filter);
+
+                // Apply client-side date filtering if needed
+                if (localFromDate.HasValue || localToDate.HasValue)
+                {
+                    if (localFromDate.HasValue)
+                    {
+                        games = games.Where(g => g.EventDate >= localFromDate.Value.Date).ToList();
+                    }
+                    if (localToDate.HasValue)
+                    {
+                        games = games.Where(g => g.EventDate <= localToDate.Value.Date.AddDays(1).AddSeconds(-1)).ToList();
+                    }
+                }
             }
             else
             {
                 games = await GameService.GetListAsync();
             }
-            
+
             // Group games by event type for category-based display
             gamesByCategory = games
-                .GroupBy(g => string.IsNullOrEmpty(g.EventType) ? "Other Events" : g.EventType)
+                .GroupBy(g => g.EventType.ToString())
                 .ToDictionary(g => g.Key, g => g.ToList());
         }
         catch (Exception ex)
@@ -175,6 +190,8 @@
     private async Task ClearFilters()
     {
         filter = new GameFilterDto();
+        localFromDate = null;
+        localToDate = null;
         await LoadGamesAsync();
     }
 
@@ -182,9 +199,10 @@
     {
         return !string.IsNullOrEmpty(filter.HomeTeam) ||
                !string.IsNullOrEmpty(filter.AwayTeam) ||
-               filter.FromDate.HasValue ||
-               filter.ToDate.HasValue ||
-               !string.IsNullOrEmpty(filter.EventType);
+               filter.EventDate.HasValue ||
+               filter.EventType.HasValue ||
+               localFromDate.HasValue ||
+               localToDate.HasValue;
     }
 
     private void NavigateToGameDetails(Guid id)
@@ -199,13 +217,13 @@
         max-width: 1600px;
         margin: 0 auto;
     }
-    
+
     .filter-card {
         background-color: #f8f9fa;
         border: none;
         border-radius: 8px;
     }
-    
+
     .game-row {
         display: flex;
         flex-wrap: nowrap;
@@ -213,7 +231,7 @@
         gap: 16px;
         padding-bottom: 16px;
     }
-    
+
     .game-card {
         flex: 0 0 auto;
         width: 300px;
@@ -222,11 +240,11 @@
         border-radius: 8px;
         overflow: hidden;
     }
-    
-    .game-card:hover {
-        transform: scale(1.05);
-    }
-    
+
+        .game-card:hover {
+            transform: scale(1.05);
+        }
+
     .game-thumbnail {
         position: relative;
         height: 168px;
@@ -234,17 +252,17 @@
         border-radius: 8px;
         overflow: hidden;
     }
-    
-    .game-thumbnail::before {
-        content: "";
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.7));
-    }
-    
+
+        .game-thumbnail::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.7));
+        }
+
     .game-thumbnail-overlay {
         position: absolute;
         top: 0;
@@ -257,16 +275,16 @@
         opacity: 0;
         transition: opacity 0.3s;
     }
-    
+
     .game-card:hover .game-thumbnail-overlay {
         opacity: 1;
     }
-    
+
     .play-icon {
         font-size: 48px;
         color: white;
     }
-    
+
     .game-info-overlay {
         position: absolute;
         bottom: 0;
@@ -275,7 +293,7 @@
         padding: 10px;
         color: white;
     }
-    
+
     .game-title {
         font-weight: bold;
         margin-top: 8px;
@@ -283,20 +301,20 @@
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    
+
     .game-details {
         font-size: 14px;
         color: #6c757d;
     }
-    
+
     .teams {
         font-weight: bold;
     }
-    
+
     .score {
         font-size: 14px;
     }
-    
+
     .date {
         font-size: 12px;
         opacity: 0.8;
