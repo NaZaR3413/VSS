@@ -77,15 +77,31 @@
     }
 
 /* Profile Styling */
-.vss-profile-info-card {
-    padding: 30px;
+.vss-profile-button {
+    background-color: #13125F;
+    color: #FFFFFF;
     text-align: left;
-    margin-bottom: 30px;
+    transition: background-color 0.3s ease;
+    margin-top: 10px;
+}
+    .vss-profile-button:hover {
+        background-color: #FED700;
+        color: #13125F;
+    }
+    
+.vss-profile-info-card {
+    padding: 20px;
+    text-align: left;
+    margin-bottom: 25px;
 }
     .vss-profile-info-card .card-title {
         margin-bottom: 30px;
         font-weight: bold;
     }
+.vss-profile-info-input {
+    width: 250px;
+    margin-bottom: 10px;
+}
 .vss-profile-img
 {
     width: 120px;
