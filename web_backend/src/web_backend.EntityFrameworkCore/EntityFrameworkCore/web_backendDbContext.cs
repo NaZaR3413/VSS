@@ -14,6 +14,7 @@ using Volo.Abp.TenantManagement;
 using Volo.Abp.TenantManagement.EntityFrameworkCore;
 using web_backend.Configurations;
 using web_backend.Livestreams;
+using web_backend.Games;
 
 namespace web_backend.EntityFrameworkCore;
 
@@ -27,6 +28,7 @@ public class web_backendDbContext :
 {
     /* Add DbSet properties for your Aggregate Roots / Entities here. */
     public DbSet<Livestream> Livestreams { get; set; }
+    public DbSet<Game> Games { get; set; }
 
     #region Entities from the modules
 
@@ -79,6 +81,7 @@ public class web_backendDbContext :
 
         /* Configure your own tables/entities inside here */
         builder.ApplyConfiguration(new LivestreamConfiguration());
+        builder.ApplyConfiguration(new GameConfiguration());
 
         //builder.Entity<YourEntity>(b =>
         //{

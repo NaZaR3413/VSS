@@ -1,5 +1,8 @@
+﻿using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Volo.Abp.Application.Services;
 
@@ -8,20 +11,11 @@ namespace web_backend.Games
     public interface IGameAppService : IApplicationService
     {
         Task<GameDto> GetAsync(Guid id);
-        
-        Task<GameDto> CreateAsync(CreateUpdateGameDto input);
-        
-        Task<GameDto> UpdateAsync(Guid id, CreateUpdateGameDto input);
-        
-        Task DeleteAsync(Guid id);
-        
         Task<List<GameDto>> GetListAsync();
-        
+        Task<GameDto> CreateAsync([FromForm] CreateGameDto input);
+        Task<GameDto> UpdateAsync(Guid id, UpdateGameDto input);
+        Task DeleteAsync(Guid id);
         Task<List<GameDto>> GetFilteredListAsync(GameFilterDto input);
-        
-        // New methods for file uploads
-        Task<GameDto> UploadGameAsync(GameUploadDto input);
-        
-        Task<GameDto> UpdateGameWithVideoAsync(Guid id, GameUploadDto input);
+
     }
 }

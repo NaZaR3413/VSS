@@ -1,213 +1,261 @@
+﻿using Azure.Storage.Sas;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.EntityFrameworkCore;
-using System.IO;
+using Volo.Abp;
 using Volo.Abp.Application.Services;
-using Volo.Abp.Domain.Repositories;
-using web_backend.Services;
+using Volo.Abp.Data;
+using Volo.Abp.Domain.Entities;
+using Volo.Abp.MultiTenancy;
+using web_backend.BlobStorage;
+using web_backend.Enums;
 
 namespace web_backend.Games
 {
-    [Authorize]
     public class GameAppService : ApplicationService, IGameAppService
     {
-        private readonly IRepository<Game, Guid> _gameRepository;
-        private readonly IBlobStorageService _blobStorageService;
-        private const string GameVideosContainer = "gamevideos";
+        private readonly IGameRepository _gameRepository;
+        private readonly IDataFilter _dataFilter;
+        private readonly BlobStorageService _blobStorageService;
+        private readonly ILogger<GameAppService> _logger;
 
         public GameAppService(
-            IRepository<Game, Guid> gameRepository,
-            IBlobStorageService blobStorageService)
-        {
+            IGameRepository gameRepository,
+            IDataFilter dataFilter,
+            BlobStorageService blobStorageService,
+            ILogger<GameAppService> logger
+            ) 
+        { 
             _gameRepository = gameRepository;
+            _dataFilter = dataFilter;
             _blobStorageService = blobStorageService;
+            _logger = logger;
         }
 
+        /// <summary>
+        /// API to return a game instance
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns>this specific game instance</returns>
         public async Task<GameDto> GetAsync(Guid id)
         {
-            var game = await _gameRepository.GetAsync(id);
-            return ObjectMapper.Map<Game, GameDto>(game);
-        }
-
-        [Authorize(Roles = "admin")]
-        public async Task<GameDto> CreateAsync(CreateUpdateGameDto input)
-        {
-            var game = new Game(
-                GuidGenerator.Create(),
-                input.GameUrl ?? string.Empty,
-                input.HomeTeam,
-                input.AwayTeam,
-                input.Description,
-                input.EventDate,
-                input.EventType
-            )
+            using (_dataFilter.Disable<IMultiTenant>())
             {
-                HomeScore = input.HomeScore,
-                AwayScore = input.AwayScore,
-                Broadcasters = input.Broadcasters ?? string.Empty
-            };
+                // retrieve game information
+                var game = await _gameRepository.GetAsync(id);
 
-            await _gameRepository.InsertAsync(game);
-            
-            if (CurrentUnitOfWork != null)
-            {
-                await CurrentUnitOfWork.SaveChangesAsync();
-            }
+                // map information onto dto
+                var result = ObjectMapper.Map<Game, GameDto>(game);
 
-            return ObjectMapper.Map<Game, GameDto>(game);
-        }
+                result.PlaybackUrl = await GeneratePlaybackUrlAsync(game);
 
-        [Authorize(Roles = "admin")]
-        public async Task<GameDto> UpdateAsync(Guid id, CreateUpdateGameDto input)
-        {
-            var game = await _gameRepository.GetAsync(id);
+                return result;
 
-            game.GameUrl = input.GameUrl ?? string.Empty;
-            game.HomeTeam = input.HomeTeam;
-            game.AwayTeam = input.AwayTeam;
-            game.HomeScore = input.HomeScore;
-            game.AwayScore = input.AwayScore;
-            game.Broadcasters = input.Broadcasters ?? game.Broadcasters;
-            game.Description = input.Description;
-            game.EventDate = input.EventDate;
-            game.EventType = input.EventType;
-
-            await _gameRepository.UpdateAsync(game);
-            
-            if (CurrentUnitOfWork != null)
-            {
-                await CurrentUnitOfWork.SaveChangesAsync();
-            }
-
-            return ObjectMapper.Map<Game, GameDto>(game);
-        }
-
-        [Authorize(Roles = "admin")]
-        public async Task DeleteAsync(Guid id)
-        {
-            var game = await _gameRepository.GetAsync(id);
-
-            // If there's a video URL, attempt to delete it from blob storage
-            if (!string.IsNullOrEmpty(game.GameUrl))
-            {
-                await _blobStorageService.DeleteFileAsync(game.GameUrl);
-            }
-
-            await _gameRepository.DeleteAsync(id);
-            
-            if (CurrentUnitOfWork != null)
-            {
-                await CurrentUnitOfWork.SaveChangesAsync();
             }
         }
 
+        /// <summary>
+        /// API to return a list of all game instances
+        /// </summary>
+        /// <returns>list of all game instances</returns>
         public async Task<List<GameDto>> GetListAsync()
         {
-            var games = await _gameRepository.GetListAsync();
-            return ObjectMapper.Map<List<Game>, List<GameDto>>(games);
-        }
-
-        public async Task<List<GameDto>> GetFilteredListAsync(GameFilterDto input)
-        {
-            var query = await _gameRepository.GetQueryableAsync();
-
-            query = query.WhereIf(
-                !string.IsNullOrEmpty(input.HomeTeam),
-                g => g.HomeTeam.Contains(input.HomeTeam ?? string.Empty)
-            );
-
-            query = query.WhereIf(
-                !string.IsNullOrEmpty(input.AwayTeam),
-                g => g.AwayTeam.Contains(input.AwayTeam ?? string.Empty)
-            );
-
-            query = query.WhereIf(
-                !string.IsNullOrEmpty(input.EventType),
-                g => g.EventType.Contains(input.EventType ?? string.Empty)
-            );
-
-            query = query.WhereIf(
-                input.FromDate.HasValue,
-                g => g.EventDate >= input.FromDate!.Value
-            );
-
-            query = query.WhereIf(
-                input.ToDate.HasValue,
-                g => g.EventDate <= input.ToDate!.Value
-            );
-
-            var games = await query.ToListAsync();
-            return ObjectMapper.Map<List<Game>, List<GameDto>>(games);
-        }
-
-        [Authorize(Roles = "admin")]
-        public async Task<GameDto> UploadGameAsync(GameUploadDto input)
-        {
-            // Create a new game with the video URL
-            var game = new Game(
-                GuidGenerator.Create(),
-                input.GameVideoUrl ?? string.Empty,
-                input.HomeTeam,
-                input.AwayTeam,
-                input.Description,
-                input.EventDate,
-                input.EventType
-            )
+            using (_dataFilter.Disable<IMultiTenant>())
             {
-                HomeScore = input.HomeScore,
-                AwayScore = input.AwayScore,
-                Broadcasters = input.Broadcasters ?? string.Empty
-            };
+                // retrieve game list
+                var game = await _gameRepository.GetListAsync();
 
-            await _gameRepository.InsertAsync(game);
-            
-            if (CurrentUnitOfWork != null)
-            {
-                await CurrentUnitOfWork.SaveChangesAsync();
+                // map information onto a dto
+                var result = ObjectMapper.Map<List<Game>, List<GameDto>>(game);
+
+                return result;
             }
-
-            return ObjectMapper.Map<Game, GameDto>(game);
         }
 
-        [Authorize(Roles = "admin")]
-        public async Task<GameDto> UpdateGameWithVideoAsync(Guid id, GameUploadDto input)
+        /// <summary>
+        /// API to create a game instance and upload the associated video to Blob Storage.
+        /// </summary>
+        /// <param name="input">The game creation input including metadata and video file.</param>
+        /// <returns>The created game information.</returns>
+        public async Task<GameDto> CreateAsync([FromForm] CreateGameDto input)
         {
-            var game = await _gameRepository.GetAsync(id);
-
-            // If a new video URL is provided, delete the old URL
-            if (!string.IsNullOrEmpty(input.GameVideoUrl) && input.GameVideoUrl != game.GameUrl)
+            using (_dataFilter.Disable<IMultiTenant>())
             {
-                // Delete the old video if it exists
-                if (!string.IsNullOrEmpty(game.GameUrl))
+                if (input.VideoFile == null || input.VideoFile.Length == 0)
                 {
-                    await _blobStorageService.DeleteFileAsync(game.GameUrl);
+                    throw new UserFriendlyException("No video file uploaded.");
                 }
 
-                // Update with the new video URL
-                game.GameUrl = input.GameVideoUrl;
+                var game = new Game
+                {
+                    GameUrl = input.GameUrl,
+                    HomeTeam = input.HomeTeam,
+                    AwayTeam = input.AwayTeam,
+                    HomeScore = input.HomeScore,
+                    AwayScore = input.AwayScore,
+                    Broadcasters = input.Broadcasters,
+                    Description = input.Description,
+                    EventDate = input.EventDate,
+                    EventType = input.EventType
+                };
+
+                var created = await _gameRepository.CreateAsync(game);
+                var blobName = BlobStorageName(input.EventType, created.EventDate, created.HomeTeam, created.AwayTeam, created.Id);
+
+                try
+                {
+                    using (var stream = input.VideoFile.OpenReadStream())
+                    {
+                        await _blobStorageService.UploadAsync(blobName, stream);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Upload failed, delete the game from the DB
+                    await _gameRepository.DeleteAsync(created.Id);
+                    throw new UserFriendlyException($"Video upload failed. Game was not saved. Reason: {ex.Message}");
+                }
+                return ObjectMapper.Map<Game, GameDto>(created);
             }
-
-            // Update other properties
-            game.HomeTeam = input.HomeTeam;
-            game.AwayTeam = input.AwayTeam;
-            game.HomeScore = input.HomeScore;
-            game.AwayScore = input.AwayScore;
-            game.Broadcasters = input.Broadcasters ?? game.Broadcasters;
-            game.Description = input.Description;
-            game.EventDate = input.EventDate;
-            game.EventType = input.EventType;
-
-            await _gameRepository.UpdateAsync(game);
-            
-            if (CurrentUnitOfWork != null)
-            {
-                await CurrentUnitOfWork.SaveChangesAsync();
-            }
-
-            return ObjectMapper.Map<Game, GameDto>(game);
         }
+
+        /// <summary>
+        /// update a game instance 
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="input"> updated information for the game</param>
+        /// <returns>no specific return, updates the game instance</returns>
+        /// <exception cref="EntityNotFoundException"></exception>
+        public async Task<GameDto> UpdateAsync(Guid id, UpdateGameDto input)
+        {
+            using (_dataFilter.Disable<IMultiTenant>())
+            {
+                var game = await _gameRepository.GetAsync(id);
+                if (game == null)
+                {
+                    throw new EntityNotFoundException(typeof(Game), id);
+                }
+
+                ObjectMapper.Map(input, game);
+
+                var updatedGame = await _gameRepository.UpdateAsync(game);
+
+                var result = ObjectMapper.Map<Game, GameDto>(updatedGame);
+
+                return result;
+            }
+        }
+
+        /// <summary>
+        /// deletes a game instance 
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        /// <exception cref="EntityNotFoundException"></exception>
+        public async Task DeleteAsync(Guid id)
+        {
+            using (_dataFilter.Disable<IMultiTenant>())
+            {
+                var game = await _gameRepository.GetAsync(id);
+                if (game == null)
+                {
+                    throw new EntityNotFoundException(typeof(Game), id);
+                }
+
+                var blobName = BlobStorageName(game.EventType, game.EventDate, game.HomeTeam, game.AwayTeam, game.Id);
+                var blobClient = _blobStorageService.GetBlobClient(blobName);
+
+                var exists = await blobClient.ExistsAsync();
+                if (exists.Value)
+                {
+                    await blobClient.DeleteAsync();
+                    _logger.LogInformation("Deleted video blob: {BlobName}", blobName);
+                }
+                else
+                {
+                    _logger.LogWarning("Video blob not found during delete: {BlobName}", blobName);
+                }
+                await _gameRepository.DeleteAsync(id);
+            }
+        }
+
+        /// <summary>
+        /// Retrieves a list of games based on the provided filters.
+        /// Supports filtering by EventType, HomeTeam, AwayTeam, Broadcasters, and EventDate.
+        /// </summary>
+        /// <param name="input">
+        /// Filter parameters for querying games.
+        /// - Visit <see cref="GameFilterDto"/> for details on available filters.
+        /// - Dates should be provided in ISO 8601 format: YYYY-MM-DDTHH:MM:SS (e.g., 2025-05-01T19:30:00). or can be yyyy-MM-dd for simplicity
+        /// </param>
+        /// <returns>
+        /// A list of matching <see cref="GameDto"/> objects.
+        /// </returns>
+        public async Task<List<GameDto>> GetFilteredListAsync(GameFilterDto input)
+        {
+            using (_dataFilter.Disable<IMultiTenant>())
+            {
+                var filteredGames = await _gameRepository.GetFilteredListAsync(
+                    input.EventType,
+                    input.HomeTeam,
+                    input.AwayTeam,
+                    input.Broadcasters,
+                    input.EventDate
+                );
+
+                var result = ObjectMapper.Map<List<Game>, List<GameDto>>(filteredGames);
+
+                return result;
+            }
+        }
+
+        /// <summary>
+        /// consistent naming for all blob storage access
+        /// </summary>
+        /// <param name="eventType"></param>
+        /// <param name="gameId"></param>
+        /// <returns></returns>
+        private string BlobStorageName(EventType eventType, DateTime eventDate, string homeTeam, string awayTeam, Guid gameId)
+        {
+            var eventTypeString = eventType.ToString();
+            var dateString = eventDate.ToString("yyyy-MM-dd"); // Keep it sortable and clear
+            var matchupString = $"{homeTeam}vs{awayTeam}".Replace(" ", ""); // Remove spaces for clean filenames
+
+            return $"{dateString}/{eventTypeString}/{matchupString}/{gameId}.mp4";
+        }
+
+        private async Task<string> GeneratePlaybackUrlAsync(Game game)
+        {
+            var blobName = BlobStorageName(game.EventType, game.EventDate, game.HomeTeam, game.AwayTeam, game.Id);
+            var blobClient = _blobStorageService.GetBlobClient(blobName);
+
+            var exists = await blobClient.ExistsAsync();
+            if (!exists.Value)
+            {
+                throw new UserFriendlyException("Video file not found for this game.");
+            }
+
+            var sasBuilder = new BlobSasBuilder
+            {
+                BlobContainerName = blobClient.BlobContainerName,
+                BlobName = blobName,
+                Resource = "b", // Blob
+                ExpiresOn = DateTimeOffset.UtcNow.AddHours(6) // adjust this expiration time as needed
+            };
+            sasBuilder.SetPermissions(BlobSasPermissions.Read);
+
+            var sasUri = blobClient.GenerateSasUri(sasBuilder);
+            return sasUri.ToString();
+        }
+
+
+
+
+
+
     }
 }
