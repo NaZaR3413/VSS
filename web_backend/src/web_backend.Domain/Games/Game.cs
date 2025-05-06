@@ -19,6 +19,8 @@ namespace web_backend.Games
         public string Description { get; set; }
         public DateTime EventDate { get; set; }
         public EventType EventType { get; set; }
+
+        public string PlaybackUrl { get; set; }
         public string GameScore
         {
             get

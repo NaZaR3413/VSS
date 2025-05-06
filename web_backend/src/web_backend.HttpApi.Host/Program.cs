@@ -1,17 +1,18 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using Serilog.Events;
-using web_backend.Scoreboard;                       // Hub namespace
+using web_backend.Scoreboard;   // Hub namespace
 
 namespace web_backend;
 
 public class Program
 {
-    public async static Task<int> Main(string[] args)
+    public static async Task<int> Main(string[] args)
     {
         Log.Logger = new LoggerConfiguration()
 #if DEBUG
@@ -32,33 +33,33 @@ public class Program
 
             var builder = WebApplication.CreateBuilder(args);
 
-            builder.Host.AddAppSettingsSecretsJson()
-                         .UseAutofac()
-                         .UseSerilog();
+            /* ↓↓↓  allow large multipart bodies (1 GB) */
+            builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = 1_073_741_824);
 
-            /* ----------  Add SignalR and CORS  ---------- */
+            builder.Host
+                   .AddAppSettingsSecretsJson()
+                   .UseAutofac()
+                   .UseSerilog();
+
+            // SignalR + open CORS for OBS overlay
             builder.Services.AddSignalR();
-
             builder.Services.AddCors(options =>
             {
-                options.AddPolicy("OverlayCors", policy =>
+                options.AddPolicy("OverlayCors", p =>
                 {
-                    policy.AllowAnyHeader()
-                          .AllowAnyMethod()
-                          .AllowCredentials()
-                          .SetIsOriginAllowed(_ => true); // allow OBS browser-source
+                    p.AllowAnyHeader()
+                     .AllowAnyMethod()
+                     .AllowCredentials()
+                     .SetIsOriginAllowed(_ => true);
                 });
             });
-            /* -------------------------------------------- */
 
             await builder.AddApplicationAsync<web_backendHttpApiHostModule>();
 
             var app = builder.Build();
 
-            /* ----------  Middleware  ---------- */
             app.UseCors("OverlayCors");
             app.MapHub<ScoreboardHub>("/signalr/scoreboard");
-            /* ---------------------------------- */
 
             await app.InitializeApplicationAsync();
             await app.RunAsync();
