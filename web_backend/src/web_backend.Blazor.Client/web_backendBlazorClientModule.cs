@@ -2,11 +2,9 @@
 using System.Net.Http;
 using Blazorise.Bootstrap5;
 using Blazorise.Icons.FontAwesome;
-using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using web_backend.Blazor.Client.Menus;
 using web_backend.Blazor.Client.Services;
 using OpenIddict.Abstractions;
@@ -16,15 +14,12 @@ using Volo.Abp.Autofac.WebAssembly;
 using Volo.Abp.AutoMapper;
 using Volo.Abp.Http.Client;
 using Volo.Abp.Identity.Blazor.WebAssembly;
-using Volo.Abp.IdentityModel;
 using Volo.Abp.Modularity;
 using Volo.Abp.SettingManagement.Blazor.WebAssembly;
 using Volo.Abp.TenantManagement.Blazor.WebAssembly;
 using Volo.Abp.UI.Navigation;
 using Volo.Abp.Http.Client.IdentityModel.WebAssembly;
-using Volo.Abp.AspNetCore.Components.WebAssembly;
-using Microsoft.AspNetCore.Components.WebAssembly.Authentication;
-using Volo.Abp.AspNetCore.Components.Web;
+
 
 namespace web_backend.Blazor.Client;
 

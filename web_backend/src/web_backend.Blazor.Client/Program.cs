@@ -39,14 +39,22 @@ public class Program
             BaseAddress = new Uri(remoteServiceBaseUrl ?? builder.HostEnvironment.BaseAddress)
         });
 
-        // Configure JSON serialization options without problematic converter
-        builder.Services.Configure<JsonSerializerOptions>(options =>
+        // Fix for NullabilityInfoContext_NotSupported error
+        // Use basic JSON options without complex settings that cause issues
+        JsonSerializerOptions jsonOptions = new JsonSerializerOptions
         {
-            options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
-            options.PropertyNameCaseInsensitive = true;
-            options.NumberHandling = JsonNumberHandling.AllowReadingFromString;
-            options.ReferenceHandler = ReferenceHandler.IgnoreCycles;
-            // Removed problematic converter that was causing NullabilityInfoContext issues
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            PropertyNameCaseInsensitive = true
+        };
+
+        builder.Services.AddSingleton(jsonOptions);
+
+        // Configure global ABP options
+        builder.Services.Configure<AbpRemoteServiceOptions>(options =>
+        {
+            options.RemoteServices.Default = new RemoteServiceConfiguration(
+                remoteServiceBaseUrl ?? builder.HostEnvironment.BaseAddress
+            );
         });
 
         // Register Debug Service first
