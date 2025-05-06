@@ -21,6 +21,7 @@ using Volo.Abp.Modularity;
 using Volo.Abp.SettingManagement.Blazor.WebAssembly;
 using Volo.Abp.TenantManagement.Blazor.WebAssembly;
 using Volo.Abp.UI.Navigation;
+using Volo.Abp.Http.Client.IdentityModel.WebAssembly;
 
 namespace web_backend.Blazor.Client;
 
@@ -30,7 +31,8 @@ namespace web_backend.Blazor.Client;
     typeof(AbpAspNetCoreComponentsWebAssemblyBasicThemeModule),
     typeof(AbpIdentityBlazorWebAssemblyModule),
     typeof(AbpTenantManagementBlazorWebAssemblyModule),
-    typeof(AbpSettingManagementBlazorWebAssemblyModule)
+    typeof(AbpSettingManagementBlazorWebAssemblyModule),
+    typeof(AbpHttpClientIdentityModelWebAssemblyModule)
 )]
 public class web_backendBlazorClientModule : AbpModule
 {
@@ -41,16 +43,24 @@ public class web_backendBlazorClientModule : AbpModule
 
         // Skip explicit root component registration - we'll let Program.cs handle this
         // ConfigureRootComponents(builder);
-        
+
         ConfigureAuthentication(builder);
         ConfigureHttpClient(context, environment);
         ConfigureBlazorise(context);
         ConfigureRouter(context);
         ConfigureMenu(context);
         ConfigureAutoMapper(context);
-        
+
         // Add LivestreamStateService for real-time updates
         context.Services.AddSingleton<LivestreamStateService>();
+
+        // Ensure the application exposes the remote configuration endpoint
+        Configure<AbpRemoteServiceOptions>(options =>
+        {
+            options.RemoteServices.Default = new RemoteServiceConfiguration(
+                builder.Configuration["RemoteServices:Default:BaseUrl"] ?? environment.BaseAddress
+            );
+        });
     }
 
     // We're commenting out this method to avoid duplicate root component registration
@@ -95,11 +105,11 @@ public class web_backendBlazorClientModule : AbpModule
             options.ProviderOptions.DefaultScopes.Add("roles");
             options.ProviderOptions.DefaultScopes.Add("email");
             options.ProviderOptions.DefaultScopes.Add("phone");
-            
+
             // Make sure redirect URIs are properly set as relative paths
             options.ProviderOptions.RedirectUri = "authentication/login-callback";
             options.ProviderOptions.PostLogoutRedirectUri = "authentication/logout-callback";
-            
+
             // Ensure response type is set correctly
             options.ProviderOptions.ResponseType = "code";
         });
@@ -125,24 +135,25 @@ public class web_backendBlazorClientModule : AbpModule
         {
             BaseAddress = new Uri(remoteServiceBaseUrl)
         });
-        
+
+        // Configure the ABP HTTP clients
+        context.Services.AddHttpClientProxies(
+            typeof(web_backendHttpApiClientModule).Assembly,
+            remoteServiceBaseUrl
+        );
+
         // Configure the named HttpClients
         context.Services.AddHttpClient("AbpMvcClient", client =>
         {
             client.BaseAddress = new Uri(remoteServiceBaseUrl);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
         });
-        
+
         context.Services.AddHttpClient("API", client =>
         {
             client.BaseAddress = new Uri(remoteServiceBaseUrl);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
         });
-        
-        // Re-enable the standard identity model authentication service
-        // Previously we had disabled it with:
-        // context.Services.RemoveAll<IIdentityModelAuthenticationService>();
-        // context.Services.AddSingleton<IIdentityModelAuthenticationService, NullIdentityModelAuthenticationService>();
     }
 
     private void ConfigureAutoMapper(ServiceConfigurationContext context)
