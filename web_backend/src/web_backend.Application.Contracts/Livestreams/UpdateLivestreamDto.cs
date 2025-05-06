@@ -18,5 +18,6 @@ namespace web_backend.Livestreams
         public bool? FreeLivestream { get; set; } 
         public EventType? EventType { get; set; } 
         public StreamStatus? StreamStatus { get; set; } 
+        public DateTime? EventDate { get; set; }
     }
 }

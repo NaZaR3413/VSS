@@ -1,0 +1,760 @@
+@page "/admin/game-schedule"
+@using web_backend.Livestreams
+@using web_backend.Enums
+@using web_backend.Blazor.Client.Services
+@inject ILivestreamAppService LivestreamService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+@inject LivestreamStateService LivestreamState
+@attribute [Authorize(Roles = "admin")]
+
+<div class="container mt-4">
+    <h2 class="mb-4">Game Schedule Management</h2>
+
+    <div class="row mb-4">
+        <div class="col-12 col-md-8">
+            <div class="input-group">
+                <input type="text" class="form-control" placeholder="Search for games..." @bind="searchQuery" @bind:event="oninput" />
+                <button class="btn btn-outline-primary" type="button" @onclick="ApplyFilter">
+                    <i class="bi bi-search"></i> Search
+                </button>
+                <button class="btn btn-outline-secondary" type="button" @onclick="ClearFilter">
+                    <i class="bi bi-x-circle"></i> Clear
+                </button>
+            </div>
+        </div>
+        <div class="col-12 col-md-4 d-flex justify-content-md-end mt-3 mt-md-0">
+            <button class="btn btn-primary" @onclick="RefreshGames">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+            <button class="btn btn-success ms-2" @onclick="AddNewGame">
+                <i class="bi bi-plus-circle"></i> Add Game
+            </button>
+        </div>
+    </div>
+
+    @if (loading)
+    {
+        <div class="text-center my-5">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading game schedule...</p>
+        </div>
+    }
+    else if (filteredGames == null || !filteredGames.Any())
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            No scheduled games found. Use the "Add Game" button to create your first game schedule.
+        </div>
+    }
+    else
+    {
+        <div class="vss-schedule-controls mb-4">
+            <ul class="nav nav-tabs">
+                <li class="nav-item">
+                    <button class="nav-link @(currentView == "date" ? "active" : "")" @onclick='() => ChangeView("date")'>
+                        <i class="bi bi-calendar-date me-1"></i> By Date
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link @(currentView == "status" ? "active" : "")" @onclick='() => ChangeView("status")'>
+                        <i class="bi bi-broadcast me-1"></i> By Status
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link @(currentView == "sport" ? "active" : "")" @onclick='() => ChangeView("sport")'>
+                        <i class="bi bi-trophy me-1"></i> By Sport
+                    </button>
+                </li>
+            </ul>
+        </div>
+
+        @if (currentView == "date")
+        {
+            <div class="accordion" id="gamesByDate">
+                @foreach (var dateGroup in gamesByDate)
+                {
+                    var dateString = dateGroup.Key.ToString("yyyy-MM-dd");
+                    var displayDate = dateGroup.Key.ToString("dddd, MMMM dd, yyyy");
+                    var headerId = $"date-header-{dateString}";
+                    var collapseId = $"date-collapse-{dateString}";
+                    var games = dateGroup.ToList();
+                    var isToday = dateGroup.Key.Date == DateTime.Today;
+                    var isFutureDate = dateGroup.Key.Date > DateTime.Today;
+
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="@headerId">
+                            <button class="accordion-button @(isToday ? "" : "collapsed")"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#@collapseId"
+                                    aria-expanded="@(isToday ? "true" : "false")"
+                                    aria-controls="@collapseId">
+                                <i class="bi @(isFutureDate ? "bi-calendar-plus" : "bi-calendar-check") me-2"></i>
+                                <span>@displayDate @(isToday ? "(Today)" : "") - @games.Count games</span>
+                            </button>
+                        </h2>
+                        <div id="@collapseId" class="accordion-collapse collapse @(isToday ? "show" : "")" 
+                             aria-labelledby="@headerId" data-bs-parent="#gamesByDate">
+                            <div class="accordion-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-bordered table-striped mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Time</th>
+                                                <th>Teams</th>
+                                                <th>Sport</th>
+                                                <th>Status</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var game in games.OrderBy(g => g.EventDate.TimeOfDay))
+                                            {
+                                                <tr>
+                                                    <td>@game.EventDate.ToString("h:mm tt")</td>
+                                                    <td>@game.DisplayName</td>
+                                                    <td>
+                                                        <span class="badge @GetSportBadgeClass(game.EventType)">
+                                                            @game.EventType
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-@GetStatusColor(game.StreamStatus)">
+                                                            @game.StreamStatus
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <div class="btn-group btn-group-sm" role="group">
+                                                            <button class="btn btn-outline-primary" @onclick="() => OpenGameModal(game)">
+                                                                <i class="bi bi-pencil"></i>
+                                                            </button>
+                                                            <button class="btn btn-outline-success" @onclick="() => UpdateStatus(game.Id, StreamStatus.PendingStart)">
+                                                                <i class="bi bi-calendar-check"></i>
+                                                            </button>
+                                                            <button class="btn btn-outline-danger" @onclick="() => ConfirmDelete(game)">
+                                                                <i class="bi bi-trash"></i>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else if (currentView == "status")
+        {
+            <div class="accordion" id="gamesByStatus">
+                @foreach (var statusGroup in gamesByStatus)
+                {
+                    var statusName = statusGroup.Key.ToString();
+                    var statusColorClass = GetStatusColor(statusGroup.Key);
+                    var headerId = $"status-header-{statusName}";
+                    var collapseId = $"status-collapse-{statusName}";
+                    var games = statusGroup.ToList();
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="@headerId">
+                            <button class="accordion-button @(statusGroup.Key == StreamStatus.PendingStart ? "" : "collapsed")"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#@collapseId"
+                                    aria-expanded="@(statusGroup.Key == StreamStatus.PendingStart ? "true" : "false")"
+                                    aria-controls="@collapseId">
+                                <span class="badge bg-@statusColorClass me-2">@statusName</span>
+                                <span>@statusName Games (@games.Count)</span>
+                            </button>
+                        </h2>
+                        <div id="@collapseId" class="accordion-collapse collapse @(statusGroup.Key == StreamStatus.PendingStart ? "show" : "")" 
+                             aria-labelledby="@headerId" data-bs-parent="#gamesByStatus">
+                            <div class="accordion-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-bordered table-striped mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Date & Time</th>
+                                                <th>Teams</th>
+                                                <th>Sport</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var game in games.OrderBy(g => g.EventDate))
+                                            {
+                                                <tr>
+                                                    <td>@game.EventDate.ToString("MMM dd, yyyy h:mm tt")</td>
+                                                    <td>@game.DisplayName</td>
+                                                    <td>
+                                                        <span class="badge @GetSportBadgeClass(game.EventType)">
+                                                            @game.EventType
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <div class="btn-group btn-group-sm" role="group">
+                                                            <button class="btn btn-outline-primary" @onclick="() => OpenGameModal(game)">
+                                                                <i class="bi bi-pencil"></i>
+                                                            </button>
+                                                            @if (statusGroup.Key == StreamStatus.PendingStart)
+                                                            {
+                                                                <button class="btn btn-outline-success" @onclick="() => NavigateToCreateLivestream(game.Id)">
+                                                                    <i class="bi bi-broadcast"></i>
+                                                                </button>
+                                                            }
+                                                            <button class="btn btn-outline-danger" @onclick="() => ConfirmDelete(game)">
+                                                                <i class="bi bi-trash"></i>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else if (currentView == "sport")
+        {
+            <div class="accordion" id="gamesBySport">
+                @foreach (var sportGroup in gamesBySport)
+                {
+                    var sportName = sportGroup.Key.ToString();
+                    var headerId = $"sport-header-{sportName}";
+                    var collapseId = $"sport-collapse-{sportName}";
+                    var games = sportGroup.ToList();
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="@headerId">
+                            <button class="accordion-button collapsed"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#@collapseId"
+                                    aria-expanded="false"
+                                    aria-controls="@collapseId">
+                                <span class="badge @GetSportBadgeClass(sportGroup.Key) me-2">@sportName</span>
+                                <span>@sportName Games (@games.Count)</span>
+                            </button>
+                        </h2>
+                        <div id="@collapseId" class="accordion-collapse collapse" 
+                             aria-labelledby="@headerId" data-bs-parent="#gamesBySport">
+                            <div class="accordion-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-bordered table-striped mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Date & Time</th>
+                                                <th>Teams</th>
+                                                <th>Status</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var game in games.OrderBy(g => g.EventDate))
+                                            {
+                                                <tr>
+                                                    <td>@game.EventDate.ToString("MMM dd, yyyy h:mm tt")</td>
+                                                    <td>@game.DisplayName</td>
+                                                    <td>
+                                                        <span class="badge bg-@GetStatusColor(game.StreamStatus)">
+                                                            @game.StreamStatus
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <div class="btn-group btn-group-sm" role="group">
+                                                            <button class="btn btn-outline-primary" @onclick="() => OpenGameModal(game)">
+                                                                <i class="bi bi-pencil"></i>
+                                                            </button>
+                                                            @if (game.StreamStatus == StreamStatus.PendingStart)
+                                                            {
+                                                                <button class="btn btn-outline-success" @onclick="() => NavigateToCreateLivestream(game.Id)">
+                                                                    <i class="bi bi-broadcast"></i>
+                                                                </button>
+                                                            }
+                                                            <button class="btn btn-outline-danger" @onclick="() => ConfirmDelete(game)">
+                                                                <i class="bi bi-trash"></i>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+<!-- Game Edit Modal -->
+@if (isModalOpen)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" style="background-color: rgba(0,0,0,0.5); z-index: 1050;">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(editMode ? "Edit Game" : "Add New Game")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseGameModal"></button>
+                </div>
+                <div class="modal-body">
+                    <form @onsubmit="HandleValidSubmit">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="homeTeam" class="form-label">Home Team</label>
+                                <input id="homeTeam" type="text" class="form-control" value="@homeTeam" @onchange="@(e => homeTeam = e.Value?.ToString() ?? "")" placeholder="Home Team" required />
+                            </div>
+                            <div class="col-md-6">
+                                <label for="awayTeam" class="form-label">Away Team</label>
+                                <input id="awayTeam" type="text" class="form-control" value="@awayTeam" @onchange="@(e => awayTeam = e.Value?.ToString() ?? "")" placeholder="Away Team" required />
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="sportType" class="form-label">Sport Type</label>
+                                <select id="sportType" class="form-select" value="@eventType" @onchange="@(e => eventType = Enum.Parse<EventType>(e.Value?.ToString() ?? "Football"))">
+                                    @foreach (var sport in Enum.GetValues(typeof(EventType)))
+                                    {
+                                        <option value="@sport">@sport</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="status" class="form-label">Status</label>
+                                <select id="status" class="form-select" value="@streamStatus" @onchange="@(e => streamStatus = Enum.Parse<StreamStatus>(e.Value?.ToString() ?? "PendingStart"))">
+                                    @foreach (var status in Enum.GetValues(typeof(StreamStatus)))
+                                    {
+                                        <option value="@status">@status</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="eventDate" class="form-label">Date</label>
+                                <input id="eventDate" type="date" class="form-control" value="@eventDate.ToString("yyyy-MM-dd")" 
+                                       @onchange="@(e => UpdateDate(e.Value?.ToString()))" />
+                            </div>
+                            <div class="col-md-6">
+                                <label for="eventTime" class="form-label">Time</label>
+                                <input id="eventTime" type="time" class="form-control" value="@eventDate.ToString("HH:mm")" 
+                                       @onchange="@(e => UpdateTime(e.Value?.ToString()))" />
+                            </div>
+                        </div>
+
+                        @if (editMode && (streamStatus == StreamStatus.Live || streamStatus == StreamStatus.Completed))
+                        {
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="homeScore" class="form-label">Home Score</label>
+                                    <input id="homeScore" type="number" class="form-control" value="@homeScore" 
+                                           @onchange="@(e => homeScore = ParseInt(e.Value?.ToString(), 0))" min="0" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="awayScore" class="form-label">Away Score</label>
+                                    <input id="awayScore" type="number" class="form-control" value="@awayScore" 
+                                           @onchange="@(e => awayScore = ParseInt(e.Value?.ToString(), 0))" min="0" />
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="hlsUrl" class="form-label">HLS URL</label>
+                                <input id="hlsUrl" type="text" class="form-control" value="@hlsUrl" 
+                                       @onchange="@(e => hlsUrl = e.Value?.ToString() ?? "")" placeholder="Stream URL" />
+                            </div>
+                        }
+
+                        <hr />
+
+                        <div class="d-flex justify-content-end">
+                            <button type="button" class="btn btn-secondary me-2" @onclick="CloseGameModal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save me-1"></i> Save Game
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Delete Confirmation Modal -->
+@if (isDeleteModalOpen)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Delete</h5>
+                    <button type="button" class="btn-close" @onclick="CancelDelete"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete the game <strong>@(gameToDelete?.DisplayName)</strong> scheduled for <strong>@(gameToDelete?.EventDate.ToString("MMM dd, yyyy h:mm tt"))</strong>?</p>
+                    <p class="text-danger"><i class="bi bi-exclamation-triangle me-2"></i>This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CancelDelete">Cancel</button>
+                    <button type="button" class="btn btn-danger" @onclick="DeleteGame">
+                        <i class="bi bi-trash me-1"></i> Delete Game
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<LivestreamDto> games = new();
+    private bool loading = true;
+    private string searchQuery = "";
+    private string currentView = "date";
+
+    // Modal state
+    private bool isModalOpen = false;
+    private bool editMode = false;
+    
+    // Form fields - separated out for better control
+    private string homeTeam = "";
+    private string awayTeam = "";
+    private EventType eventType = EventType.Football;
+    private StreamStatus streamStatus = StreamStatus.PendingStart;
+    private DateTime eventDate = DateTime.Today.AddHours(18);
+    private int homeScore = 0;
+    private int awayScore = 0;
+    private string hlsUrl = "";
+    private Guid currentGameId;
+
+    // Delete confirmation
+    private bool isDeleteModalOpen = false;
+    private LivestreamDto gameToDelete = null;
+
+    private IEnumerable<LivestreamDto> filteredGames => 
+        string.IsNullOrWhiteSpace(searchQuery) 
+        ? games 
+        : games.Where(g => 
+            (g.HomeTeam?.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ?? false) || 
+            (g.AwayTeam?.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ?? false) ||
+            g.EventType.ToString().Contains(searchQuery, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<IGrouping<DateTime, LivestreamDto>> gamesByDate =>
+        filteredGames?.GroupBy(g => g.EventDate.Date)
+        .OrderBy(g => g.Key);
+
+    private IEnumerable<IGrouping<StreamStatus, LivestreamDto>> gamesByStatus =>
+        filteredGames?.GroupBy(g => g.StreamStatus)
+        .OrderBy(g => g.Key == StreamStatus.PendingStart ? 0 :
+                     g.Key == StreamStatus.AwaitingConnection ? 1 :
+                     g.Key == StreamStatus.Live ? 2 : 3);
+
+    private IEnumerable<IGrouping<EventType, LivestreamDto>> gamesBySport =>
+        filteredGames?.GroupBy(g => g.EventType)
+        .OrderBy(g => g.Key.ToString());
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadGames();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // One-time initialization
+            await JS.InvokeVoidAsync("console.log", "Game Schedule Management component initialized");
+        }
+    }
+
+    private async Task LoadGames()
+    {
+        loading = true;
+        try
+        {
+            games = await LivestreamService.GetListAsync();
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("console.error", $"Error loading games: {ex.Message}");
+            await JS.InvokeVoidAsync("alert", $"Failed to load games: {ex.Message}");
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task RefreshGames()
+    {
+        await LoadGames();
+    }
+
+    private void ChangeView(string view)
+    {
+        currentView = view;
+    }
+
+    private void ApplyFilter()
+    {
+        // Search is applied automatically via filteredGames property
+    }
+
+    private void ClearFilter()
+    {
+        searchQuery = "";
+    }
+
+    private string GetStatusColor(StreamStatus status)
+    {
+        return status switch
+        {
+            StreamStatus.Live => "success",
+            StreamStatus.PendingStart => "info",
+            StreamStatus.AwaitingConnection => "warning",
+            StreamStatus.Completed => "secondary",
+            _ => "dark"
+        };
+    }
+
+    private string GetSportBadgeClass(EventType eventType)
+    {
+        return eventType switch
+        {
+            EventType.Basketball => "bg-orange text-white",
+            EventType.Football => "bg-brown text-white",
+            EventType.Baseball => "bg-green text-white",
+            EventType.Soccer => "bg-blue text-white",
+            EventType.Volleyball => "bg-purple text-white",
+            EventType.Hockey => "bg-info text-dark",
+            EventType.Tennis => "bg-warning text-dark",
+            EventType.Softball => "bg-success text-white",
+            EventType.Lacrosse => "bg-primary text-white",
+            EventType.Rugby => "bg-danger text-white",
+            _ => "bg-secondary text-white"
+        };
+    }
+
+    private void AddNewGame()
+    {
+        // Add new game - initialize form values
+        editMode = false;
+        homeTeam = "";
+        awayTeam = "";
+        eventType = EventType.Football;
+        streamStatus = StreamStatus.PendingStart;
+        eventDate = DateTime.Today.AddHours(18); // Default to 6 PM today
+        homeScore = 0;
+        awayScore = 0;
+        hlsUrl = "";
+        
+        isModalOpen = true;
+        StateHasChanged();
+    }
+
+    private void OpenGameModal(LivestreamDto game)
+    {
+        if (game == null)
+        {
+            AddNewGame();
+            return;
+        }
+        
+        // Edit existing game - populate form values
+        editMode = true;
+        homeTeam = game.HomeTeam ?? "";
+        awayTeam = game.AwayTeam ?? "";
+        eventType = game.EventType;
+        streamStatus = game.StreamStatus;
+        eventDate = game.EventDate;
+        homeScore = game.HomeScore;
+        awayScore = game.AwayScore;
+        hlsUrl = game.HlsUrl ?? "";
+        currentGameId = game.Id;
+        
+        isModalOpen = true;
+        StateHasChanged();
+    }
+
+    private void CloseGameModal()
+    {
+        isModalOpen = false;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            if (editMode)
+            {
+                // Update existing game
+                var updateDto = new UpdateLivestreamDto
+                {
+                    HomeTeam = homeTeam,
+                    AwayTeam = awayTeam,
+                    EventType = eventType,
+                    StreamStatus = streamStatus,
+                    EventDate = eventDate,
+                    HomeScore = homeScore,
+                    AwayScore = awayScore,
+                    HlsUrl = hlsUrl
+                };
+
+                await LivestreamService.UpdateAsync(currentGameId, updateDto);
+                await JS.InvokeVoidAsync("alert", "Game updated successfully!");
+            }
+            else
+            {
+                // Create new game
+                var createDto = new CreateLivestreamDto
+                {
+                    HomeTeam = homeTeam,
+                    AwayTeam = awayTeam,
+                    EventType = eventType,
+                    StreamStatus = streamStatus,
+                    EventDate = eventDate,
+                    HomeScore = homeScore,
+                    AwayScore = awayScore,
+                    HlsUrl = hlsUrl
+                };
+
+                await LivestreamService.CreateAsync(createDto);
+                await JS.InvokeVoidAsync("alert", "Game created successfully!");
+            }
+
+            // Close modal and refresh data
+            CloseGameModal();
+            await LoadGames();
+
+            // Notify changes
+            LivestreamState?.NotifyLivestreamStatusChanged();
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error saving game: {ex.Message}");
+        }
+    }
+
+    private void UpdateDate(string dateString)
+    {
+        if (DateTime.TryParse(dateString, out DateTime newDate))
+        {
+            // Keep the time but replace the date
+            eventDate = new DateTime(
+                newDate.Year, 
+                newDate.Month, 
+                newDate.Day, 
+                eventDate.Hour, 
+                eventDate.Minute, 
+                0);
+        }
+    }
+
+    private void UpdateTime(string timeString)
+    {
+        if (TimeSpan.TryParse(timeString, out TimeSpan timeSpan))
+        {
+            // Keep the date but replace the time
+            eventDate = eventDate.Date.Add(timeSpan);
+        }
+    }
+
+    private int ParseInt(string input, int defaultValue)
+    {
+        if (int.TryParse(input, out int result))
+        {
+            return result;
+        }
+        return defaultValue;
+    }
+
+    private async Task UpdateStatus(Guid id, StreamStatus status)
+    {
+        try
+        {
+            // Get the current game to preserve its data
+            var game = games.FirstOrDefault(g => g.Id == id);
+            if (game == null)
+            {
+                throw new Exception("Game not found");
+            }
+
+            var updateDto = new UpdateLivestreamDto
+            {
+                StreamStatus = status,
+                // Preserve existing data
+                HomeScore = game.HomeScore,
+                AwayScore = game.AwayScore,
+                HomeTeam = game.HomeTeam,
+                AwayTeam = game.AwayTeam,
+                EventType = game.EventType,
+                EventDate = game.EventDate,
+                HlsUrl = game.HlsUrl
+            };
+
+            await LivestreamService.UpdateAsync(id, updateDto);
+
+            // Notify about status changes
+            LivestreamState?.NotifyLivestreamStatusChanged();
+
+            await JS.InvokeVoidAsync("alert", $"Game status updated to {status}");
+            await LoadGames();
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error updating game status: {ex.Message}");
+        }
+    }
+
+    private void ConfirmDelete(LivestreamDto game)
+    {
+        gameToDelete = game;
+        isDeleteModalOpen = true;
+    }
+
+    private void CancelDelete()
+    {
+        gameToDelete = null;
+        isDeleteModalOpen = false;
+    }
+
+    private async Task DeleteGame()
+    {
+        try
+        {
+            if (gameToDelete != null)
+            {
+                await LivestreamService.DeleteAsync(gameToDelete.Id);
+                await JS.InvokeVoidAsync("alert", "Game deleted successfully!");
+                
+                // Close modal and refresh
+                CancelDelete();
+                await LoadGames();
+
+                // Notify about changes
+                LivestreamState?.NotifyLivestreamStatusChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error deleting game: {ex.Message}");
+        }
+    }
+
+    private void NavigateToCreateLivestream(Guid id)
+    {
+        // Navigate to the livestream creation page with the game ID
+        NavigationManager.NavigateTo($"/admin/create-livestream?gameId={id}");
+    }
+}

@@ -92,6 +92,19 @@ public class web_backendMenuContributor : IMenuContributor
                         l["Menu:GameTimes"],
                         "/admin/gametimes"
                     )
+                ).AddItem(
+                    new ApplicationMenuItem(
+                        "Admin.Scoreboards",
+                        l["Menu:Scoreboards"],
+                        "/admin/scoreboards"
+                    )
+                ).AddItem(
+                    new ApplicationMenuItem(
+                        "Admin.ManageScoreboard",
+                        l["Menu:ManageScoreboard"],
+                        "/admin/manage-scoreboard",
+                        icon: "fas fa-stopwatch"
+                    )
                 )
             );
         }
