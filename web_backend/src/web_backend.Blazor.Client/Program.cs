@@ -8,6 +8,11 @@ using Microsoft.JSInterop;
 using web_backend.Blazor.Client.Services;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Volo.Abp.AspNetCore.Components.WebAssembly;
+using Volo.Abp.Modularity;
+using Volo.Abp.AutoMapper;
+using Volo.Abp.Http.Client;
+using Volo.Abp.Http.Client.IdentityModel;
 
 namespace web_backend.Blazor.Client;
 
@@ -34,14 +39,13 @@ public class Program
             BaseAddress = new Uri(remoteServiceBaseUrl ?? builder.HostEnvironment.BaseAddress)
         });
 
-        // Fix for NullabilityInfoContext issues in .NET 8
-        // Configure JSON serialization options directly
         builder.Services.Configure<JsonSerializerOptions>(options =>
         {
             options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
             options.PropertyNameCaseInsensitive = true;
             options.NumberHandling = JsonNumberHandling.AllowReadingFromString;
             options.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+            options.Converters.Add(new NullableTypeConverterFactory());
         });
 
         // Register Debug Service first
@@ -63,6 +67,7 @@ public class Program
 
         try
         {
+            // Initialize the application
             await application.InitializeApplicationAsync(host.Services);
             await jsRuntime.InvokeVoidAsync("console.log", "Application initialized successfully");
         }
@@ -73,6 +78,13 @@ public class Program
             if (ex.InnerException != null)
             {
                 await jsRuntime.InvokeVoidAsync("console.error", $"Inner exception: {ex.InnerException.Message}");
+
+                // Log the stack trace for debugging in production
+                await jsRuntime.InvokeVoidAsync("console.error", $"Stack trace: {ex.StackTrace}");
+                if (ex.InnerException.StackTrace != null)
+                {
+                    await jsRuntime.InvokeVoidAsync("console.error", $"Inner stack trace: {ex.InnerException.StackTrace}");
+                }
             }
         }
 
@@ -87,6 +99,7 @@ public class Program
             if (ex.InnerException != null)
             {
                 await jsRuntime.InvokeVoidAsync("console.error", $"Inner exception: {ex.InnerException.Message}");
+                await jsRuntime.InvokeVoidAsync("console.error", $"Stack trace: {ex.StackTrace}");
             }
         }
     }

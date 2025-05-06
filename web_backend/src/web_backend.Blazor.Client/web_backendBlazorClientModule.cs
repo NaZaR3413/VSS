@@ -22,6 +22,9 @@ using Volo.Abp.SettingManagement.Blazor.WebAssembly;
 using Volo.Abp.TenantManagement.Blazor.WebAssembly;
 using Volo.Abp.UI.Navigation;
 using Volo.Abp.Http.Client.IdentityModel.WebAssembly;
+using Volo.Abp.AspNetCore.Components.WebAssembly;
+using Microsoft.AspNetCore.Components.WebAssembly.Authentication;
+using Volo.Abp.AspNetCore.Components.Web;
 
 namespace web_backend.Blazor.Client;
 
@@ -36,13 +39,16 @@ namespace web_backend.Blazor.Client;
 )]
 public class web_backendBlazorClientModule : AbpModule
 {
+    public override void PreConfigureServices(ServiceConfigurationContext context)
+    {
+        // Skip setting application configuration path at this level
+        // We'll define it directly in the appsettings.json file instead
+    }
+
     public override void ConfigureServices(ServiceConfigurationContext context)
     {
         var environment = context.Services.GetSingletonInstance<IWebAssemblyHostEnvironment>();
         var builder = context.Services.GetSingletonInstance<WebAssemblyHostBuilder>();
-
-        // Skip explicit root component registration - we'll let Program.cs handle this
-        // ConfigureRootComponents(builder);
 
         ConfigureAuthentication(builder);
         ConfigureHttpClient(context, environment);
@@ -62,12 +68,6 @@ public class web_backendBlazorClientModule : AbpModule
             );
         });
     }
-
-    // We're commenting out this method to avoid duplicate root component registration
-    // private void ConfigureRootComponents(WebAssemblyHostBuilder builder)
-    // {
-    //     builder.RootComponents.Add<App>("#app");
-    // }
 
     private void ConfigureRouter(ServiceConfigurationContext context)
     {
@@ -105,6 +105,7 @@ public class web_backendBlazorClientModule : AbpModule
             options.ProviderOptions.DefaultScopes.Add("roles");
             options.ProviderOptions.DefaultScopes.Add("email");
             options.ProviderOptions.DefaultScopes.Add("phone");
+            options.ProviderOptions.DefaultScopes.Add("profile");
 
             // Make sure redirect URIs are properly set as relative paths
             options.ProviderOptions.RedirectUri = "authentication/login-callback";
@@ -115,7 +116,7 @@ public class web_backendBlazorClientModule : AbpModule
         });
     }
 
-    private static void ConfigureHttpClient(ServiceConfigurationContext context, IWebAssemblyHostEnvironment environment)
+    private void ConfigureHttpClient(ServiceConfigurationContext context, IWebAssemblyHostEnvironment environment)
     {
         var configuration = context.Services.GetSingletonInstance<IConfiguration>();
         var remoteServiceBaseUrl = configuration
@@ -142,17 +143,32 @@ public class web_backendBlazorClientModule : AbpModule
             remoteServiceBaseUrl
         );
 
+        // Configure HTTP client settings - now using non-static method
+        Configure<AbpHttpClientOptions>(options =>
+        {
+            // Configure HTTP client options here if needed
+        });
+
         // Configure the named HttpClients
+        context.Services.AddHttpClient("Default", client =>
+        {
+            client.BaseAddress = new Uri(remoteServiceBaseUrl);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+            client.Timeout = TimeSpan.FromMinutes(2);
+        });
+
         context.Services.AddHttpClient("AbpMvcClient", client =>
         {
             client.BaseAddress = new Uri(remoteServiceBaseUrl);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
+            client.Timeout = TimeSpan.FromMinutes(2);
         });
 
         context.Services.AddHttpClient("API", client =>
         {
             client.BaseAddress = new Uri(remoteServiceBaseUrl);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
+            client.Timeout = TimeSpan.FromMinutes(2);
         });
     }
 
