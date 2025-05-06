@@ -59,14 +59,6 @@ public class web_backendBlazorClientModule : AbpModule
 
         // Add LivestreamStateService for real-time updates
         context.Services.AddSingleton<LivestreamStateService>();
-
-        // Ensure the application exposes the remote configuration endpoint
-        Configure<AbpRemoteServiceOptions>(options =>
-        {
-            options.RemoteServices.Default = new RemoteServiceConfiguration(
-                builder.Configuration["RemoteServices:Default:BaseUrl"] ?? environment.BaseAddress
-            );
-        });
     }
 
     private void ConfigureRouter(ServiceConfigurationContext context)
@@ -137,13 +129,19 @@ public class web_backendBlazorClientModule : AbpModule
             BaseAddress = new Uri(remoteServiceBaseUrl)
         });
 
+        // Configure AbpRemoteServiceOptions with proper API settings
+        Configure<AbpRemoteServiceOptions>(options =>
+        {
+            options.RemoteServices.Default = new RemoteServiceConfiguration(remoteServiceBaseUrl);
+        });
+
         // Configure the ABP HTTP clients
         context.Services.AddHttpClientProxies(
             typeof(web_backendHttpApiClientModule).Assembly,
             remoteServiceBaseUrl
         );
 
-        // Configure HTTP client settings - now using non-static method
+        // Configure HTTP client settings
         Configure<AbpHttpClientOptions>(options =>
         {
             // Configure HTTP client options here if needed

@@ -39,13 +39,14 @@ public class Program
             BaseAddress = new Uri(remoteServiceBaseUrl ?? builder.HostEnvironment.BaseAddress)
         });
 
+        // Configure JSON serialization options without problematic converter
         builder.Services.Configure<JsonSerializerOptions>(options =>
         {
             options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
             options.PropertyNameCaseInsensitive = true;
             options.NumberHandling = JsonNumberHandling.AllowReadingFromString;
             options.ReferenceHandler = ReferenceHandler.IgnoreCycles;
-            options.Converters.Add(new NullableTypeConverterFactory());
+            // Removed problematic converter that was causing NullabilityInfoContext issues
         });
 
         // Register Debug Service first
@@ -78,8 +79,6 @@ public class Program
             if (ex.InnerException != null)
             {
                 await jsRuntime.InvokeVoidAsync("console.error", $"Inner exception: {ex.InnerException.Message}");
-
-                // Log the stack trace for debugging in production
                 await jsRuntime.InvokeVoidAsync("console.error", $"Stack trace: {ex.StackTrace}");
                 if (ex.InnerException.StackTrace != null)
                 {
