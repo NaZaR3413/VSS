@@ -7,92 +7,189 @@
 @attribute [Authorize(Roles = "admin")]
 
 <div class="container mt-4">
-    <h2>Create Livestream</h2>
+    <div class="vss-page-title mb-4">
+        <h2><i class="bi bi-broadcast me-2"></i> Create Livestream</h2>
+        <p class="text-muted">Set up a new livestream event for broadcasting</p>
+    </div>
 
-    <EditForm Model="@newLivestream" OnValidSubmit="GenerateLivestreamKey">
-        <DataAnnotationsValidator />
-        <Microsoft.AspNetCore.Components.Forms.ValidationSummary />
+    <div class="row">
+        <div class="col-lg-8">
+            <EditForm Model="@newLivestream" OnValidSubmit="GenerateLivestreamKey" class="vss-create-livestream-form">
+                <DataAnnotationsValidator />
+                <Microsoft.AspNetCore.Components.Forms.ValidationSummary />
 
-        <div class="card mb-4">
-            <div class="card-header">Event Details</div>
-            <div class="card-body">
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label for="homeTeam" class="form-label">Home Team</label>
-                        <InputText id="homeTeam" class="form-control" @bind-Value="newLivestream.HomeTeam" required />
+                <div class="card vss-form-card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Event Details</h5>
                     </div>
-                    <div class="col-md-6">
-                        <label for="awayTeam" class="form-label">Away Team</label>
-                        <InputText id="awayTeam" class="form-control" @bind-Value="newLivestream.AwayTeam" required />
+                    <div class="card-body">
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="form-floating mb-3 mb-md-0">
+                                    <InputText id="homeTeam" class="form-control" @bind-Value="newLivestream.HomeTeam" placeholder="Home Team" required />
+                                    <label for="homeTeam">Home Team</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-floating">
+                                    <InputText id="awayTeam" class="form-control" @bind-Value="newLivestream.AwayTeam" placeholder="Away Team" required />
+                                    <label for="awayTeam">Away Team</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="eventType" class="form-label">Sport Type</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-trophy"></i></span>
+                                    <InputSelect id="eventType" class="form-select" @bind-Value="newLivestream.EventType">
+                                        @foreach (var eventType in Enum.GetValues(typeof(EventType)))
+                                        {
+                                            <option value="@eventType">@eventType</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="eventDate" class="form-label">Event Date & Time</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-calendar-event"></i></span>
+                                    <InputDate id="eventDate" class="form-control" @bind-Value="newLivestream.EventDate" />
+                                </div>
+                                <small class="form-text text-muted">Select the date and time when the game will begin</small>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label for="eventType" class="form-label">Event Type</label>
-                        <InputSelect id="eventType" class="form-control" @bind-Value="newLivestream.EventType">
-                            @foreach (var eventType in Enum.GetValues(typeof(EventType)))
-                            {
-                                <option value="@eventType">@eventType</option>
-                            }
-                        </InputSelect>
-                    </div>
-                    <div class="col-md-6">
-                        <label for="eventDate" class="form-label">Event Date & Time</label>
-                        <InputDate id="eventDate" class="form-control" @bind-Value="newLivestream.EventDate" />
-                    </div>
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end mb-4">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="bi bi-play-circle me-2"></i>Generate Livestream Key
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card vss-info-card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-question-circle me-2"></i>How to Stream</h5>
+                </div>
+                <div class="card-body">
+                    <ol class="vss-streaming-steps">
+                        <li>
+                            <strong>Create Event</strong>
+                            <p>Fill out the event details and generate a stream key</p>
+                        </li>
+                        <li>
+                            <strong>Set Up OBS Studio</strong>
+                            <p>Open OBS and navigate to Settings > Stream</p>
+                        </li>
+                        <li>
+                            <strong>Configure Stream</strong>
+                            <p>Select "Custom" as service and use:</p>
+                            <code>rtmp://localhost:1935/live</code>
+                        </li>
+                        <li>
+                            <strong>Enter Stream Key</strong>
+                            <p>Paste the generated stream key and click "Start Streaming"</p>
+                        </li>
+                    </ol>
                 </div>
             </div>
         </div>
-
-        <div class="d-grid gap-2 d-md-flex justify-content-md-end mb-4">
-            <button type="submit" class="btn btn-primary">Generate Livestream Key</button>
-        </div>
-    </EditForm>
+    </div>
 
     @if (livestreamCreated)
     {
-        <div class="card mb-4">
-            <div class="card-header bg-success text-white">Livestream Generated Successfully</div>
-            <div class="card-body">
-                <h5 class="card-title">Livestream Details</h5>
-                <div class="mb-3">
-                    <label class="form-label">Stream Key (Copy this to input into OBS Stream Key):</label>
-                    <div class="input-group">
-                        <input type="text" readonly class="form-control" value="@streamKey" id="streamKeyInput">
-                        <button class="btn btn-outline-secondary" type="button" @onclick="CopyStreamKey">Copy</button>
-                    </div>
-                    <small class="form-text text-muted">Use this key in OBS to start streaming.</small>
+        <div class="vss-success-container">
+            <div class="card vss-livestream-success-card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-check-circle me-2"></i>Livestream Generated Successfully</h5>
                 </div>
-
-                <div class="mb-3">
-                    <label class="form-label">Livestream URL (Copy this to share with other people):</label>
-                    <div class="input-group">
-                        <input type="text" readonly class="form-control" value="@livestreamUrl" id="livestreamUrlInput">
-                        <button class="btn btn-outline-secondary" type="button" @onclick="CopyLivestreamUrl">Copy</button>
-                    </div>
-                </div>
-
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" id="streamActiveSwitch" @bind="isStreamActive" />
-                            <label class="form-check-label" for="streamActiveSwitch">Stream Active</label>
+                <div class="card-body">
+                    <div class="row align-items-center mb-4">
+                        <div class="col-md-8">
+                            <h4 class="mb-3">Stream Details for: @newLivestream.HomeTeam vs @newLivestream.AwayTeam</h4>
+                            <p class="text-muted">
+                                <i class="bi bi-calendar3 me-2"></i>@newLivestream.EventDate.ToString("dddd, MMMM d, yyyy at h:mm tt")
+                            </p>
+                        </div>
+                        <div class="col-md-4 text-md-end">
+                            <span class="vss-status-badge badge bg-@statusColor">
+                                <i class="bi bi-broadcast me-1"></i>@currentStatus
+                            </span>
                         </div>
                     </div>
-                    <div class="col-md-6 text-end">
-                        <span class="badge bg-@statusColor">@currentStatus</span>
-                    </div>
-                </div>
 
-                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                    <button class="btn btn-success" @onclick="ViewLivestream">View Livestream</button>
+                    <div class="vss-stream-details">
+                        <div class="vss-stream-detail-item mb-3">
+                            <label class="form-label"><i class="bi bi-key me-2"></i>Stream Key (Copy this to OBS):</label>
+                            <div class="input-group input-group-lg">
+                                <input type="text" readonly class="form-control" value="@streamKey" id="streamKeyInput">
+                                <button class="btn btn-outline-primary" type="button" @onclick="CopyStreamKey">
+                                    <i class="bi bi-clipboard me-1"></i>Copy
+                                </button>
+                            </div>
+                            <small class="form-text text-muted">Use this key in OBS to start streaming.</small>
+                        </div>
+
+                        <div class="vss-stream-detail-item mb-3">
+                            <label class="form-label"><i class="bi bi-link-45deg me-2"></i>RTMP Server URL:</label>
+                            <div class="input-group input-group-lg">
+                                <input type="text" readonly class="form-control" value="rtmp://localhost:1935/live" id="rtmpUrlInput">
+                                <button class="btn btn-outline-primary" type="button" @onclick="CopyRtmpUrl">
+                                    <i class="bi bi-clipboard me-1"></i>Copy
+                                </button>
+                            </div>
+                            <small class="form-text text-muted">Server address to enter in OBS.</small>
+                        </div>
+
+                        <div class="vss-stream-detail-item mb-3">
+                            <label class="form-label"><i class="bi bi-share me-2"></i>Livestream URL (Share this):</label>
+                            <div class="input-group input-group-lg">
+                                <input type="text" readonly class="form-control" value="@livestreamUrl" id="livestreamUrlInput">
+                                <button class="btn btn-outline-primary" type="button" @onclick="CopyLivestreamUrl">
+                                    <i class="bi bi-clipboard me-1"></i>Copy
+                                </button>
+                            </div>
+                            <small class="form-text text-muted">Share this URL with viewers to watch the stream.</small>
+                        </div>
+                    </div>
+
+                    <div class="card vss-stream-control-card mb-3">
+                        <div class="card-body">
+                            <div class="row align-items-center">
+                                <div class="col-md-6">
+                                    <h5 class="mb-0"><i class="bi bi-broadcast me-2"></i>Stream Control</h5>
+                                </div>
+                                <div class="col-md-6 d-flex justify-content-end">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" 
+                                               id="streamActiveSwitch" @bind="isStreamActive" />
+                                        <label class="form-check-label fw-bold" for="streamActiveSwitch">
+                                            @(isStreamActive ? "Stream Active" : "Stream Inactive")
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <button class="btn btn-outline-primary" @onclick="() => livestreamCreated = false">
+                            <i class="bi bi-arrow-left me-1"></i>Create Another
+                        </button>
+                        <button class="btn btn-success btn-lg" @onclick="ViewLivestream">
+                            <i class="bi bi-display me-1"></i>View Livestream
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
     }
 </div>
-
 
 @code {
     private CreateLivestreamDto newLivestream = new()

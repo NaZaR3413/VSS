@@ -13,67 +13,107 @@
             <!-- HERO SECTION -->
             <section class="vss-hero text-center mb-5">
                 <h1 class="display-4 fw-bold">Varsity Sports Show</h1>
-                <p class="lead">Your home for Arizona high school sports – live, on-demand, and in-depth.</p>
+                <p class="lead">Your home for high school and college sports – live, on-demand, and in-depth.</p>
             </section>
 
             <!-- UPCOMING GAMES -->
             <section id="livestreams" class="mb-5">
                 <h2 class="text-start mb-3">Upcoming Live Streams</h2>
                 <div class="row row-cols-1 row-cols-md-2 g-4">
-                    <div class="col">
-                        <div class="vss-livestream-item">
-                            <h2>Chandler Wolves vs. Hamilton Huskies</h2>
-                            <p>Sat, 4/10 @@ 6:00 PM</p>
-                            <a class="vss-auth__button" href="/livestreams/chandler-vs-hamilton">Watch Live</a>
+                    @if (upcomingGames != null && upcomingGames.Any())
+                    {
+                        @foreach (var game in upcomingGames)
+                        {
+                            <div class="col">
+                                <div class="vss-livestream-item">
+                                    <h2>@game.HomeTeam vs. @game.AwayTeam</h2>
+                                    <p>@game.EventDate.ToString("ddd, M/d") at @game.EventDate.ToString("h:mm tt")</p>
+                                    <a class="vss-auth__button" href="/livestream/@game.Id">Watch Live</a>
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="col">
+                            <div class="vss-livestream-item">
+                                <h2>No upcoming games scheduled</h2>
+                                <p>Check back soon for new game announcements</p>
+                            </div>
                         </div>
-                    </div>
-                    <div class="col">
-                        <div class="vss-livestream-item">
-                            <h2>Saguaro Sabercats vs. Basha Bears</h2>
-                            <p>Sun, 4/11 @@ 5:30 PM</p>
-                            <a class="vss-auth__button" href="/livestreams/saguaro-vs-basha">Watch Live</a>
-                        </div>
-                    </div>
+                    }
                 </div>
             </section>
 
             <!-- SCORES SECTION -->
             <section class="mb-5">
                 <h2 class="text-start mb-3">Recent Scores</h2>
-                <div class="row row-cols-1 row-cols-md-2 g-3">
-                    <div class="col">
-                        <div class="vss-score-card">
-                            <p class="mb-1"><strong>Mesquite 35</strong> - 27 Higley</p>
-                            <p class="text-muted mb-0">Final - April 5</p>
+                <div class="row row-cols-1 row-cols-md-2 g-4">
+                    @if (recentScores != null && recentScores.Any())
+                    {
+                        @foreach (var game in recentScores)
+                        {
+                            <div class="col">
+                                <div class="vss-score-card">
+                                    <div class="vss-score-card-header">
+                                        <span class="vss-score-date">@game.EventDate.ToString("MMM d, yyyy")</span>
+                                        <span class="vss-score-badge">@game.EventType</span>
+                                    </div>
+                                    <div class="vss-score-teams">
+                                        <div class="vss-score-team @(game.HomeScore > game.AwayScore ? "vss-score-winner" : "")">
+                                            <div class="vss-team-name">@game.HomeTeam</div>
+                                            <div class="vss-team-score">@game.HomeScore</div>
+                                        </div>
+                                        <div class="vss-score-divider">
+                                            <span>VS</span>
+                                        </div>
+                                        <div class="vss-score-team @(game.AwayScore > game.HomeScore ? "vss-score-winner" : "")">
+                                            <div class="vss-team-name">@game.AwayTeam</div>
+                                            <div class="vss-team-score">@game.AwayScore</div>
+                                        </div>
+                                    </div>
+                                    <div class="vss-score-footer">
+                                        <span class="vss-score-status">Final</span>
+                                        <a href="/livestream/@game.Id" class="vss-score-replay-link">
+                                            <i class="bi bi-play-circle"></i> Watch Replay
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="col-12">
+                            <div class="vss-empty-scores">
+                                <div class="vss-empty-scores-icon">
+                                    <i class="bi bi-calendar2-x"></i>
+                                </div>
+                                <h4>No Recent Games</h4>
+                                <p>Check back soon for game results and highlights</p>
+                            </div>
                         </div>
-                    </div>
-                    <div class="col">
-                        <div class="vss-score-card">
-                            <p class="mb-1"><strong>Centennial 24</strong> - 30 Liberty</p>
-                            <p class="text-muted mb-0">Final - April 5</p>
-                        </div>
-                    </div>
+                    }
                 </div>
             </section>
 
-            <!-- NEWS + ARTICLES -->
+            <!-- SOCIAL MEDIA SECTION -->
             <section class="mb-5">
-                <h2 class="text-start mb-3">Latest News</h2>
-                <div class="row row-cols-1 row-cols-md-2 g-4">
-                    <div class="col">
-                        <div class="vss-news-card">
-                            <h5>Top 10 Plays of the Week</h5>
-                            <p class="text-muted">April 6, 2025</p>
-                            <p>Relive the best touchdowns, buzzer-beaters, and highlight reels from this week's action across Arizona high school sports.</p>
-                            <a class="vss-auth__link" href="/news/top-plays">Read More →</a>
-                        </div>
-                    </div>
-                    <div class="col">
-                        <div class="vss-news-card">
-                            <h5>Power Rankings: Week 4</h5>
-                            <p class="text-muted">April 6, 2025</p>
-                            <p>Who's rising, who's falling? See where your team stands in the latest rankings from our VSS analysts.</p>
-                            <a class="vss-auth__link" href="/news/power-rankings">Read More →</a>
+                <h2 class="text-start mb-3">Follow Us on Instagram</h2>
+                <div class="row">
+                    <div class="col-12">
+                        <div class="vss-social-card p-3 bg-white rounded shadow-sm">
+                            <div style="height: 600px; overflow: hidden;">
+                                <iframe 
+                                    src="https://www.instagram.com/varsitysportsshow/embed" 
+                                    allowtransparency="true" 
+                                    allowfullscreen="true" 
+                                    scrolling="no" 
+                                    frameborder="0"
+                                    style="width: 100%; height: 100%; border: none; overflow: hidden;"
+                                    allow="encrypted-media;">
+                                </iframe>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -91,11 +131,15 @@
 
     private bool shouldInitializeVideoPlayer = false;
     private bool ShowPreviewOverlay = false;
+    private List<LivestreamDto> upcomingGames = new List<LivestreamDto>();
+    private List<LivestreamDto> recentScores = new List<LivestreamDto>();
 
     protected override async Task OnInitializedAsync()
     {
         Console.WriteLine("Initializing landing page...");
         await LoadFeaturedStreamAsync();
+        await LoadUpcomingGamesAsync();
+        await LoadRecentScoresAsync();
         Console.WriteLine($"Finished loading stream. URL: {VideoUrl}");
 
         if (!string.IsNullOrEmpty(VideoUrl))
@@ -196,6 +240,54 @@
         {
             await JS.InvokeVoidAsync("console.error", $"Error loading featured stream: {ex.Message}");
             StreamTitle = "Error loading featured stream.";
+        }
+    }
+
+    private async Task LoadUpcomingGamesAsync()
+    {
+        try
+        {
+            // Get all livestreams
+            List<LivestreamDto> allStreams = await LivestreamService.GetListAsync();
+            
+            // Filter for pending/upcoming games only (not live, not completed)
+            var currentDate = DateTime.Now;
+            upcomingGames = allStreams
+                .Where(s => (s.StreamStatus == StreamStatus.PendingStart || s.StreamStatus == StreamStatus.AwaitingConnection) 
+                       && s.EventDate > currentDate)
+                .OrderBy(s => s.EventDate)
+                .Take(2)  // Get the 2 closest upcoming games
+                .ToList();
+            
+            await JS.InvokeVoidAsync("console.log", $"Found {upcomingGames.Count} upcoming games");
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("console.error", $"Error loading upcoming games: {ex.Message}");
+            upcomingGames = new List<LivestreamDto>();
+        }
+    }
+
+    private async Task LoadRecentScoresAsync()
+    {
+        try
+        {
+            // Get all livestreams
+            List<LivestreamDto> allStreams = await LivestreamService.GetListAsync();
+            
+            // Filter for completed games with scores
+            recentScores = allStreams
+                .Where(s => s.StreamStatus == StreamStatus.Completed)
+                .OrderByDescending(s => s.EventDate)
+                .Take(2)  // Get the 2 most recent completed games
+                .ToList();
+            
+            await JS.InvokeVoidAsync("console.log", $"Found {recentScores.Count} recent scores");
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("console.error", $"Error loading recent scores: {ex.Message}");
+            recentScores = new List<LivestreamDto>();
         }
     }
 

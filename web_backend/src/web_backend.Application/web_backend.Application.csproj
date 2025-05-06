@@ -23,6 +23,9 @@
     <PackageReference Include="Volo.Abp.TenantManagement.Application" Version="8.3.1" />
     <PackageReference Include="Volo.Abp.FeatureManagement.Application" Version="8.3.1" />
     <PackageReference Include="Volo.Abp.SettingManagement.Application" Version="8.3.1" />
+	  <PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.3.0" />
+	  <PackageReference Include="Microsoft.AspNetCore.SignalR.Core" Version="1.2.0" />
+	  <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.4" />
   </ItemGroup>
 
 </Project>

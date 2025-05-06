@@ -18,6 +18,9 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.4" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.4" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
+		<PackageReference Include="Microsoft.AspNetCore.SignalR" Version="1.2.0" />
+		<PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="9.0.4" />
+		<PackageReference Include="System.Net.Http.Json" Version="9.0.4" />
   </ItemGroup>
 
   <ItemGroup>
@@ -37,6 +40,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\web_backend.HttpApi.Client\web_backend.HttpApi.Client.csproj" />
 	<ProjectReference Include="..\web_backend.Domain.Shared\web_backend.Domain.Shared.csproj" />
+	<ProjectReference Include="..\web_backend.Application.Contracts\web_backend.Application.Contracts.csproj" />
   </ItemGroup>
 
 </Project>
