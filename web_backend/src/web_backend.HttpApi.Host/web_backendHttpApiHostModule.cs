@@ -41,6 +41,8 @@ using Microsoft.AspNetCore.CookiePolicy;
 using AbpIdentityUser = Volo.Abp.Identity.IdentityUser;
 using Volo.Abp.BlobStoring;
 using Volo.Abp.BlobStoring.Azure;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 
 namespace web_backend
 {
@@ -55,7 +57,7 @@ namespace web_backend
         typeof(AbpAspNetCoreSerilogModule),
         typeof(AbpSwashbuckleModule),
         typeof(AbpIdentityHttpApiModule),
-        typeof(AbpBlobStoringAzureModule)                  //  <- Azure Blob Storage
+        typeof(AbpBlobStoringAzureModule)             // Azure Blob Storage
     )]
     public class web_backendHttpApiHostModule : AbpModule
     {
@@ -126,23 +128,7 @@ namespace web_backend
             ConfigureCors(ctx, cfg);
             ConfigureSwaggerServices(ctx, cfg);
             ConfigureHttpClients(ctx);
-            ConfigureBlobStorage(cfg);                     //  <- Azure blob
-        }
-
-        /* ---------- Azure Blob ---------- */
-        private void ConfigureBlobStorage(IConfiguration cfg)
-        {
-            Configure<AbpBlobStoringOptions>(o =>
-            {
-                o.Containers.ConfigureDefault(c =>
-                {
-                    c.UseAzure(az =>
-                    {
-                        az.ConnectionString = cfg["Storage:ConnectionString"];
-                        az.ContainerName = "videos";
-                    });
-                });
-            });
+            ConfigureAzureBlobStorage(ctx, cfg);          //  <- pass both ctx & cfg
         }
 
         /* ---------- Auth ---------- */
@@ -244,7 +230,7 @@ namespace web_backend
                     var origins = cfg["App:CorsOrigins"]?
                         .Split(',', StringSplitOptions.RemoveEmptyEntries)
                         .Select(x => x.RemovePostFix("/"))
-                        .Append("https://salmon‑glacier‑08dca301e.6.azurestaticapps.net") // ← explicit
+                        .Append("https://salmon‑glacier‑08dca301e.6.azurestaticapps.net")
                         .ToArray() ?? Array.Empty<string>();
 
                     b.WithOrigins(origins)
@@ -257,7 +243,32 @@ namespace web_backend
             });
         }
 
+        /* ---------- Azure Blob ---------- */
 
+        private void ConfigureAzureBlobStorage(
+            ServiceConfigurationContext ctx,
+            IConfiguration cfg)
+        {
+            var conn = cfg["Storage:ConnectionString"];
+
+            // SDK client (optional – useful for your own code)
+            ctx.Services.AddSingleton(_ => new BlobServiceClient(conn));
+
+            // ABP blob‑storing
+            ctx.Services.Configure<AbpBlobStoringOptions>(opt =>
+            {
+                opt.Containers.ConfigureDefault(c =>
+                {
+                    c.UseAzure(az =>
+                    {
+                        az.ConnectionString = conn;
+                        az.ContainerName = "videos";
+                        az.CreateContainerIfNotExists = true;
+
+                    });
+                });
+            });
+        }
         /* ----------------------------------------------------------
            APP PIPELINE
         -----------------------------------------------------------*/
