@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Volo.Abp;
 using Volo.Abp.Application.Services;
+using Volo.Abp.BlobStoring;
 using Volo.Abp.ObjectMapping;
 
 namespace web_backend.Games;
@@ -16,23 +17,28 @@ namespace web_backend.Games;
 public class GameAppService : ApplicationService, IGameAppService
 {
     private readonly IGameRepository _repo;
-    private readonly IObjectMapper _mapper;
+    private readonly IObjectMapper _map;
+    private readonly IBlobContainer _blob;   // default container “videos”
 
-    public GameAppService(IGameRepository repo, IObjectMapper mapper)
+    public GameAppService(
+        IGameRepository repo,
+        IObjectMapper map,
+        IBlobContainer blob)
     {
         _repo = repo;
-        _mapper = mapper;
+        _map = map;
+        _blob = blob;
     }
 
-    /* ----------  Queries  ---------- */
+    /* ----------  Queries ---------- */
 
     [HttpGet("{id}")]
     public async Task<GameDto> GetAsync(Guid id) =>
-        _mapper.Map<Game, GameDto>(await _repo.GetAsync(id));
+        _map.Map<Game, GameDto>(await _repo.GetAsync(id));
 
     [HttpGet]
     public async Task<List<GameDto>> GetListAsync() =>
-        _mapper.Map<List<Game>, List<GameDto>>(await _repo.GetListAsync());
+        _map.Map<List<Game>, List<GameDto>>(await _repo.GetListAsync());
 
     [HttpPost("filter")]
     public async Task<List<GameDto>> GetFilteredListAsync([FromBody] GameFilterDto f)
@@ -40,52 +46,48 @@ public class GameAppService : ApplicationService, IGameAppService
         var list = await _repo.GetFilteredListAsync(
             f.EventType, f.HomeTeam, f.AwayTeam, f.Broadcasters, f.EventDate);
 
-        return _mapper.Map<List<Game>, List<GameDto>>(list);
+        return _map.Map<List<Game>, List<GameDto>>(list);
     }
 
-    /* ----------  Commands  ---------- */
+    /* ----------  Commands ---------- */
 
-    // POST /api/app/game/upload   (multipart/form‑data)
+    // POST /api/app/game/upload  (multipart/form‑data)
     [HttpPost("upload")]
     [DisableRequestSizeLimit]
     public async Task<GameDto> CreateAsync([FromForm] CreateGameDto input)
     {
-        string videoRel = string.Empty;
+        string blobName = string.Empty;
+        string publicUrl = string.Empty;
 
         if (input.VideoFile is { Length: > 0 })
         {
-            var root = Path.Combine(AppContext.BaseDirectory, "wwwroot", "videos");
-            Directory.CreateDirectory(root);
+            blobName = $"{Guid.NewGuid()}{Path.GetExtension(input.VideoFile.FileName)}";
 
-            var fileName = $"{Guid.NewGuid()}{Path.GetExtension(input.VideoFile.FileName)}";
-            var fullPath = Path.Combine(root, fileName);
+            await using var stream = input.VideoFile.OpenReadStream();
+            await _blob.SaveAsync(blobName, stream, overrideExisting: false);
 
-            await using var fs = new FileStream(fullPath, FileMode.Create);
-            await input.VideoFile.CopyToAsync(fs);
-
-            videoRel = $"/videos/{fileName}";
+            // if the container is public. Otherwise return SAS from your front‑end proxy
+            publicUrl = $"https://{_blob.GetUrl(blobName)}";
         }
 
-        var entity = _mapper.Map<CreateGameDto, Game>(input);
-        entity.GameUrl = videoRel;
-        entity.PlaybackUrl = videoRel;
+        var entity = _map.Map<CreateGameDto, Game>(input);
+        entity.GameUrl = publicUrl;
+        entity.PlaybackUrl = publicUrl;
 
-        entity = await _repo.CreateAsync(entity);    // autoSave true in repository
-        return _mapper.Map<Game, GameDto>(entity);
+        entity = await _repo.CreateAsync(entity);
+        return _map.Map<Game, GameDto>(entity);
     }
 
-    // PUT /api/app/game/{id}
     [HttpPut("{id}")]
     public async Task<GameDto> UpdateAsync(Guid id, [FromBody] UpdateGameDto input)
     {
-        var entity = await _repo.GetAsync(id);
-        _mapper.Map(input, entity);
+        var e = await _repo.GetAsync(id);
+        _map.Map(input, e);
 
-        entity = await _repo.UpdateAsync(entity);
-        return _mapper.Map<Game, GameDto>(entity);
+        e = await _repo.UpdateAsync(e);
+        return _map.Map<Game, GameDto>(e);
     }
 
-    // DELETE /api/app/game/{id}
     [HttpDelete("{id}")]
     public Task DeleteAsync(Guid id) => _repo.DeleteAsync(id);
 }

@@ -1,4 +1,4 @@
-using Volo.Abp.AspNetCore.Mvc.UI.Theme.Basic.Bundling;
+﻿using Volo.Abp.AspNetCore.Mvc.UI.Theme.Basic.Bundling;
 using Volo.Abp.AspNetCore.Mvc.UI.Theme.Basic;
 using System;
 using System.Collections.Generic;
@@ -12,8 +12,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using web_backend.EntityFrameworkCore;
 using web_backend.MultiTenancy;
-using Volo.Abp.AspNetCore.Mvc.UI.Theme.Basic;
-using Volo.Abp.AspNetCore.Mvc.UI.Theme.Basic.Bundling;
 using Microsoft.OpenApi.Models;
 using OpenIddict.Validation.AspNetCore;
 using Volo.Abp;
@@ -37,12 +35,12 @@ using Volo.Abp.ObjectExtending;
 using Volo.Abp.Identity;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Http;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.CookiePolicy;
 using AbpIdentityUser = Volo.Abp.Identity.IdentityUser;
-
+using Volo.Abp.BlobStoring;
+using Volo.Abp.BlobStoring.Azure;
 
 namespace web_backend
 {
@@ -56,58 +54,44 @@ namespace web_backend
         typeof(AbpAccountWebOpenIddictModule),
         typeof(AbpAspNetCoreSerilogModule),
         typeof(AbpSwashbuckleModule),
-        typeof(AbpIdentityHttpApiModule)
+        typeof(AbpIdentityHttpApiModule),
+        typeof(AbpBlobStoringAzureModule)                  //  <- Azure Blob Storage
     )]
     public class web_backendHttpApiHostModule : AbpModule
     {
-        public override void PreConfigureServices(ServiceConfigurationContext context)
+        /* ----------------------------------------------------------
+           PRE‑CONFIGURE
+        -----------------------------------------------------------*/
+        public override void PreConfigureServices(ServiceConfigurationContext ctx)
         {
-            var hostingEnvironment = context.Services.GetHostingEnvironment();
+            var env = ctx.Services.GetHostingEnvironment();
 
-            Console.WriteLine($"Hosting Environment: {hostingEnvironment.EnvironmentName}");
-
-            if (!hostingEnvironment.IsDevelopment())
+            if (!env.IsDevelopment())
             {
-                Console.WriteLine("Running production OpenIddict configuration...");
+                PreConfigure<AbpOpenIddictAspNetCoreOptions>(o =>
+                    o.AddDevelopmentEncryptionAndSigningCertificate = false);
 
-                PreConfigure<AbpOpenIddictAspNetCoreOptions>(options =>
+                PreConfigure<OpenIddictServerBuilder>(builder =>
                 {
-                    options.AddDevelopmentEncryptionAndSigningCertificate = false;
-                });
-
-                PreConfigure<OpenIddictServerBuilder>(serverBuilder =>
-                {
-                    try
+                    var certPath = Path.Combine(AppContext.BaseDirectory, "openiddict.pfx");
+                    if (File.Exists(certPath))
                     {
-                        var certPath = Path.Combine(AppContext.BaseDirectory, "openiddict.pfx");
-
-                        if (!File.Exists(certPath))
-                        {
-                            Console.WriteLine("Certificate not found. Using development certificate.");
-                            PreConfigure<AbpOpenIddictAspNetCoreOptions>(f => f.AddDevelopmentEncryptionAndSigningCertificate = true);
-                            return;
-                        }
-
-                        var certificate = new X509Certificate2(
-                            certPath,
-                            "Varsity2024",
-                            X509KeyStorageFlags.MachineKeySet);
-
-                        serverBuilder.AddEncryptionCertificate(certificate);
-                        serverBuilder.AddSigningCertificate(certificate);
+                        var cert = new X509Certificate2(
+                            certPath, "Varsity2024", X509KeyStorageFlags.MachineKeySet);
+                        builder.AddEncryptionCertificate(cert);
+                        builder.AddSigningCertificate(cert);
                     }
-                    catch
+                    else
                     {
-                        PreConfigure<AbpOpenIddictAspNetCoreOptions>(f => f.AddDevelopmentEncryptionAndSigningCertificate = true);
+                        PreConfigure<AbpOpenIddictAspNetCoreOptions>(f =>
+                            f.AddDevelopmentEncryptionAndSigningCertificate = true);
                     }
                 });
             }
             else
             {
                 PreConfigure<AbpOpenIddictAspNetCoreOptions>(o =>
-                {
-                    o.AddDevelopmentEncryptionAndSigningCertificate = true;
-                });
+                    o.AddDevelopmentEncryptionAndSigningCertificate = true);
             }
 
             PreConfigure<OpenIddictBuilder>(b =>
@@ -120,46 +104,65 @@ namespace web_backend
                 });
             });
 
+            /* extend Identity user */
             ObjectExtensionManager.Instance.MapEfCoreProperty<AbpIdentityUser, string>(
-    "Name",
-    (eb, pb) => pb.HasMaxLength(IdentityUserConsts.MaxUserNameLength));
-
-ObjectExtensionManager.Instance.MapEfCoreProperty<AbpIdentityUser, string>(
-    "PhoneNumber",
-    (eb, pb) => pb.HasMaxLength(IdentityUserConsts.MaxPhoneNumberLength));
-
+                "Name", (e, p) => p.HasMaxLength(IdentityUserConsts.MaxUserNameLength));
+            ObjectExtensionManager.Instance.MapEfCoreProperty<AbpIdentityUser, string>(
+                "PhoneNumber", (e, p) => p.HasMaxLength(IdentityUserConsts.MaxPhoneNumberLength));
         }
 
-        public override void ConfigureServices(ServiceConfigurationContext context)
+        /* ----------------------------------------------------------
+           CONFIGURE
+        -----------------------------------------------------------*/
+        public override void ConfigureServices(ServiceConfigurationContext ctx)
         {
-            var configuration = context.Services.GetConfiguration();
+            var cfg = ctx.Services.GetConfiguration();
 
-            ConfigureAuthentication(context);
+            ConfigureAuthentication(ctx);
             ConfigureBundles();
-            ConfigureUrls(configuration);
+            ConfigureUrls(cfg);
             ConfigureConventionalControllers();
-            ConfigureVirtualFileSystem(context);
-            ConfigureCors(context, configuration);
-            ConfigureSwaggerServices(context, configuration);
-            ConfigureHttpClients(context);
-
+            ConfigureVirtualFileSystem(ctx);
+            ConfigureCors(ctx, cfg);
+            ConfigureSwaggerServices(ctx, cfg);
+            ConfigureHttpClients(ctx);
+            ConfigureBlobStorage(cfg);                     //  <- Azure blob
         }
 
-        private void ConfigureAuthentication(ServiceConfigurationContext context)
+        /* ---------- Azure Blob ---------- */
+        private void ConfigureBlobStorage(IConfiguration cfg)
         {
-            context.Services.ForwardIdentityAuthenticationForBearer(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
-            context.Services.Configure<AbpClaimsPrincipalFactoryOptions>(o => o.IsDynamicClaimsEnabled = true);
-
-            // Cross-origin-friendly auth cookie
-            context.Services.Configure<CookieAuthenticationOptions>(
-                IdentityConstants.ApplicationScheme,
-                opts =>
+            Configure<AbpBlobStoringOptions>(o =>
+            {
+                o.Containers.ConfigureDefault(c =>
                 {
-                    opts.Cookie.SameSite = SameSiteMode.None;
-                    opts.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                    c.UseAzure(az =>
+                    {
+                        az.ConnectionString = cfg["Storage:ConnectionString"];
+                        az.ContainerName = "videos";
+                    });
+                });
+            });
+        }
+
+        /* ---------- Auth ---------- */
+        private void ConfigureAuthentication(ServiceConfigurationContext ctx)
+        {
+            ctx.Services.ForwardIdentityAuthenticationForBearer(
+                OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
+
+            ctx.Services.Configure<AbpClaimsPrincipalFactoryOptions>(o => o.IsDynamicClaimsEnabled = true);
+
+            ctx.Services.Configure<CookieAuthenticationOptions>(
+                IdentityConstants.ApplicationScheme,
+                o =>
+                {
+                    o.Cookie.SameSite = SameSiteMode.None;
+                    o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
                 });
         }
 
+        /* ---------- Bundles ---------- */
         private void ConfigureBundles()
         {
             Configure<AbpBundlingOptions>(o =>
@@ -170,41 +173,45 @@ ObjectExtensionManager.Instance.MapEfCoreProperty<AbpIdentityUser, string>(
             });
         }
 
-        private void ConfigureUrls(IConfiguration configuration)
+        /* ---------- URLs ---------- */
+        private void ConfigureUrls(IConfiguration cfg)
         {
             Configure<AppUrlOptions>(o =>
             {
-                o.Applications["MVC"].RootUrl = configuration["App:SelfUrl"];
-                o.RedirectAllowedUrls.AddRange(configuration["App:RedirectAllowedUrls"]?.Split(',') ?? Array.Empty<string>());
-                o.Applications["Angular"].RootUrl = configuration["App:ClientUrl"];
+                o.Applications["MVC"].RootUrl = cfg["App:SelfUrl"];
+                o.RedirectAllowedUrls.AddRange(
+                    cfg["App:RedirectAllowedUrls"]?.Split(',') ?? Array.Empty<string>());
+                o.Applications["Angular"].RootUrl = cfg["App:ClientUrl"];
                 o.Applications["Angular"].Urls[AccountUrlNames.PasswordReset] = "account/reset-password";
             });
         }
 
-        private void ConfigureVirtualFileSystem(ServiceConfigurationContext context)
+        /* ---------- VFS in dev ---------- */
+        private void ConfigureVirtualFileSystem(ServiceConfigurationContext ctx)
         {
-            var env = context.Services.GetHostingEnvironment();
-            if (env.IsDevelopment())
-            {
-                Configure<AbpVirtualFileSystemOptions>(o =>
-                {
-                    o.FileSets.ReplaceEmbeddedByPhysical<web_backendDomainSharedModule>(Path.Combine(env.ContentRootPath, "..", "web_backend.Domain.Shared"));
-                    o.FileSets.ReplaceEmbeddedByPhysical<web_backendDomainModule>(Path.Combine(env.ContentRootPath, "..", "web_backend.Domain"));
-                    o.FileSets.ReplaceEmbeddedByPhysical<web_backendApplicationContractsModule>(Path.Combine(env.ContentRootPath, "..", "web_backend.Application.Contracts"));
-                    o.FileSets.ReplaceEmbeddedByPhysical<web_backendApplicationModule>(Path.Combine(env.ContentRootPath, "..", "web_backend.Application"));
-                });
-            }
-        }
+            var env = ctx.Services.GetHostingEnvironment();
+            if (!env.IsDevelopment()) return;
 
-        private void ConfigureHttpClients(ServiceConfigurationContext context)
-        {
-            context.Services.AddHttpClient("StreamProxy", client =>
+            Configure<AbpVirtualFileSystemOptions>(o =>
             {
-                client.Timeout = TimeSpan.FromSeconds(10);
+                o.FileSets.ReplaceEmbeddedByPhysical<web_backendDomainSharedModule>(
+                    Path.Combine(env.ContentRootPath, "..", "web_backend.Domain.Shared"));
+                o.FileSets.ReplaceEmbeddedByPhysical<web_backendDomainModule>(
+                    Path.Combine(env.ContentRootPath, "..", "web_backend.Domain"));
+                o.FileSets.ReplaceEmbeddedByPhysical<web_backendApplicationContractsModule>(
+                    Path.Combine(env.ContentRootPath, "..", "web_backend.Application.Contracts"));
+                o.FileSets.ReplaceEmbeddedByPhysical<web_backendApplicationModule>(
+                    Path.Combine(env.ContentRootPath, "..", "web_backend.Application"));
             });
         }
 
+        /* ---------- HTTP clients ---------- */
+        private void ConfigureHttpClients(ServiceConfigurationContext ctx)
+        {
+            ctx.Services.AddHttpClient("StreamProxy", c => c.Timeout = TimeSpan.FromSeconds(10));
+        }
 
+        /* ---------- Conventional controllers ---------- */
         private void ConfigureConventionalControllers()
         {
             Configure<AbpAspNetCoreMvcOptions>(o =>
@@ -213,10 +220,11 @@ ObjectExtensionManager.Instance.MapEfCoreProperty<AbpIdentityUser, string>(
             });
         }
 
-        private static void ConfigureSwaggerServices(ServiceConfigurationContext context, IConfiguration configuration)
+        /* ---------- Swagger ---------- */
+        private static void ConfigureSwaggerServices(ServiceConfigurationContext ctx, IConfiguration cfg)
         {
-            context.Services.AddAbpSwaggerGenWithOAuth(
-                configuration["AuthServer:Authority"]!,
+            ctx.Services.AddAbpSwaggerGenWithOAuth(
+                cfg["AuthServer:Authority"]!,
                 new Dictionary<string, string> { { "web_backend", "web_backend API" } },
                 o =>
                 {
@@ -226,22 +234,20 @@ ObjectExtensionManager.Instance.MapEfCoreProperty<AbpIdentityUser, string>(
                 });
         }
 
-        private void ConfigureCors(ServiceConfigurationContext context, IConfiguration configuration)
+        /* ---------- CORS ---------- */
+        private void ConfigureCors(ServiceConfigurationContext ctx, IConfiguration cfg)
         {
-            context.Services.AddCors(o =>
+            ctx.Services.AddCors(o =>
             {
                 o.AddDefaultPolicy(b =>
                 {
-                    var corsOrigins = configuration["App:CorsOrigins"]?
+                    var corsOrigins = cfg["App:CorsOrigins"]?
                         .Split(',', StringSplitOptions.RemoveEmptyEntries)
-                        .Select(origin => origin.RemovePostFix("/"))
+                        .Select(s => s.RemovePostFix("/"))
                         .ToArray() ?? Array.Empty<string>();
 
-                    var env = context.Services.GetHostingEnvironment();
-                    if (env.IsDevelopment())
-                    {
+                    if (ctx.Services.GetHostingEnvironment().IsDevelopment())
                         corsOrigins = corsOrigins.Append("*").ToArray();
-                    }
 
                     b.WithOrigins(corsOrigins)
                      .WithAbpExposedHeaders()
@@ -253,29 +259,29 @@ ObjectExtensionManager.Instance.MapEfCoreProperty<AbpIdentityUser, string>(
             });
         }
 
-        public override void OnApplicationInitialization(ApplicationInitializationContext context)
+        /* ----------------------------------------------------------
+           APP PIPELINE
+        -----------------------------------------------------------*/
+        public override void OnApplicationInitialization(ApplicationInitializationContext ctx)
         {
-            var app = context.GetApplicationBuilder();
-            var env = context.GetEnvironment();
+            var app = ctx.GetApplicationBuilder();
+            var env = ctx.GetEnvironment();
 
-            if (env.IsDevelopment())
-            {
-                app.UseDeveloperExceptionPage();
-            }
+            if (env.IsDevelopment()) app.UseDeveloperExceptionPage();
             else
             {
-                app.UseExceptionHandler(errorApp =>
+                app.UseExceptionHandler(ea =>
                 {
-                    errorApp.Run(async ctx =>
+                    ea.Run(async c =>
                     {
-                        ctx.Response.StatusCode = 500;
-                        ctx.Response.ContentType = "text/html";
-                        var ex = ctx.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
+                        c.Response.StatusCode = 500;
+                        c.Response.ContentType = "text/html";
+                        var ex = c.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
                         if (ex != null)
                         {
-                            var logger = ctx.RequestServices.GetService<ILogger<web_backendHttpApiHostModule>>();
-                            logger?.LogError(ex, "Unhandled exception");
-                            await ctx.Response.WriteAsync($"<h1>{ex.Message}</h1><pre>{ex.StackTrace}</pre>");
+                            var log = c.RequestServices.GetRequiredService<ILogger<web_backendHttpApiHostModule>>();
+                            log.LogError(ex, "Unhandled exception");
+                            await c.Response.WriteAsync($"<h1>{ex.Message}</h1><pre>{ex.StackTrace}</pre>");
                         }
                     });
                 });
@@ -287,7 +293,6 @@ ObjectExtensionManager.Instance.MapEfCoreProperty<AbpIdentityUser, string>(
             app.UseRouting();
             app.UseCors();
 
-            // cookie policy for cross-origin requests
             app.UseCookiePolicy(new CookiePolicyOptions
             {
                 MinimumSameSitePolicy = SameSiteMode.None,
@@ -297,10 +302,7 @@ ObjectExtensionManager.Instance.MapEfCoreProperty<AbpIdentityUser, string>(
             app.UseAuthentication();
             app.UseAbpOpenIddictValidation();
 
-            if (MultiTenancyConsts.IsEnabled)
-            {
-                app.UseMultiTenancy();
-            }
+            if (MultiTenancyConsts.IsEnabled) app.UseMultiTenancy();
 
             app.UseUnitOfWork();
             app.UseDynamicClaims();
@@ -310,8 +312,8 @@ ObjectExtensionManager.Instance.MapEfCoreProperty<AbpIdentityUser, string>(
             app.UseAbpSwaggerUI(c =>
             {
                 c.SwaggerEndpoint("/swagger/v1/swagger.json", "web_backend API");
-                var configuration = context.ServiceProvider.GetRequiredService<IConfiguration>();
-                c.OAuthClientId(configuration["AuthServer:SwaggerClientId"]);
+                var cfg = ctx.ServiceProvider.GetRequiredService<IConfiguration>();
+                c.OAuthClientId(cfg["AuthServer:SwaggerClientId"]);
                 c.OAuthScopes("web_backend");
             });
 
