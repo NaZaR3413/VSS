@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace web_backend.Blazor.Client.Pages.Scoreboard
 {
+    [AllowAnonymous]
     public partial class ScoreboardOverlay : web_backendComponentBase, IAsyncDisposable
     {
         private Timer _gameClockTimer;
@@ -45,14 +46,14 @@ namespace web_backend.Blazor.Client.Pages.Scoreboard
 
         [Parameter]
         [SupplyParameterFromQuery(Name = "id")]
-        public string? ScoreboardId { get; set; }
+        public string ScoreboardId { get; set; }
 
         [Parameter]
-        public string? Id { get; set; }
+        public string Id { get; set; }
 
         [Parameter]
         [SupplyParameterFromQuery(Name = "livestreamId")]
-        public string? LivestreamIdParam { get; set; }
+        public string LivestreamIdParam { get; set; }
 
         [Inject]
         private IJSRuntime JSRuntime { get; set; }
@@ -200,35 +201,55 @@ namespace web_backend.Blazor.Client.Pages.Scoreboard
         {
             try
             {
-                hubConnection = new HubConnectionBuilder()
-                    .WithUrl(NavigationManager.ToAbsoluteUri("/signalr/scoreboard"))
-                    .WithAutomaticReconnect()
-                    .Build();
-
-                hubConnection.On<string, int, int>("UpdateScore", (gameId, homeScore, awayScore) =>
+                // Only try to connect to SignalR if we're in a browser environment
+                // and not using a static file host that doesn't support SignalR
+                if (NavigationManager.BaseUri.Contains("localhost") ||
+                    NavigationManager.BaseUri.Contains("20.3.254.14") ||
+                    NavigationManager.BaseUri.Contains("vss-backend-api"))
                 {
-                    if (_syncWithLivestream && _livestreamId.HasValue && gameId == _livestreamId.ToString())
-                    {
-                        HomeTeamScore = homeScore;
-                        AwayTeamScore = awayScore;
-                        InvokeAsync(StateHasChanged);
-                    }
-                });
+                    hubConnection = new HubConnectionBuilder()
+                        .WithUrl(NavigationManager.ToAbsoluteUri("/signalr/scoreboard"))
+                        .WithAutomaticReconnect()
+                        .Build();
 
-                hubConnection.On<string>("RefreshScoreboard", (gameId) =>
+                    hubConnection.On<string, int, int>("UpdateScore", (gameId, homeScore, awayScore) =>
+                    {
+                        if (_syncWithLivestream && _livestreamId.HasValue && gameId == _livestreamId.ToString())
+                        {
+                            HomeTeamScore = homeScore;
+                            AwayTeamScore = awayScore;
+                            InvokeAsync(StateHasChanged);
+                        }
+                    });
+
+                    hubConnection.On<string>("RefreshScoreboard", (gameId) =>
+                    {
+                        if (_syncWithLivestream && _livestreamId.HasValue && gameId == _livestreamId.ToString())
+                        {
+                            InvokeAsync(SyncWithLivestreamData);
+                        }
+                    });
+
+                    try
+                    {
+                        await hubConnection.StartAsync();
+                        Console.WriteLine("SignalR connection established successfully");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine($"Error starting SignalR connection: {ex.Message}");
+                        // Don't rethrow - scoreboard should still work without real-time updates
+                    }
+                }
+                else
                 {
-                    if (_syncWithLivestream && _livestreamId.HasValue && gameId == _livestreamId.ToString())
-                    {
-                        InvokeAsync(SyncWithLivestreamData);
-                    }
-                });
-
-                await hubConnection.StartAsync();
+                    Console.WriteLine("Skipping SignalR connection for static file hosting");
+                }
             }
             catch (Exception ex)
             {
                 // Log error but don't fail - scoreboard should still work without real-time updates
-                Console.Error.WriteLine("Error setting up SignalR connection: " + ex.Message);
+                Console.Error.WriteLine($"Error setting up SignalR connection: {ex.Message}");
             }
         }
 

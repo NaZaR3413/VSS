@@ -40,50 +40,41 @@
 </html>
 
 <script>
-    window.configureForOBS = function () {
-        // Ensure transparent background
-        document.body.style.background = 'transparent';
-        document.documentElement.style.background = 'transparent';
+    // Check if we're on the scoreboard page and should configure for OBS
+    if (window.location.pathname.includes('/scoreboard/')) {
+        window.configureForOBS = function () {
+            // Ensure transparent background
+            document.body.style.background = 'transparent';
+            document.documentElement.style.background = 'transparent';
 
-        // Remove any unwanted elements
-        document.querySelectorAll('.abp-application-layout, .navbar, .footer, .sidebar, .header, .notification-area, .admin-controls, .admin-panel')
-            .forEach(el => {
-                el.style.display = 'none';
+            // Remove any unwanted elements
+            document.querySelectorAll('.abp-application-layout, .navbar, .footer, .sidebar, .header, .notification-area, .admin-controls, .admin-panel')
+                .forEach(el => {
+                    if (el) el.style.display = 'none';
+                });
+
+            // Set OBS-friendly CSS variables
+            document.documentElement.style.setProperty('--background-color', 'transparent');
+
+            // Add a special class to body
+            document.body.classList.add('obs-mode');
+
+            console.log("OBS configuration applied");
+        };
+
+        window.notifyScoreboardLoaded = function () {
+            console.log("Scoreboard loaded successfully");
+
+            // Fix team logo sizes
+            document.querySelectorAll('.team-logo img').forEach(img => {
+                if (img) {
+                    img.style.width = '100%';
+                    img.style.height = '100%';
+                    img.style.objectFit = 'contain';
+                    img.style.maxWidth = '32px';
+                    img.style.maxHeight = '32px';
+                }
             });
-
-        // Set OBS-friendly CSS variables
-        document.documentElement.style.setProperty('--background-color', 'transparent');
-
-        // Add a special class to body
-        document.body.classList.add('obs-mode');
-
-        // Ensure visible elements are properly sized
-        const overlay = document.querySelector('.obs-overlay');
-        if (overlay) {
-            overlay.style.position = 'absolute';
-            overlay.style.top = '0';
-            overlay.style.left = '0';
-            overlay.style.width = '100%';
-            overlay.style.height = '100%';
-        }
-
-        console.log("OBS configuration applied");
-    };
-
-    window.notifyScoreboardLoaded = function () {
-        console.log("Scoreboard loaded successfully");
-
-        // Create a custom event
-        const event = new CustomEvent('scoreboardLoaded');
-        window.dispatchEvent(event);
-
-        // Fix team logo sizes
-        document.querySelectorAll('.team-logo img').forEach(img => {
-            img.style.width = '100%';
-            img.style.height = '100%';
-            img.style.objectFit = 'contain';
-            img.style.maxWidth = '32px';
-            img.style.maxHeight = '32px';
-        });
-    };
+        };
+    }
 </script>

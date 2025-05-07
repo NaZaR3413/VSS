@@ -7,6 +7,7 @@
     <base href="/" />
 
     <!-- Only include the minimum required styles -->
+    <link href="css/scoreboard.css" rel="stylesheet" />
     <link href="web_backend.Blazor.Client.styles.css" rel="stylesheet" />
 
     <style>
@@ -91,81 +92,56 @@
 
     <script>
         // This script ensures OBS can access the scoreboard
-        window.addEventListener('DOMContentLoaded', function () {
-            // Force AdminMode to false for this overlay
+        window.configureForOBS = function () {
+            // Ensure transparent background
+            document.body.style.background = 'transparent';
+            document.documentElement.style.background = 'transparent';
+            document.body.style.backgroundColor = 'transparent';
+            document.documentElement.style.backgroundColor = 'transparent';
+
+            // Remove any unwanted elements
+            document.querySelectorAll('.abp-application-layout, .navbar, .footer, .sidebar, .header, .notification-area, .admin-controls, .admin-panel')
+                .forEach(el => {
+                    if (el) el.style.display = 'none';
+                });
+
+            // Add a special class to body
+            document.body.classList.add('obs-mode');
+
+            // Remove background color from ancestors
+            let element = document.querySelector('.obs-overlay');
+            while (element) {
+                if (element.style) {
+                    element.style.backgroundColor = 'transparent';
+                    element.style.background = 'transparent';
+                }
+                element = element.parentElement;
+            }
+
+            console.log("OBS configuration applied");
+        };
+
+        window.notifyScoreboardLoaded = function () {
+            console.log("Scoreboard loaded successfully");
+
+            // Fix team logo sizes
+            document.querySelectorAll('.team-logo img').forEach(img => {
+                img.style.width = '100%';
+                img.style.height = '100%';
+                img.style.objectFit = 'contain';
+                img.style.maxWidth = '32px';
+                img.style.maxHeight = '32px';
+            });
+        };
+
+        // Initial setup
+        document.addEventListener('DOMContentLoaded', function () {
+            // Force the URL to include admin=false for OBS usage
             const urlParams = new URLSearchParams(window.location.search);
             if (!urlParams.has('admin')) {
-                // Add admin=false parameter if not already present
                 urlParams.set('admin', 'false');
-
-                // Remove any additional parameters that might conflict
-                if (!urlParams.has('id') && !urlParams.has('livestreamId')) {
-                    const storedScoreboardId = localStorage.getItem('lastScoreboardId');
-                    if (storedScoreboardId) {
-                        urlParams.set('id', storedScoreboardId);
-                    }
-                }
-
-                const newUrl = '/scoreboard/overlay?' + urlParams.toString();
-                window.location.href = newUrl;
-            }
-
-            // Remove any unnecessary elements that might be interfering
-            document.querySelectorAll('body > *:not(#app)').forEach(el => {
-                if (el.id !== 'app') {
-                    el.style.display = 'none';
-                }
-            });
-
-            // Store current scoreboard ID if available
-            const scoreboardId = urlParams.get('id');
-            if (scoreboardId) {
-                localStorage.setItem('lastScoreboardId', scoreboardId);
-            }
-
-            // Configure body for OBS
-            document.body.style.backgroundColor = 'transparent';
-            document.body.style.margin = '0';
-            document.body.style.padding = '0';
-            document.body.style.overflow = 'hidden';
-
-            // Force navigation to the overlay route
-            setTimeout(() => {
-                // Add a delay for Blazor to initialize
-                if (!window.location.pathname.includes('/scoreboard/overlay')) {
-                    window.location.href = '/scoreboard/overlay?' + urlParams.toString();
-                }
-
-                // Listen for scoreboard updates to handle real-time updates
-                window.addEventListener('scoreboardUpdated', function (e) {
-                    console.log('Scoreboard updated:', e.detail);
-                });
-            }, 1000);
-        });
-
-        // Helper function to refresh the overlay if it goes stale
-        function refreshOverlay() {
-            const urlParams = new URLSearchParams(window.location.search);
-            window.location.href = '/scoreboard/overlay?' + urlParams.toString();
-        }
-
-        // Refresh if no updates for 5 minutes (failsafe)
-        setInterval(() => {
-            refreshOverlay();
-        }, 5 * 60 * 1000);
-
-        window.addEventListener('DOMContentLoaded', function () {
-            // Force AdminMode to false for this overlay
-            const urlParams = new URLSearchParams(window.location.search);
-            urlParams.set('admin', 'false');
-
-            // Ensure direct access paths work
-            if (window.location.pathname.includes('/scoreboard/overlay') ||
-                window.location.pathname.includes('/scoreboard/')) {
-                // We're already on the right path
-            } else {
-                // Force navigation to the overlay route
-                window.location.href = '/scoreboard/overlay?' + urlParams.toString();
+                const newUrl = window.location.pathname + '?' + urlParams.toString();
+                history.replaceState(null, '', newUrl);
             }
         });
     </script>

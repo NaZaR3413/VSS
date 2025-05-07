@@ -1,24 +1,32 @@
 @page "/scoreboard"
 @page "/scoreboard/overlay"
 @page "/scoreboard/{id:guid?}"
-@attribute [AllowAnonymous]
 @inherits web_backendComponentBase
 
 <div class="@CssClass">
-    @if (!AdminMode)
+    @if (loading)
     {
-        <div class="obs-overlay @ScoreboardShape.ToLower()">
-            <div class="scoreboard-container @ScoreboardShape.ToLower()" style="background-color: @BackgroundColor; color: @TextColor; border-color: @BorderColor;">
+        <div class="loading-indicator">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (!AdminMode)
+    {
+        <!-- For OBS use, clean overlay with no extra page elements -->
+        <div class="obs-overlay @(ScoreboardShape?.ToLower() ?? "rounded")">
+            <div class="scoreboard-container @(ScoreboardShape?.ToLower() ?? "rounded")" style="background-color: @(BackgroundColor ?? "#1a1a1a"); color: @(TextColor ?? "#ffffff"); border-color: @(BorderColor ?? "#333333");">
                 <div class="teams-container">
                     <div class="team home @(PossessionTeam == "home" ? "possession" : "")"
-                         style="background-color: @HomeTeamBackgroundColor; color: @HomeTeamTextColor;">
+                         style="background-color: @(HomeTeamBackgroundColor ?? "#3366cc"); color: @(HomeTeamTextColor ?? "#ffffff");">
                         <div class="team-logo">
                             @if (!string.IsNullOrEmpty(HomeTeamLogo))
                             {
                                 <img src="@HomeTeamLogo" alt="@HomeTeamName Logo" />
                             }
                         </div>
-                        <div class="team-name">@HomeTeamName</div>
+                        <div class="team-name">@(HomeTeamName ?? "Home")</div>
                         <div class="team-score">@HomeTeamScore</div>
                     </div>
 
@@ -32,14 +40,14 @@
                     </div>
 
                     <div class="team away @(PossessionTeam == "away" ? "possession" : "")"
-                         style="background-color: @AwayTeamBackgroundColor; color: @AwayTeamTextColor;">
+                         style="background-color: @(AwayTeamBackgroundColor ?? "#cc3333"); color: @(AwayTeamTextColor ?? "#ffffff");">
                         <div class="team-logo">
                             @if (!string.IsNullOrEmpty(AwayTeamLogo))
                             {
                                 <img src="@AwayTeamLogo" alt="@AwayTeamName Logo" />
                             }
                         </div>
-                        <div class="team-name">@AwayTeamName</div>
+                        <div class="team-name">@(AwayTeamName ?? "Away")</div>
                         <div class="team-score">@AwayTeamScore</div>
                     </div>
                 </div>
@@ -74,8 +82,8 @@
                         else if (SportType == "Football" || SportType == "Soccer")
                         {
                             <div class="stats-row">
-                                <span>@HomeTeamStats</span>
-                                <span>@AwayTeamStats</span>
+                                <span>@(HomeTeamStats ?? "")</span>
+                                <span>@(AwayTeamStats ?? "")</span>
                             </div>
                         }
                         else if (SportType == "Baseball")
@@ -268,6 +276,9 @@
 
 @code {
     public string CssClass => AdminMode ? "" : "obs-only-mode";
+
+    private bool loading = true;
+
 }
 
 <style>
@@ -551,5 +562,82 @@
         .timeout-indicator.active {
             background-color: #ffcc00;
         }
+
+    /* Scoreboard-specific styles */
+    html, body {
+        background-color: transparent !important;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+    }
+
+        body.obs-mode {
+            background-color: rgba(0, 0, 0, 0) !important;
+        }
+
+    .obs-only-mode {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        margin: 0;
+        padding: 0;
+        background: transparent !important;
+        overflow: hidden;
+    }
+
+        .obs-only-mode * {
+            font-family: 'Roboto', 'Arial', sans-serif !important;
+        }
+
+        .obs-only-mode .abp-application-layout,
+        .obs-only-mode .navbar,
+        .obs-only-mode .footer,
+        .obs-only-mode .sidebar,
+        .obs-only-mode .header,
+        .obs-only-mode .notification-area {
+            display: none !important;
+        }
+
+    /* Loading indicator */
+    .loading-indicator {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: rgba(255, 255, 255, 0.8);
+        padding: 20px;
+        border-radius: 10px;
+        z-index: 1000;
+    }
+
+    /* Fix for team logos */
+    .team-logo {
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+        .team-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            max-width: 32px;
+            max-height: 32px;
+        }
+
+    /* Fix for timeout indicators */
+    .timeout-indicator {
+        background-color: #444;
+        border-radius: 50%;
+    }
+
+        .timeout-indicator.active {
+            background-color: #ffcc00;
+        }
+
 </style>
 

@@ -89,7 +89,7 @@
                         <li>
                             <strong>Configure Stream</strong>
                             <p>Select "Custom" as service and use:</p>
-                            <code>rtmp://localhost:1935/live</code>
+                            <code>rtmp://20.3.254.14/live</code>
                         </li>
                         <li>
                             <strong>Enter Stream Key</strong>
@@ -133,17 +133,6 @@
                                 </button>
                             </div>
                             <small class="form-text text-muted">Use this key in OBS to start streaming.</small>
-                        </div>
-
-                        <div class="vss-stream-detail-item mb-3">
-                            <label class="form-label"><i class="bi bi-link-45deg me-2"></i>RTMP Server URL:</label>
-                            <div class="input-group input-group-lg">
-                                <input type="text" readonly class="form-control" value="rtmp://localhost:1935/live" id="rtmpUrlInput">
-                                <button class="btn btn-outline-primary" type="button" @onclick="CopyRtmpUrl">
-                                    <i class="bi bi-clipboard me-1"></i>Copy
-                                </button>
-                            </div>
-                            <small class="form-text text-muted">Server address to enter in OBS.</small>
                         </div>
 
                         <div class="vss-stream-detail-item mb-3">
