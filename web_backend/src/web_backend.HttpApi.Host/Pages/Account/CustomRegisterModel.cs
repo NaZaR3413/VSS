@@ -171,7 +171,6 @@ public class CustomRegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterMo
 
         
         [DynamicStringLength(typeof(IdentityUserConsts), nameof(IdentityUserConsts.MaxPhoneNumberLength))]
-        [Phone]
         [RegularExpression(@"^[\d\-\+\(\) ]+$", ErrorMessage = "Enter a valid phone number.")]
         public string? PhoneNumber { get; set; }
 

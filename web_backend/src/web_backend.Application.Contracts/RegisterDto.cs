@@ -15,11 +15,10 @@ namespace web_backend.Pages.Account
         [DynamicStringLength(typeof(IdentityUserConsts), nameof(IdentityUserConsts.MaxNameLength))]
         public string Name { get; set; }
 
-        
+
         [DynamicStringLength(typeof(IdentityUserConsts), nameof(IdentityUserConsts.MaxPhoneNumberLength))]
-        [Phone]
-        [RegularExpression(@"^[1-9]\d{1,14}$", ErrorMessage = "Enter a valid phone number.")]
-        public string PhoneNumber { get; set; }
+        [RegularExpression(@"^[\d\-\+\(\) ]+$", ErrorMessage = "Enter a valid phone number.")]
+        public string? PhoneNumber { get; set; }
 
         [Required(ErrorMessage = "Please confirm password.")]
         [DynamicStringLength(typeof(IdentityUserConsts), nameof(IdentityUserConsts.MaxPasswordLength))]
