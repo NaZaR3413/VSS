@@ -34,9 +34,12 @@ namespace web_backend.Games
             return await qry.ToListAsync();
         }
 
-        public async Task<Game> CreateAsync(Game game) => await InsertAsync(game);
+        public async Task<Game> CreateAsync(Game game)
+    => await InsertAsync(game, autoSave: true);          // force SaveChanges
 
-        public async Task<Game> UpdateAsync(Game game) => await base.UpdateAsync(game);
+        public async Task<Game> UpdateAsync(Game game)
+            => await base.UpdateAsync(game, autoSave: true);     // idem
+
 
         public async Task DeleteAsync(Guid id) => await base.DeleteAsync(id);
 

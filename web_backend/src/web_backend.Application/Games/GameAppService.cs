@@ -7,11 +7,10 @@ using Microsoft.AspNetCore.Mvc;
 using Volo.Abp;
 using Volo.Abp.Application.Services;
 using Volo.Abp.ObjectMapping;
-using web_backend.Games;
 
 namespace web_backend.Games;
 
-[RemoteService]                       // enables auto‑proxy for Blazor WASM
+[RemoteService]
 [Area("app")]
 [Route("api/app/game")]
 public class GameAppService : ApplicationService, IGameAppService
@@ -28,54 +27,54 @@ public class GameAppService : ApplicationService, IGameAppService
     /* ----------  Queries  ---------- */
 
     [HttpGet("{id}")]
-    public async Task<GameDto> GetAsync(Guid id)
-        => _mapper.Map<Game, GameDto>(await _repo.GetAsync(id));
+    public async Task<GameDto> GetAsync(Guid id) =>
+        _mapper.Map<Game, GameDto>(await _repo.GetAsync(id));
 
     [HttpGet]
-    public async Task<List<GameDto>> GetListAsync()
-        => _mapper.Map<List<Game>, List<GameDto>>(await _repo.GetListAsync());
+    public async Task<List<GameDto>> GetListAsync() =>
+        _mapper.Map<List<Game>, List<GameDto>>(await _repo.GetListAsync());
 
     [HttpPost("filter")]
-    public async Task<List<GameDto>> GetFilteredListAsync([FromBody] GameFilterDto input)
+    public async Task<List<GameDto>> GetFilteredListAsync([FromBody] GameFilterDto f)
     {
         var list = await _repo.GetFilteredListAsync(
-            input.EventType, input.HomeTeam, input.AwayTeam,
-            input.Broadcasters, input.EventDate);
+            f.EventType, f.HomeTeam, f.AwayTeam, f.Broadcasters, f.EventDate);
 
         return _mapper.Map<List<Game>, List<GameDto>>(list);
     }
 
     /* ----------  Commands  ---------- */
 
-    // multipart/form‑data  POST  /api/app/game/upload
+    // POST /api/app/game/upload   (multipart/form‑data)
     [HttpPost("upload")]
     [DisableRequestSizeLimit]
     public async Task<GameDto> CreateAsync([FromForm] CreateGameDto input)
     {
-        // simple file save to local wwwroot/videos – adapt for blob storage as needed
-        var videoPath = string.Empty;
+        string videoRel = string.Empty;
+
         if (input.VideoFile is { Length: > 0 })
         {
-            var webRoot = Path.Combine(AppContext.BaseDirectory, "wwwroot", "videos");
-            Directory.CreateDirectory(webRoot);
+            var root = Path.Combine(AppContext.BaseDirectory, "wwwroot", "videos");
+            Directory.CreateDirectory(root);
+
             var fileName = $"{Guid.NewGuid()}{Path.GetExtension(input.VideoFile.FileName)}";
-            var fullPath = Path.Combine(webRoot, fileName);
+            var fullPath = Path.Combine(root, fileName);
 
             await using var fs = new FileStream(fullPath, FileMode.Create);
             await input.VideoFile.CopyToAsync(fs);
 
-            videoPath = $"/videos/{fileName}";
+            videoRel = $"/videos/{fileName}";
         }
 
         var entity = _mapper.Map<CreateGameDto, Game>(input);
-        entity.GameUrl = videoPath;
-        entity.PlaybackUrl = videoPath;
+        entity.GameUrl = videoRel;
+        entity.PlaybackUrl = videoRel;
 
-        entity = await _repo.CreateAsync(entity);
+        entity = await _repo.CreateAsync(entity);    // autoSave true in repository
         return _mapper.Map<Game, GameDto>(entity);
     }
 
-    // PUT  /api/app/game/{id}
+    // PUT /api/app/game/{id}
     [HttpPut("{id}")]
     public async Task<GameDto> UpdateAsync(Guid id, [FromBody] UpdateGameDto input)
     {
@@ -86,7 +85,7 @@ public class GameAppService : ApplicationService, IGameAppService
         return _mapper.Map<Game, GameDto>(entity);
     }
 
-    // DELETE  /api/app/game/{id}
+    // DELETE /api/app/game/{id}
     [HttpDelete("{id}")]
     public Task DeleteAsync(Guid id) => _repo.DeleteAsync(id);
 }
