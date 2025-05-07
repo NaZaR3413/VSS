@@ -241,15 +241,13 @@ namespace web_backend
             {
                 o.AddDefaultPolicy(b =>
                 {
-                    var corsOrigins = cfg["App:CorsOrigins"]?
+                    var origins = cfg["App:CorsOrigins"]?
                         .Split(',', StringSplitOptions.RemoveEmptyEntries)
-                        .Select(s => s.RemovePostFix("/"))
+                        .Select(x => x.RemovePostFix("/"))
+                        .Append("https://salmon‑glacier‑08dca301e.6.azurestaticapps.net") // ← explicit
                         .ToArray() ?? Array.Empty<string>();
 
-                    if (ctx.Services.GetHostingEnvironment().IsDevelopment())
-                        corsOrigins = corsOrigins.Append("*").ToArray();
-
-                    b.WithOrigins(corsOrigins)
+                    b.WithOrigins(origins)
                      .WithAbpExposedHeaders()
                      .SetIsOriginAllowedToAllowWildcardSubdomains()
                      .AllowAnyHeader()
@@ -258,6 +256,7 @@ namespace web_backend
                 });
             });
         }
+
 
         /* ----------------------------------------------------------
            APP PIPELINE

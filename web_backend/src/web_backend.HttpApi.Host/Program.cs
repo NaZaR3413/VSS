@@ -34,7 +34,8 @@ public class Program
             var builder = WebApplication.CreateBuilder(args);
 
             /* ↓↓↓  allow large multipart bodies (1 GB) */
-            builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = 1_073_741_824);
+            builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = 1_073_741_824); // 1 GB
+
 
             builder.Host
                    .AddAppSettingsSecretsJson()
