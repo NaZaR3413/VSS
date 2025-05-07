@@ -2,11 +2,105 @@
 @page "/scoreboard/overlay"
 @inherits web_backendComponentBase
 
-@if (!AdminMode)
-{
-    <!-- For OBS use, clean overlay with no extra page elements -->
-    <div class="obs-overlay @ScoreboardShape.ToLower()">
+<div class="@CssClass">
+    @if (!AdminMode)
+    {
+        <!-- For OBS use, clean overlay with no extra page elements -->
+        <div class="obs-overlay @ScoreboardShape.ToLower()">
+            <div class="scoreboard-container @ScoreboardShape.ToLower()" style="background-color: @BackgroundColor; color: @TextColor; border-color: @BorderColor;">
+                <div class="teams-container">
+                    <div class="team home @(PossessionTeam == "home" ? "possession" : "")" 
+                         style="background-color: @HomeTeamBackgroundColor; color: @HomeTeamTextColor;">
+                        <div class="team-logo">
+                            @if (!string.IsNullOrEmpty(HomeTeamLogo))
+                            {
+                                <img src="@HomeTeamLogo" alt="@HomeTeamName Logo" />
+                            }
+                        </div>
+                        <div class="team-name">@HomeTeamName</div>
+                        <div class="team-score">@HomeTeamScore</div>
+                    </div>
+                    
+                    <div class="game-info">
+                        <div class="period-indicator">@GetPeriodLabel(): @CurrentPeriod</div>
+                        <div class="game-clock">@FormattedGameClock</div>
+                        @if (!string.IsNullOrEmpty(ShotClock))
+                        {
+                            <div class="shot-clock @(_shotClockWarning ? "warning" : "")">@ShotClock</div>
+                        }
+                    </div>
+                    
+                    <div class="team away @(PossessionTeam == "away" ? "possession" : "")"
+                         style="background-color: @AwayTeamBackgroundColor; color: @AwayTeamTextColor;">
+                        <div class="team-logo">
+                            @if (!string.IsNullOrEmpty(AwayTeamLogo))
+                            {
+                                <img src="@AwayTeamLogo" alt="@AwayTeamName Logo" />
+                            }
+                        </div>
+                        <div class="team-name">@AwayTeamName</div>
+                        <div class="team-score">@AwayTeamScore</div>
+                    </div>
+                </div>
+                
+                @if (ShowTimeouts)
+                {
+                    <div class="timeout-container">
+                        <div class="home-timeouts">
+                            @for (int i = 0; i < MaxTimeouts; i++)
+                            {
+                                <div class="timeout-indicator @(i < HomeTimeouts ? "active" : "")"></div>
+                            }
+                        </div>
+                        <div class="away-timeouts">
+                            @for (int i = 0; i < MaxTimeouts; i++)
+                            {
+                                <div class="timeout-indicator @(i < AwayTimeouts ? "active" : "")"></div>
+                            }
+                        </div>
+                    </div>
+                }
+                
+                @if (ShowAdditionalStats)
+                {
+                    <div class="additional-stats">
+                        @if (SportType == "Basketball")
+                        {
+                            <div class="foul-count">
+                                <span>Fouls: @HomeTeamFouls - @AwayTeamFouls</span>
+                            </div>
+                        }
+                        else if (SportType == "Football" || SportType == "Soccer")
+                        {
+                            <div class="stats-row">
+                                <span>@HomeTeamStats</span>
+                                <span>@AwayTeamStats</span>
+                            </div>
+                        }
+                        else if (SportType == "Baseball")
+                        {
+                            <div class="baseball-stats">
+                                <div class="inning-indicator">
+                                    <span>@(TopInning ? "▲" : "▼") @CurrentInning</span>
+                                </div>
+                                <div class="count">
+                                    <span>B: @Balls S: @Strikes O: @Outs</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Original layout for admin mode -->
         <div class="scoreboard-container @ScoreboardShape.ToLower()" style="background-color: @BackgroundColor; color: @TextColor; border-color: @BorderColor;">
+            <div class="header" style="background-color: @HeaderColor;">
+                <div class="event-info">@EventTitle</div>
+                <div class="period-indicator">@GetPeriodLabel(): @CurrentPeriod</div>
+            </div>
             <div class="teams-container">
                 <div class="team home @(PossessionTeam == "home" ? "possession" : "")" 
                      style="background-color: @HomeTeamBackgroundColor; color: @HomeTeamTextColor;">
@@ -19,16 +113,6 @@
                     <div class="team-name">@HomeTeamName</div>
                     <div class="team-score">@HomeTeamScore</div>
                 </div>
-                
-                <div class="game-info">
-                    <div class="period-indicator">@GetPeriodLabel(): @CurrentPeriod</div>
-                    <div class="game-clock">@FormattedGameClock</div>
-                    @if (!string.IsNullOrEmpty(ShotClock))
-                    {
-                        <div class="shot-clock @(_shotClockWarning ? "warning" : "")">@ShotClock</div>
-                    }
-                </div>
-                
                 <div class="team away @(PossessionTeam == "away" ? "possession" : "")"
                      style="background-color: @AwayTeamBackgroundColor; color: @AwayTeamTextColor;">
                     <div class="team-logo">
@@ -40,6 +124,10 @@
                     <div class="team-name">@AwayTeamName</div>
                     <div class="team-score">@AwayTeamScore</div>
                 </div>
+            </div>
+            <div class="clock-container">
+                <div class="game-clock">@FormattedGameClock</div>
+                <div class="shot-clock @(_shotClockWarning ? "warning" : "")">@ShotClock</div>
             </div>
             
             @if (ShowTimeouts)
@@ -89,167 +177,85 @@
                     }
                 </div>
             }
-        </div>
-    </div>
-}
-else
-{
-    <!-- Original layout for admin mode -->
-    <div class="scoreboard-container @ScoreboardShape.ToLower()" style="background-color: @BackgroundColor; color: @TextColor; border-color: @BorderColor;">
-        <div class="header" style="background-color: @HeaderColor;">
-            <div class="event-info">@EventTitle</div>
-            <div class="period-indicator">@GetPeriodLabel(): @CurrentPeriod</div>
-        </div>
-        <div class="teams-container">
-            <div class="team home @(PossessionTeam == "home" ? "possession" : "")" 
-                 style="background-color: @HomeTeamBackgroundColor; color: @HomeTeamTextColor;">
-                <div class="team-logo">
-                    @if (!string.IsNullOrEmpty(HomeTeamLogo))
-                    {
-                        <img src="@HomeTeamLogo" alt="@HomeTeamName Logo" />
-                    }
-                </div>
-                <div class="team-name">@HomeTeamName</div>
-                <div class="team-score">@HomeTeamScore</div>
-            </div>
-            <div class="team away @(PossessionTeam == "away" ? "possession" : "")"
-                 style="background-color: @AwayTeamBackgroundColor; color: @AwayTeamTextColor;">
-                <div class="team-logo">
-                    @if (!string.IsNullOrEmpty(AwayTeamLogo))
-                    {
-                        <img src="@AwayTeamLogo" alt="@AwayTeamName Logo" />
-                    }
-                </div>
-                <div class="team-name">@AwayTeamName</div>
-                <div class="team-score">@AwayTeamScore</div>
-            </div>
-        </div>
-        <div class="clock-container">
-            <div class="game-clock">@FormattedGameClock</div>
-            <div class="shot-clock @(_shotClockWarning ? "warning" : "")">@ShotClock</div>
-        </div>
-        
-        @if (ShowTimeouts)
-        {
-            <div class="timeout-container">
-                <div class="home-timeouts">
-                    @for (int i = 0; i < MaxTimeouts; i++)
-                    {
-                        <div class="timeout-indicator @(i < HomeTimeouts ? "active" : "")"></div>
-                    }
-                </div>
-                <div class="away-timeouts">
-                    @for (int i = 0; i < MaxTimeouts; i++)
-                    {
-                        <div class="timeout-indicator @(i < AwayTimeouts ? "active" : "")"></div>
-                    }
-                </div>
-            </div>
-        }
-        
-        @if (ShowAdditionalStats)
-        {
-            <div class="additional-stats">
-                @if (SportType == "Basketball")
-                {
-                    <div class="foul-count">
-                        <span>Fouls: @HomeTeamFouls - @AwayTeamFouls</span>
-                    </div>
-                }
-                else if (SportType == "Football" || SportType == "Soccer")
-                {
-                    <div class="stats-row">
-                        <span>@HomeTeamStats</span>
-                        <span>@AwayTeamStats</span>
-                    </div>
-                }
-                else if (SportType == "Baseball")
-                {
-                    <div class="baseball-stats">
-                        <div class="inning-indicator">
-                            <span>@(TopInning ? "▲" : "▼") @CurrentInning</span>
-                        </div>
-                        <div class="count">
-                            <span>B: @Balls S: @Strikes O: @Outs</span>
-                        </div>
-                    </div>
-                }
-            </div>
-        }
-        
-        <div class="admin-controls">
-            <div class="clock-controls">
-                <button @onclick="ToggleGameClock">@(_gameClockRunning ? "Pause" : "Start")</button>
-                <button @onclick="ResetGameClock">Reset Clock</button>
-                <button @onclick="() => AdjustGameClock(-60)">-1m</button>
-                <button @onclick="() => AdjustGameClock(-10)">-10s</button>
-                <button @onclick="() => AdjustGameClock(10)">+10s</button>
-                <button @onclick="() => AdjustGameClock(60)">+1m</button>
-            </div>
             
-            <div class="score-controls">
-                <div class="home-score-controls">
-                    <button @onclick="@(() => UpdateScore("home", -1))">@("-1")</button>
-                    <button @onclick="@(() => UpdateScore("home", 1))">@("+1")</button>
-                    <button @onclick="@(() => UpdateScore("home", 2))">@("+2")</button>
-                    <button @onclick="@(() => UpdateScore("home", 3))">@("+3")</button>
+            <div class="admin-controls">
+                <div class="clock-controls">
+                    <button @onclick="ToggleGameClock">@(_gameClockRunning ? "Pause" : "Start")</button>
+                    <button @onclick="ResetGameClock">Reset Clock</button>
+                    <button @onclick="() => AdjustGameClock(-60)">-1m</button>
+                    <button @onclick="() => AdjustGameClock(-10)">-10s</button>
+                    <button @onclick="() => AdjustGameClock(10)">+10s</button>
+                    <button @onclick="() => AdjustGameClock(60)">+1m</button>
                 </div>
-                <div class="away-score-controls">
-                    <button @onclick="@(() => UpdateScore("away", -1))">@("-1")</button>
-                    <button @onclick="@(() => UpdateScore("away", 1))">@("+1")</button>
-                    <button @onclick="@(() => UpdateScore("away", 2))">@("+2")</button>
-                    <button @onclick="@(() => UpdateScore("away", 3))">@("+3")</button>
-                </div>
-            </div>
-            
-            <div class="timeout-controls">
-                <button @onclick="@(() => UpdateTimeouts("home", -1))">@("Home TO-")</button>
-                <button @onclick="@(() => UpdateTimeouts("home", 1))">@("Home TO+")</button>
-                <button @onclick="@(() => UpdateTimeouts("away", -1))">@("Away TO-")</button>
-                <button @onclick="@(() => UpdateTimeouts("away", 1))">@("Away TO+")</button>
-            </div>
-            
-            <div class="period-controls">
-                <button @onclick="DecrementPeriod">@("Period-")</button>
-                <button @onclick="IncrementPeriod">@("Period+")</button>
-                <button @onclick="TogglePossession">@("Toggle Possession")</button>
-            </div>
-            
-            <div class="style-controls">
-                <select @onchange="OnSportTypeChanged">
-                    <option value="Basketball" selected="@(SportType == "Basketball")">Basketball</option>
-                    <option value="Football" selected="@(SportType == "Football")">Football</option>
-                    <option value="Soccer" selected="@(SportType == "Soccer")">Soccer</option>
-                    <option value="Hockey" selected="@(SportType == "Hockey")">Hockey</option>
-                    <option value="Baseball" selected="@(SportType == "Baseball")">Baseball</option>
-                </select>
                 
-                <select @onchange="OnShapeChanged">
-                    <option value="Rectangle" selected="@(ScoreboardShape == "Rectangle")">Rectangle</option>
-                    <option value="Rounded" selected="@(ScoreboardShape == "Rounded")">Rounded</option>
-                    <option value="Pill" selected="@(ScoreboardShape == "Pill")">Pill</option>
-                    <option value="Modern" selected="@(ScoreboardShape == "Modern")">Modern</option>
-                    <option value="Slim" selected="@(ScoreboardShape == "Slim")">Slim</option>
-                </select>
+                <div class="score-controls">
+                    <div class="home-score-controls">
+                        <button @onclick="@(() => UpdateScore("home", -1))">@("-1")</button>
+                        <button @onclick="@(() => UpdateScore("home", 1))">@("+1")</button>
+                        <button @onclick="@(() => UpdateScore("home", 2))">@("+2")</button>
+                        <button @onclick="@(() => UpdateScore("home", 3))">@("+3")</button>
+                    </div>
+                    <div class="away-score-controls">
+                        <button @onclick="@(() => UpdateScore("away", -1))">@("-1")</button>
+                        <button @onclick="@(() => UpdateScore("away", 1))">@("+1")</button>
+                        <button @onclick="@(() => UpdateScore("away", 2))">@("+2")</button>
+                        <button @onclick="@(() => UpdateScore("away", 3))">@("+3")</button>
+                    </div>
+                </div>
                 
-                <input type="color" @bind="BackgroundColor" title="Background Color" />
-                <input type="color" @bind="TextColor" title="Text Color" />
-                <input type="color" @bind="BorderColor" title="Border Color" />
-                <input type="color" @bind="HeaderColor" title="Header Color" />
+                <div class="timeout-controls">
+                    <button @onclick="@(() => UpdateTimeouts("home", -1))">@("Home TO-")</button>
+                    <button @onclick="@(() => UpdateTimeouts("home", 1))">@("Home TO+")</button>
+                    <button @onclick="@(() => UpdateTimeouts("away", -1))">@("Away TO-")</button>
+                    <button @onclick="@(() => UpdateTimeouts("away", 1))">@("Away TO+")</button>
+                </div>
                 
-                <button @onclick="SaveSettings">Save Settings</button>
-                <button @onclick="LoadSettings">Load Settings</button>
+                <div class="period-controls">
+                    <button @onclick="DecrementPeriod">@("Period-")</button>
+                    <button @onclick="IncrementPeriod">@("Period+")</button>
+                    <button @onclick="TogglePossession">@("Toggle Possession")</button>
+                </div>
+                
+                <div class="style-controls">
+                    <select @onchange="OnSportTypeChanged">
+                        <option value="Basketball" selected="@(SportType == "Basketball")">Basketball</option>
+                        <option value="Football" selected="@(SportType == "Football")">Football</option>
+                        <option value="Soccer" selected="@(SportType == "Soccer")">Soccer</option>
+                        <option value="Hockey" selected="@(SportType == "Hockey")">Hockey</option>
+                        <option value="Baseball" selected="@(SportType == "Baseball")">Baseball</option>
+                    </select>
+                    
+                    <select @onchange="OnShapeChanged">
+                        <option value="Rectangle" selected="@(ScoreboardShape == "Rectangle")">Rectangle</option>
+                        <option value="Rounded" selected="@(ScoreboardShape == "Rounded")">Rounded</option>
+                        <option value="Pill" selected="@(ScoreboardShape == "Pill")">Pill</option>
+                        <option value="Modern" selected="@(ScoreboardShape == "Modern")">Modern</option>
+                        <option value="Slim" selected="@(ScoreboardShape == "Slim")">Slim</option>
+                    </select>
+                    
+                    <input type="color" @bind="BackgroundColor" title="Background Color" />
+                    <input type="color" @bind="TextColor" title="Text Color" />
+                    <input type="color" @bind="BorderColor" title="Border Color" />
+                    <input type="color" @bind="HeaderColor" title="Header Color" />
+                    
+                    <button @onclick="SaveSettings">Save Settings</button>
+                    <button @onclick="LoadSettings">Load Settings</button>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="admin-panel">
-        <div class="admin-form">
-            <div class="form-group">
-                <label>Event Title:</label>
+        <div class="admin-panel">
+            <div class="admin-form">
+                <div class="form-group">
+                    <label>Event Title:</label>
+                </div>
             </div>
         </div>
-    </div>
+    }
+}
+ 
+@code {
+    public string CssClass => AdminMode ? "" : "obs-only-mode";
 }
 
 <style>
@@ -264,6 +270,28 @@ else
         max-width: 600px;
         margin: 0 auto;
         overflow: hidden;
+    }
+    
+    /* OBS-only mode styles to ensure proper isolation */
+    .obs-only-mode {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        margin: 0;
+        padding: 0;
+        background: transparent !important;
+        overflow: hidden;
+    }
+    
+    .obs-only-mode .abp-application-layout,
+    .obs-only-mode .navbar,
+    .obs-only-mode .footer,
+    .obs-only-mode .sidebar,
+    .obs-only-mode .header,
+    .obs-only-mode .notification-area {
+        display: none !important;
     }
     
     /* OBS Overlay Specific Styles */
@@ -451,5 +479,10 @@ else
     /* Animation */
     @@keyframes blinking {
         50% { opacity: 0.5; }
+    }
+    
+    /* Adding styles to ensure clean display in OBS */
+    .obs-only-mode * {
+        font-family: 'Roboto', 'Arial', sans-serif !important;
     }
 </style>

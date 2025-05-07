@@ -1,0 +1,158 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Scoreboard Overlay</title>
+    <base href="/" />
+
+    <!-- Only include the minimum required styles -->
+    <link href="web_backend.Blazor.Client.styles.css" rel="stylesheet" />
+
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            background-color: transparent !important;
+        }
+
+        #app {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: transparent !important;
+            overflow: hidden;
+        }
+
+        /* Hide the spinner to ensure clean loading */
+        .spinner {
+            display: none !important;
+        }
+
+        /* Hide any ABP or framework UI elements */
+        .abp-application-layout,
+        .navbar,
+        .footer,
+        .sidebar,
+        .header,
+        .notification-area,
+        .admin-controls,
+        .admin-panel {
+            display: none !important;
+        }
+
+        /* Hide all elements except the scoreboard */
+        body > *:not(#app),
+        #app > *:not(.obs-overlay):not(.scoreboard-container):not(.obs-only-mode) {
+            display: none !important;
+        }
+
+        /* Force transparent background */
+        body, html, #app, .obs-overlay {
+            background-color: transparent !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+        }
+
+        /* Ensure timeout indicators are visible when active */
+        .timeout-indicator.active {
+            background-color: #ffcc00 !important;
+        }
+
+        /* Fix for potential z-index issues in OBS */
+        .obs-overlay {
+            z-index: 9999 !important;
+        }
+
+        /* Make sure text is legible on transparent background */
+        .team-name, .team-score, .game-clock, .period-indicator {
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- The app will render the scoreboard here -->
+    </div>
+
+    <!-- ABP Framework scripts (minimal set) -->
+    <script src="global.js"></script>
+
+    <!-- Blazor WebAssembly script -->
+    <script src="_framework/blazor.webassembly.js"></script>
+
+    <script>
+        // This script ensures OBS can access the scoreboard
+        window.addEventListener('DOMContentLoaded', function () {
+            // Force AdminMode to false for this overlay
+            const urlParams = new URLSearchParams(window.location.search);
+            if (!urlParams.has('admin')) {
+                // Add admin=false parameter if not already present
+                urlParams.set('admin', 'false');
+
+                // Remove any additional parameters that might conflict
+                if (!urlParams.has('id') && !urlParams.has('livestreamId')) {
+                    const storedScoreboardId = localStorage.getItem('lastScoreboardId');
+                    if (storedScoreboardId) {
+                        urlParams.set('id', storedScoreboardId);
+                    }
+                }
+
+                const newUrl = '/scoreboard/overlay?' + urlParams.toString();
+                window.location.href = newUrl;
+            }
+
+            // Remove any unnecessary elements that might be interfering
+            document.querySelectorAll('body > *:not(#app)').forEach(el => {
+                if (el.id !== 'app') {
+                    el.style.display = 'none';
+                }
+            });
+
+            // Store current scoreboard ID if available
+            const scoreboardId = urlParams.get('id');
+            if (scoreboardId) {
+                localStorage.setItem('lastScoreboardId', scoreboardId);
+            }
+
+            // Configure body for OBS
+            document.body.style.backgroundColor = 'transparent';
+            document.body.style.margin = '0';
+            document.body.style.padding = '0';
+            document.body.style.overflow = 'hidden';
+
+            // Force navigation to the overlay route
+            setTimeout(() => {
+                // Add a delay for Blazor to initialize
+                if (!window.location.pathname.includes('/scoreboard/overlay')) {
+                    window.location.href = '/scoreboard/overlay?' + urlParams.toString();
+                }
+
+                // Listen for scoreboard updates to handle real-time updates
+                window.addEventListener('scoreboardUpdated', function (e) {
+                    console.log('Scoreboard updated:', e.detail);
+                });
+            }, 1000);
+        });
+
+        // Helper function to refresh the overlay if it goes stale
+        function refreshOverlay() {
+            const urlParams = new URLSearchParams(window.location.search);
+            window.location.href = '/scoreboard/overlay?' + urlParams.toString();
+        }
+
+        // Refresh if no updates for 5 minutes (failsafe)
+        setInterval(() => {
+            refreshOverlay();
+        }, 5 * 60 * 1000);
+    </script>
+</body>
+</html>
