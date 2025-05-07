@@ -1915,3 +1915,123 @@ section {
         font-size: 1rem;
     }
 }
+
+
+body {
+    -webkit-text-size-adjust: 100%;
+}
+
+/* Improve touch targets for mobile */
+button,
+.btn,
+.vss-nav__link,
+.vss-dropdown__link,
+.nav-link,
+.navbar-toggler {
+    min-height: 44px;
+    min-width: 44px;
+}
+
+/* Adjustments for small screens */
+@media (max-width: 576px) {
+    /* Header and navigation adjustments */
+    .vss-header__logo img {
+        max-height: 50px;
+        margin-left: -10px;
+    }
+
+    .vss-nav .nav-link {
+        font-size: 18px;
+        padding: 12px 10px;
+    }
+
+    /* Form improvements for touch */
+    input, select, textarea {
+        font-size: 16px !important; /* Prevents iOS zoom on focus */
+    }
+
+    /* Stack auth buttons on mobile */
+    .vss-auth {
+        flex-direction: column;
+        align-items: stretch;
+        width: 100%;
+    }
+
+        .vss-auth .vss-auth__button,
+        .vss-auth .vss-auth__link {
+            margin: 5px 0;
+            text-align: center;
+        }
+
+    /* Improve table display on small screens */
+    .table-responsive {
+        border: 0;
+    }
+
+    /* Adjust modals for better mobile view */
+    .modal-dialog {
+        margin: 0.5rem;
+        max-width: calc(100% - 1rem);
+    }
+
+    /* Better spacing for small screens */
+    .row {
+        margin-left: -10px;
+        margin-right: -10px;
+    }
+
+    .col, [class*="col-"] {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+
+    /* Game/livestream cards on mobile */
+    .vss-livestream-item,
+    .vss-score-card,
+    .vss-news-card,
+    .vss-schedule-card {
+        padding: 15px 10px;
+    }
+
+    /* Video player container */
+    .vss-video-container {
+        padding: 10px;
+    }
+}
+
+/* Tablet adjustments */
+@media (min-width: 577px) and (max-width: 991px) {
+    /* Specific tweaks for tablet view */
+    .vss-nav .nav-link {
+        font-size: 16px;
+        padding: 10px 8px;
+    }
+
+    /* Auth buttons on tablets */
+    .vss-auth .vss-auth__button {
+        padding: 8px 12px;
+        font-size: 16px;
+    }
+}
+
+/* Ensure forms stack properly on mobile */
+@media (max-width: 767px) {
+    .form-floating {
+        margin-bottom: 15px;
+    }
+
+    /* Adjust card layouts for smaller screens */
+    .vss-form-card .card-body {
+        padding: 15px 10px;
+    }
+
+    /* Game information and control layouts */
+    .game-info-card {
+        margin-bottom: 20px;
+    }
+
+    /* Modal form improvements */
+    .modal-body form .row > div {
+        margin-bottom: 15px;
+    }
+}
