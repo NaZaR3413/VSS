@@ -153,6 +153,21 @@
         setInterval(() => {
             refreshOverlay();
         }, 5 * 60 * 1000);
+
+        window.addEventListener('DOMContentLoaded', function () {
+            // Force AdminMode to false for this overlay
+            const urlParams = new URLSearchParams(window.location.search);
+            urlParams.set('admin', 'false');
+
+            // Ensure direct access paths work
+            if (window.location.pathname.includes('/scoreboard/overlay') ||
+                window.location.pathname.includes('/scoreboard/')) {
+                // We're already on the right path
+            } else {
+                // Force navigation to the overlay route
+                window.location.href = '/scoreboard/overlay?' + urlParams.toString();
+            }
+        });
     </script>
 </body>
 </html>

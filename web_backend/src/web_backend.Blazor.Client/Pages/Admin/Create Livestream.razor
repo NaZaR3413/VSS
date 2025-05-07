@@ -166,7 +166,7 @@
                                 </div>
                                 <div class="col-md-6 d-flex justify-content-end">
                                     <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" 
+                                        <input class="form-check-input" type="checkbox"
                                                id="streamActiveSwitch" @bind="isStreamActive" />
                                         <label class="form-check-label fw-bold" for="streamActiveSwitch">
                                             @(isStreamActive ? "Stream Active" : "Stream Inactive")
@@ -197,7 +197,8 @@
             EventDate = DateTime.Now,
             StreamStatus = StreamStatus.AwaitingConnection,
             HomeScore = 0,
-            AwayScore = 0
+            AwayScore = 0,
+            FreeLivestream = true // Set this to match your requirements
         };
 
     private bool livestreamCreated = false;
@@ -225,7 +226,13 @@
     {
         try
         {
-            // Create the livestream in the database first
+            // Generate a temporary stream key (for updating later if needed)
+            var tempStreamKey = Guid.NewGuid().ToString().ToUpper();
+
+            // Set HLS URL *before* creating the livestream
+            newLivestream.HlsUrl = $"https://20.3.254.14:8080/hls/{tempStreamKey}.m3u8";
+
+            // Create the livestream with the required HlsUrl already set
             var result = await LivestreamService.CreateAsync(newLivestream);
 
             // Store the ID returned from the service
@@ -234,13 +241,16 @@
             // Use the actual livestream ID as the stream key
             streamKey = livestreamId.ToString().ToUpper();
 
-            // Use HTTPS for the HLS URL instead of HTTP (this is the key change)
-            var updateDto = new UpdateLivestreamDto
-                {
-                    HlsUrl = $"https://20.3.254.14:8080/hls/{streamKey}.m3u8"
-                };
+            // If the stream key is different from the temp key, update the HLS URL
+            if (streamKey != tempStreamKey)
+            {
+                var updateDto = new UpdateLivestreamDto
+                    {
+                        HlsUrl = $"https://20.3.254.14:8080/hls/{streamKey}.m3u8"
+                    };
 
-            await LivestreamService.UpdateAsync(livestreamId, updateDto);
+                await LivestreamService.UpdateAsync(livestreamId, updateDto);
+            }
 
             // Build the livestream URL for viewing
             livestreamUrl = $"{NavigationManager.BaseUri}livestream/{livestreamId}";
@@ -252,6 +262,7 @@
         catch (Exception ex)
         {
             await JS.InvokeVoidAsync("alert", $"Error creating livestream: {ex.Message}");
+            Console.Error.WriteLine($"Error creating livestream: {ex}");
         }
     }
 

@@ -12,6 +12,7 @@ using Volo.Abp.SettingManagement;
 using Volo.Abp.TenantManagement;
 using Volo.Abp.Validation.Localization;
 using Volo.Abp.VirtualFileSystem;
+using Microsoft.AspNetCore.Authorization;
 
 namespace web_backend;
 
@@ -38,6 +39,14 @@ public class web_backendDomainSharedModule : AbpModule
         Configure<AbpVirtualFileSystemOptions>(options =>
         {
             options.FileSets.AddEmbedded<web_backendDomainSharedModule>();
+        });
+
+        Configure<AuthorizationOptions>(options =>
+        {
+            options.AddPolicy("ScoreboardPolicy", policy =>
+            {
+                policy.RequireAssertion(context => true);
+            });
         });
 
         Configure<AbpLocalizationOptions>(options =>

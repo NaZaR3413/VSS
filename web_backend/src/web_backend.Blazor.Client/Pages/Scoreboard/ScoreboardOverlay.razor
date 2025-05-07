@@ -1,15 +1,16 @@
 @page "/scoreboard"
 @page "/scoreboard/overlay"
+@page "/scoreboard/{id:guid?}"
+@attribute [AllowAnonymous]
 @inherits web_backendComponentBase
 
 <div class="@CssClass">
     @if (!AdminMode)
     {
-        <!-- For OBS use, clean overlay with no extra page elements -->
         <div class="obs-overlay @ScoreboardShape.ToLower()">
             <div class="scoreboard-container @ScoreboardShape.ToLower()" style="background-color: @BackgroundColor; color: @TextColor; border-color: @BorderColor;">
                 <div class="teams-container">
-                    <div class="team home @(PossessionTeam == "home" ? "possession" : "")" 
+                    <div class="team home @(PossessionTeam == "home" ? "possession" : "")"
                          style="background-color: @HomeTeamBackgroundColor; color: @HomeTeamTextColor;">
                         <div class="team-logo">
                             @if (!string.IsNullOrEmpty(HomeTeamLogo))
@@ -20,7 +21,7 @@
                         <div class="team-name">@HomeTeamName</div>
                         <div class="team-score">@HomeTeamScore</div>
                     </div>
-                    
+
                     <div class="game-info">
                         <div class="period-indicator">@GetPeriodLabel(): @CurrentPeriod</div>
                         <div class="game-clock">@FormattedGameClock</div>
@@ -29,7 +30,7 @@
                             <div class="shot-clock @(_shotClockWarning ? "warning" : "")">@ShotClock</div>
                         }
                     </div>
-                    
+
                     <div class="team away @(PossessionTeam == "away" ? "possession" : "")"
                          style="background-color: @AwayTeamBackgroundColor; color: @AwayTeamTextColor;">
                         <div class="team-logo">
@@ -42,7 +43,7 @@
                         <div class="team-score">@AwayTeamScore</div>
                     </div>
                 </div>
-                
+
                 @if (ShowTimeouts)
                 {
                     <div class="timeout-container">
@@ -60,7 +61,7 @@
                         </div>
                     </div>
                 }
-                
+
                 @if (ShowAdditionalStats)
                 {
                     <div class="additional-stats">
@@ -102,7 +103,7 @@
                 <div class="period-indicator">@GetPeriodLabel(): @CurrentPeriod</div>
             </div>
             <div class="teams-container">
-                <div class="team home @(PossessionTeam == "home" ? "possession" : "")" 
+                <div class="team home @(PossessionTeam == "home" ? "possession" : "")"
                      style="background-color: @HomeTeamBackgroundColor; color: @HomeTeamTextColor;">
                     <div class="team-logo">
                         @if (!string.IsNullOrEmpty(HomeTeamLogo))
@@ -129,7 +130,7 @@
                 <div class="game-clock">@FormattedGameClock</div>
                 <div class="shot-clock @(_shotClockWarning ? "warning" : "")">@ShotClock</div>
             </div>
-            
+
             @if (ShowTimeouts)
             {
                 <div class="timeout-container">
@@ -147,7 +148,7 @@
                     </div>
                 </div>
             }
-            
+
             @if (ShowAdditionalStats)
             {
                 <div class="additional-stats">
@@ -177,7 +178,7 @@
                     }
                 </div>
             }
-            
+
             <div class="admin-controls">
                 <div class="clock-controls">
                     <button @onclick="ToggleGameClock">@(_gameClockRunning ? "Pause" : "Start")</button>
@@ -187,7 +188,7 @@
                     <button @onclick="() => AdjustGameClock(10)">+10s</button>
                     <button @onclick="() => AdjustGameClock(60)">+1m</button>
                 </div>
-                
+
                 <div class="score-controls">
                     <div class="home-score-controls">
                         <button @onclick="@(() => UpdateScore("home", -1))">@("-1")</button>
@@ -202,20 +203,20 @@
                         <button @onclick="@(() => UpdateScore("away", 3))">@("+3")</button>
                     </div>
                 </div>
-                
+
                 <div class="timeout-controls">
                     <button @onclick="@(() => UpdateTimeouts("home", -1))">@("Home TO-")</button>
                     <button @onclick="@(() => UpdateTimeouts("home", 1))">@("Home TO+")</button>
                     <button @onclick="@(() => UpdateTimeouts("away", -1))">@("Away TO-")</button>
                     <button @onclick="@(() => UpdateTimeouts("away", 1))">@("Away TO+")</button>
                 </div>
-                
+
                 <div class="period-controls">
                     <button @onclick="DecrementPeriod">@("Period-")</button>
                     <button @onclick="IncrementPeriod">@("Period+")</button>
                     <button @onclick="TogglePossession">@("Toggle Possession")</button>
                 </div>
-                
+
                 <div class="style-controls">
                     <select @onchange="OnSportTypeChanged">
                         <option value="Basketball" selected="@(SportType == "Basketball")">Basketball</option>
@@ -224,7 +225,7 @@
                         <option value="Hockey" selected="@(SportType == "Hockey")">Hockey</option>
                         <option value="Baseball" selected="@(SportType == "Baseball")">Baseball</option>
                     </select>
-                    
+
                     <select @onchange="OnShapeChanged">
                         <option value="Rectangle" selected="@(ScoreboardShape == "Rectangle")">Rectangle</option>
                         <option value="Rounded" selected="@(ScoreboardShape == "Rounded")">Rounded</option>
@@ -232,14 +233,15 @@
                         <option value="Modern" selected="@(ScoreboardShape == "Modern")">Modern</option>
                         <option value="Slim" selected="@(ScoreboardShape == "Slim")">Slim</option>
                     </select>
-                    
+
                     <input type="color" @bind="BackgroundColor" title="Background Color" />
                     <input type="color" @bind="TextColor" title="Text Color" />
                     <input type="color" @bind="BorderColor" title="Border Color" />
                     <input type="color" @bind="HeaderColor" title="Header Color" />
-                    
+
                     <button @onclick="SaveSettings">Save Settings</button>
                     <button @onclick="LoadSettings">Load Settings</button>
+                    <button @onclick="CopyOverlayUrl">Copy OBS URL</button>
                 </div>
             </div>
         </div>
@@ -248,13 +250,22 @@
             <div class="admin-form">
                 <div class="form-group">
                     <label>Event Title:</label>
+                    <input type="text" class="form-control" @bind="EventTitle" />
+                </div>
+
+                <div class="form-group">
+                    <label>OBS URL:</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" readonly value="@GetOverlayUrl()" />
+                        <button class="btn btn-outline-secondary" @onclick="CopyOverlayUrl">Copy</button>
+                    </div>
+                    <small class="form-text text-muted">Use this URL in your OBS Browser Source</small>
                 </div>
             </div>
         </div>
     }
-}
 </div>
- 
+
 @code {
     public string CssClass => AdminMode ? "" : "obs-only-mode";
 }
@@ -272,7 +283,7 @@
         margin: 0 auto;
         overflow: hidden;
     }
-    
+
     /* OBS-only mode styles to ensure proper isolation */
     .obs-only-mode {
         position: absolute;
@@ -285,16 +296,16 @@
         background: transparent !important;
         overflow: hidden;
     }
-    
-    .obs-only-mode .abp-application-layout,
-    .obs-only-mode .navbar,
-    .obs-only-mode .footer,
-    .obs-only-mode .sidebar,
-    .obs-only-mode .header,
-    .obs-only-mode .notification-area {
-        display: none !important;
-    }
-    
+
+        .obs-only-mode .abp-application-layout,
+        .obs-only-mode .navbar,
+        .obs-only-mode .footer,
+        .obs-only-mode .sidebar,
+        .obs-only-mode .header,
+        .obs-only-mode .notification-area {
+            display: none !important;
+        }
+
     /* OBS Overlay Specific Styles */
     .obs-overlay {
         /* Full reset for OBS browser source */
@@ -308,14 +319,14 @@
         bottom: 0;
         overflow: hidden;
     }
-    
+
     body {
         background: transparent !important;
         margin: 0;
         padding: 0;
         overflow: hidden;
     }
-    
+
     /* Only applied to non-admin mode */
     .obs-overlay .scoreboard-container {
         margin: 0;
@@ -326,7 +337,7 @@
         flex-direction: row;
         border-width: 0;
     }
-    
+
     .obs-overlay .teams-container {
         width: 100%;
         height: 100%;
@@ -334,7 +345,7 @@
         align-items: center;
         justify-content: space-between;
     }
-    
+
     .obs-overlay .team {
         height: 100%;
         padding: 0 15px;
@@ -343,12 +354,25 @@
         justify-content: space-between;
         min-width: 180px;
     }
-    
+
     .obs-overlay .team-logo {
         width: 32px;
         height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        margin-right: 8px;
     }
-    
+
+        .obs-overlay .team-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            max-width: 32px;
+            max-height: 32px;
+        }
+
     .obs-overlay .team-name {
         font-size: 1em;
         font-weight: bold;
@@ -357,14 +381,14 @@
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    
+
     .obs-overlay .team-score {
         font-size: 2em;
         font-weight: bold;
         min-width: 50px;
         text-align: center;
     }
-    
+
     .obs-overlay .game-info {
         display: flex;
         flex-direction: column;
@@ -376,27 +400,27 @@
         height: 100%;
         min-width: 100px;
     }
-    
+
     .obs-overlay .period-indicator {
         font-size: 0.75em;
         margin-bottom: 3px;
     }
-    
+
     .obs-overlay .game-clock {
         font-size: 1.4em;
         font-weight: bold;
     }
-    
+
     .obs-overlay .shot-clock {
         font-size: 0.75em;
         margin-top: 3px;
     }
-    
-    .obs-overlay .shot-clock.warning {
-        color: red;
-        animation: blinking 1s infinite;
-    }
-    
+
+        .obs-overlay .shot-clock.warning {
+            color: red;
+            animation: blinking 1s infinite;
+        }
+
     .obs-overlay .timeout-container {
         position: absolute;
         bottom: 0;
@@ -408,13 +432,19 @@
         background-color: rgba(0,0,0,0.3);
         height: 10px;
     }
-    
+
     .obs-overlay .timeout-indicator {
         width: 6px;
         height: 6px;
         margin: 0 2px;
+        background-color: #444;
+        border-radius: 50%;
     }
-    
+
+        .obs-overlay .timeout-indicator.active {
+            background-color: #ffcc00;
+        }
+
     .obs-overlay .additional-stats {
         position: absolute;
         top: 0;
@@ -424,41 +454,41 @@
         padding: 2px 10px;
         background-color: rgba(0,0,0,0.3);
     }
-    
+
     /* Shape Variations */
     .scoreboard-container.rectangle {
         border-radius: 0;
     }
-    
+
     .scoreboard-container.rounded {
         border-radius: 8px;
     }
-    
+
     .scoreboard-container.pill {
         border-radius: 40px;
     }
-    
+
     .scoreboard-container.modern {
         border-radius: 4px;
     }
-    
+
     .scoreboard-container.slim {
         border-radius: 0;
         height: 60px !important; /* Even thinner */
     }
-    
+
     .obs-overlay.slim .team-name {
         font-size: 0.9em;
     }
-    
+
     .obs-overlay.slim .team-score {
         font-size: 1.8em;
     }
-    
+
     .obs-overlay.slim .game-clock {
         font-size: 1.2em;
     }
-    
+
     /* Ensure possession indicator is visible but not too big */
     .obs-overlay .team.possession::after {
         content: "\2022";
@@ -467,11 +497,11 @@
         font-size: 18px;
         color: yellow;
     }
-    
+
     .obs-overlay .team.home.possession::after {
         left: 5px;
     }
-    
+
     .obs-overlay .team.away.possession::after {
         right: 5px;
         left: auto;
@@ -479,11 +509,47 @@
 
     /* Animation */
     @@keyframes blinking {
-        50% { opacity: 0.5; }
+        50% {
+            opacity: 0.5;
+        }
     }
-    
+
     /* Adding styles to ensure clean display in OBS */
     .obs-only-mode * {
         font-family: 'Roboto', 'Arial', sans-serif !important;
     }
+
+    /* Admin panel styles */
+    .admin-panel {
+        margin-top: 20px;
+        padding: 15px;
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+    }
+
+    .admin-form .form-group {
+        margin-bottom: 15px;
+    }
+
+    .admin-form label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 600;
+    }
+
+    /* CSS-only background transparency fix for OBS */
+    :root {
+        --background-color: transparent;
+    }
+
+    .timeout-indicator {
+        background-color: #444;
+        border-radius: 50%;
+    }
+
+        .timeout-indicator.active {
+            background-color: #ffcc00;
+        }
 </style>
+
