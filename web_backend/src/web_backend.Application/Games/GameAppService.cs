@@ -8,6 +8,7 @@ using Volo.Abp;
 using Volo.Abp.Application.Services;
 using Volo.Abp.BlobStoring;
 using Volo.Abp.ObjectMapping;
+using Azure.Storage.Blobs;                     // ← Azure SDK
 
 namespace web_backend.Games;
 
@@ -16,18 +17,23 @@ namespace web_backend.Games;
 [Route("api/app/game")]
 public class GameAppService : ApplicationService, IGameAppService
 {
+    private const string ContainerName = "videos";
+
     private readonly IGameRepository _repo;
     private readonly IObjectMapper _map;
-    private readonly IBlobContainer _blob;   // default container “videos”
+    private readonly IBlobContainer _blob;          // default container
+    private readonly BlobServiceClient _blobSvc;      // Azure url helper
 
     public GameAppService(
         IGameRepository repo,
         IObjectMapper map,
-        IBlobContainer blob)
+        IBlobContainer blob,
+        BlobServiceClient blobSvc)                    // injected by AbpBlobStoring.Azure
     {
         _repo = repo;
         _map = map;
         _blob = blob;
+        _blobSvc = blobSvc;
     }
 
     /* ----------  Queries ---------- */
@@ -51,7 +57,7 @@ public class GameAppService : ApplicationService, IGameAppService
 
     /* ----------  Commands ---------- */
 
-    // POST /api/app/game/upload  (multipart/form‑data)
+    // POST /api/app/game/upload (multipart/form‑data)
     [HttpPost("upload")]
     [DisableRequestSizeLimit]
     public async Task<GameDto> CreateAsync([FromForm] CreateGameDto input)
@@ -66,8 +72,9 @@ public class GameAppService : ApplicationService, IGameAppService
             await using var stream = input.VideoFile.OpenReadStream();
             await _blob.SaveAsync(blobName, stream, overrideExisting: false);
 
-            // if the container is public. Otherwise return SAS from your front‑end proxy
-            publicUrl = $"https://{_blob.GetUrl(blobName)}";
+            // build https://{account}.blob.core.windows.net/videos/{blobName}
+            var container = _blobSvc.GetBlobContainerClient(ContainerName);
+            publicUrl = container.GetBlobClient(blobName).Uri.ToString();
         }
 
         var entity = _map.Map<CreateGameDto, Game>(input);
