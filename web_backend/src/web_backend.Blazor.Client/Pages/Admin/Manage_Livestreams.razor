@@ -80,6 +80,7 @@
                                                 <th>Event Date</th>
                                                 <th>Score</th>
                                                 <th>Event Type</th>
+                                                <th>Access</th>
                                                 <th>Actions</th>
                                             </tr>
                                         </thead>
@@ -119,6 +120,18 @@
                                                         }
                                                     </td>
                                                     <td>@stream.EventType</td>
+                                                    <td>
+                                                        <div class="form-check form-switch">
+                                                            <input class="form-check-input" type="checkbox"
+                                                                   checked="@stream.FreeLivestream"
+                                                                   @onchange="(e) => ToggleFreeLivestream(stream.Id, e)" />
+                                                            <label class="form-check-label">
+                                                                <span class="badge @(stream.FreeLivestream ? "bg-success" : "bg-secondary")">
+                                                                    @(stream.FreeLivestream ? "Free" : "Subscribers Only")
+                                                                </span>
+                                                            </label>
+                                                        </div>
+                                                    </td>
                                                     <td>
                                                         <div class="btn-group" role="group">
                                                             <button class="btn btn-sm btn-primary" @onclick="() => ViewLivestream(stream.Id)">
@@ -178,6 +191,7 @@
                                                 <th>Score</th>
                                                 <th>Event Type</th>
                                                 <th>Status</th>
+                                                <th>Access</th>
                                                 <th>Actions</th>
                                             </tr>
                                         </thead>
@@ -221,6 +235,18 @@
                                                         <span class="badge bg-@GetStatusColor(stream.StreamStatus)">
                                                             @stream.StreamStatus.ToString()
                                                         </span>
+                                                    </td>
+                                                    <td>
+                                                        <div class="form-check form-switch">
+                                                            <input class="form-check-input" type="checkbox"
+                                                                   checked="@stream.FreeLivestream"
+                                                                   @onchange="(e) => ToggleFreeLivestream(stream.Id, e)" />
+                                                            <label class="form-check-label">
+                                                                <span class="badge @(stream.FreeLivestream ? "bg-success" : "bg-secondary")">
+                                                                    @(stream.FreeLivestream ? "Free" : "Subscribers Only")
+                                                                </span>
+                                                            </label>
+                                                        </div>
                                                     </td>
                                                     <td>
                                                         <div class="btn-group" role="group">
@@ -310,7 +336,7 @@
     {
         try
         {
-            // First, get the current livestream to preserve its scores
+            // First, get the current livestream to preserve its scores and settings
             var currentLivestream = livestreams.FirstOrDefault(l => l.Id == id);
             if (currentLivestream == null)
             {
@@ -322,7 +348,9 @@
                     StreamStatus = status,
                 // Preserve the current scores
                     HomeScore = currentLivestream.HomeScore,
-                    AwayScore = currentLivestream.AwayScore
+                    AwayScore = currentLivestream.AwayScore,
+                // Preserve FreeLivestream setting
+                    FreeLivestream = currentLivestream.FreeLivestream
                 };
 
             await LivestreamService.UpdateAsync(id, updateDto);
@@ -336,6 +364,45 @@
         catch (Exception ex)
         {
             await JS.InvokeVoidAsync("alert", $"Error updating livestream status: {ex.Message}");
+        }
+    }
+
+    private async Task ToggleFreeLivestream(Guid id, ChangeEventArgs e)
+    {
+        try
+        {
+            bool isChecked = (bool)e.Value;
+
+            // Get the current livestream to preserve other settings
+            var currentLivestream = livestreams.FirstOrDefault(l => l.Id == id);
+            if (currentLivestream == null)
+            {
+                throw new Exception("Livestream not found");
+            }
+
+            var updateDto = new UpdateLivestreamDto
+                {
+                    FreeLivestream = isChecked,
+                // Preserve other key settings
+                    StreamStatus = currentLivestream.StreamStatus,
+                    HomeScore = currentLivestream.HomeScore,
+                    AwayScore = currentLivestream.AwayScore
+                };
+
+            await LivestreamService.UpdateAsync(id, updateDto);
+
+            string accessMessage = isChecked ?
+                "Livestream is now free for all viewers." :
+                "Livestream is now restricted to subscribers only.";
+
+            await JS.InvokeVoidAsync("alert", accessMessage);
+            await RefreshLivestreams();
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error updating access settings: {ex.Message}");
+            // Refresh to reset UI state
+            await RefreshLivestreams();
         }
     }
 
@@ -355,7 +422,7 @@
     {
         try
         {
-            // Get the current livestream to preserve its status
+            // Get the current livestream to preserve its status and settings
             var currentLivestream = livestreams.FirstOrDefault(l => l.Id == editingScoreId);
             if (currentLivestream == null)
             {
@@ -366,8 +433,9 @@
                 {
                     HomeScore = homeScoreEdit,
                     AwayScore = awayScoreEdit,
-                // Preserve the current status
-                    StreamStatus = currentLivestream.StreamStatus
+                // Preserve the current status and access settings
+                    StreamStatus = currentLivestream.StreamStatus,
+                    FreeLivestream = currentLivestream.FreeLivestream
                 };
 
             await LivestreamService.UpdateAsync(editingScoreId, updateDto);

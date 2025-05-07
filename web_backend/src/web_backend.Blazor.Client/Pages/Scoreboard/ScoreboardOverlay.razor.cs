@@ -31,6 +31,8 @@ namespace web_backend.Blazor.Client.Pages.Scoreboard
         private LivestreamDto _linkedLivestream;
         private DateTime _lastScoreSync = DateTime.MinValue;
         private bool _isLoaded = false;
+        private bool loading = true;
+
 
         [Parameter]
         [SupplyParameterFromQuery(Name = "admin")]
@@ -137,6 +139,8 @@ namespace web_backend.Blazor.Client.Pages.Scoreboard
 
         protected override async Task OnInitializedAsync()
         {
+            loading = true; 
+
             _gameClockTimer = new Timer(1000);
             _gameClockTimer.Elapsed += OnGameClockTick;
 
@@ -181,22 +185,35 @@ namespace web_backend.Blazor.Client.Pages.Scoreboard
             await SetupSignalRConnection();
 
             _isLoaded = true;
+            loading = false;
         }
-
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
             if (firstRender)
             {
-                if (!AdminMode)
+                try
                 {
-                    // Configure OBS specific settings when in non-admin mode
-                    await JSRuntime.InvokeVoidAsync("configureForOBS");
+                    if (!AdminMode)
+                    {
+                        // Configure OBS specific settings when in non-admin mode
+                        await JSRuntime.InvokeVoidAsync("configureForOBS");
+                    }
+
+                    await JSRuntime.InvokeVoidAsync("notifyScoreboardLoaded");
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"Error in OnAfterRenderAsync: {ex.Message}");
                 }
 
-                await JSRuntime.InvokeVoidAsync("notifyScoreboardLoaded");
+                // Finally, make sure loading is false and force refresh
+                if (loading)
+                {
+                    loading = false;
+                    StateHasChanged();
+                }
             }
         }
-
         private async Task SetupSignalRConnection()
         {
             try

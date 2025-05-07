@@ -60,6 +60,17 @@
                                 <small class="form-text text-muted">Select the date and time when the game will begin</small>
                             </div>
                         </div>
+
+                        <!-- Add Free Livestream Toggle -->
+                        <div class="form-check form-switch mb-3">
+                            <InputCheckbox class="form-check-input" id="freeLivestreamToggle" @bind-Value="newLivestream.FreeLivestream" />
+                            <label class="form-check-label" for="freeLivestreamToggle">
+                                Make this livestream free for all users
+                            </label>
+                            <div class="text-muted small">
+                                If enabled, this livestream will be available to all users without subscription. Otherwise, only subscribers can access it.
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -115,6 +126,13 @@
                             <p class="text-muted">
                                 <i class="bi bi-calendar3 me-2"></i>@newLivestream.EventDate.ToString("dddd, MMMM d, yyyy at h:mm tt")
                             </p>
+                            <!-- Show access status -->
+                            <p>
+                                <span class="badge @(newLivestream.FreeLivestream ? "bg-success" : "bg-secondary")">
+                                    <i class="bi @(newLivestream.FreeLivestream ? "bi-unlock" : "bi-lock")"></i>
+                                    @(newLivestream.FreeLivestream ? "Free Access" : "Subscribers Only")
+                                </span>
+                            </p>
                         </div>
                         <div class="col-md-4 text-md-end">
                             <span class="vss-status-badge badge bg-@statusColor">
@@ -166,6 +184,27 @@
                         </div>
                     </div>
 
+                    <!-- Add Free Livestream Toggle to Control Panel -->
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <div class="row align-items-center">
+                                <div class="col-md-6">
+                                    <h5 class="mb-0"><i class="bi bi-lock me-2"></i>Access Control</h5>
+                                </div>
+                                <div class="col-md-6 d-flex justify-content-end">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox"
+                                               id="freeLivestreamSwitch" checked="@newLivestream.FreeLivestream"
+                                               @onchange="ToggleFreeLivestream" />
+                                        <label class="form-check-label fw-bold" for="freeLivestreamSwitch">
+                                            @(newLivestream.FreeLivestream ? "Free Access" : "Subscribers Only")
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="d-flex justify-content-between">
                         <button class="btn btn-outline-primary" @onclick="() => livestreamCreated = false">
                             <i class="bi bi-arrow-left me-1"></i>Create Another
@@ -180,6 +219,7 @@
     }
 </div>
 
+
 @code {
     private CreateLivestreamDto newLivestream = new()
         {
@@ -187,7 +227,7 @@
             StreamStatus = StreamStatus.AwaitingConnection,
             HomeScore = 0,
             AwayScore = 0,
-            FreeLivestream = true // Set this to match your requirements
+            FreeLivestream = false // Set this to match your requirements
         };
 
     private bool livestreamCreated = false;
@@ -252,6 +292,35 @@
         {
             await JS.InvokeVoidAsync("alert", $"Error creating livestream: {ex.Message}");
             Console.Error.WriteLine($"Error creating livestream: {ex}");
+        }
+    }
+
+    private async Task ToggleFreeLivestream(ChangeEventArgs e)
+    {
+        bool isChecked = (bool)e.Value;
+        newLivestream.FreeLivestream = isChecked;
+
+        // Update the livestream settings in the database
+        var updateDto = new UpdateLivestreamDto
+            {
+                FreeLivestream = isChecked
+            };
+
+        try
+        {
+            await LivestreamService.UpdateAsync(livestreamId, updateDto);
+
+            string accessMessage = isChecked ?
+                "Livestream is now free for all viewers." :
+                "Livestream is now restricted to subscribers only.";
+
+            await JS.InvokeVoidAsync("alert", accessMessage);
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error updating access settings: {ex.Message}");
+            // Revert the toggle if update failed
+            newLivestream.FreeLivestream = !isChecked;
         }
     }
 

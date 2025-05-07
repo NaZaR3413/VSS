@@ -61,7 +61,17 @@
                                                 @(!string.IsNullOrEmpty(stream.HomeTeam) && !string.IsNullOrEmpty(stream.AwayTeam)
                                                     ? $"{stream.HomeTeam} vs {stream.AwayTeam}"
                                                     : $"Livestream {stream.Id.ToString().Substring(0, 8)}")
-                                                <span class="badge bg-danger">LIVE</span>
+                                                <div class="d-flex align-items-center justify-content-between">
+                                                    <span class="badge bg-danger me-1">LIVE</span>
+                                                    @if (stream.FreeLivestream)
+                                                    {
+                                                        <span class="badge bg-success">Free</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-secondary">Subscribers</span>
+                                                    }
+                                                </div>
                                             </a>
                                         </li>
                                     }
@@ -222,6 +232,33 @@
         await InvokeAsync(StateHasChanged);
     }
 
+    private bool CanAccessLivestream(LivestreamDto livestream)
+    {
+        // Allow access if the livestream is free
+        if (livestream.FreeLivestream)
+            return true;
+
+        // Or if the user is authenticated (assuming they're a subscriber)
+        return authState?.User.Identity?.IsAuthenticated == true;
+    }
+
+    private void NavigateToLivestream(string id)
+    {
+        var livestream = activeLivestreams.FirstOrDefault(l => l.Id.ToString() == id);
+
+        // If livestream is null or the user can access it, navigate to the livestream
+        if (livestream == null || CanAccessLivestream(livestream))
+        {
+            NavigationManager.NavigateTo($"/livestream/{id}");
+        }
+        else
+        {
+            // Show subscription required message
+            JS.InvokeVoidAsync("showBannerNotification",
+                "This livestream requires a subscription. Please log in or subscribe to access this content.");
+        }
+    }
+
     private async Task RefreshLivestreams(bool force)
     {
         try
@@ -250,8 +287,6 @@
             await JS.InvokeVoidAsync("console.error", $"Error fetching livestreams: {ex.Message}");
         }
     }
-
-    private void NavigateToLivestream(string id) => NavigationManager.NavigateTo($"/livestream/{id}", true);
 
     private async Task ShowNoLivestreamsNotification()
     {

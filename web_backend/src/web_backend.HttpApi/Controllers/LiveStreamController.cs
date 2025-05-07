@@ -4,12 +4,14 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using web_backend.Livestreams;
 using Volo.Abp.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace web_backend.Controllers
 {
     [Route("livestream")]
     [ApiController]
-    public class LivestreamController : AbpController  // Required for ABP-based APIs
+    public class LivestreamController : AbpController
     {
         private readonly ILivestreamAppService _livestreamAppService;
 
@@ -33,9 +35,17 @@ namespace web_backend.Controllers
             {
                 return NotFound(new { Message = "Livestream not found." });
             }
+
+            // Check access control for non-free livestreams
+            if (!result.FreeLivestream && !User.Identity.IsAuthenticated)
+            {
+                return Forbid("This livestream requires a subscription.");
+            }
+
             return Ok(result);
         }
 
+        [Authorize(Roles = "admin")]
         [HttpPost]
         public async Task<ActionResult<LivestreamDto>> Create([FromBody] CreateLivestreamDto dto)
         {
@@ -43,6 +53,7 @@ namespace web_backend.Controllers
             return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
         }
 
+        [Authorize(Roles = "admin")]
         [HttpPut("{id}")]
         public async Task<ActionResult<LivestreamDto>> Update(Guid id, [FromBody] UpdateLivestreamDto dto)
         {
@@ -50,11 +61,32 @@ namespace web_backend.Controllers
             return Ok(result);
         }
 
+        [Authorize(Roles = "admin")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
             await _livestreamAppService.DeleteAsync(id);
             return NoContent();
+        }
+
+        [HttpGet("access-check/{id}")]
+        public async Task<IActionResult> CheckAccess(Guid id)
+        {
+            var livestream = await _livestreamAppService.GetAsync(id);
+            if (livestream == null)
+            {
+                return NotFound(new { Message = "Livestream not found." });
+            }
+
+            bool hasAccess = livestream.FreeLivestream || User.Identity.IsAuthenticated;
+
+            return Ok(new
+            {
+                HasAccess = hasAccess,
+                IsFreeLivestream = livestream.FreeLivestream,
+                RequiresSubscription = !livestream.FreeLivestream,
+                IsAuthenticated = User.Identity.IsAuthenticated
+            });
         }
     }
 }

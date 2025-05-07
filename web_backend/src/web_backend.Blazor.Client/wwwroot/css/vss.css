@@ -2035,3 +2035,63 @@ button,
         margin-bottom: 15px;
     }
 }
+
+.free-livestream-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.8rem;
+    padding: 0.3rem 0.6rem;
+}
+
+.subscriber-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.8rem;
+    padding: 0.3rem 0.6rem;
+    background-color: #6c757d;
+}
+
+/* Make the form switch bigger and more prominent */
+.form-switch-lg .form-check-input {
+    width: 3rem;
+    height: 1.5rem;
+    margin-top: 0.25rem;
+}
+
+.form-switch-lg .form-check-label {
+    padding-top: 0.25rem;
+    padding-left: 0.5rem;
+}
+
+/* Free livestream badge styling */
+.badge.bg-success.free-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.7rem;
+    padding: 0.35em 0.65em;
+}
+
+.badge.bg-secondary.subscribers-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.7rem;
+    padding: 0.35em 0.65em;
+}
+
+/* Customize form-switch for livestream access toggle */
+.form-check.form-switch .form-check-input:checked {
+    background-color: #198754;
+    border-color: #198754;
+}
+
+.form-check.form-switch .form-check-input:not(:checked) {
+    background-color: #6c757d;
+    border-color: #6c757d;
+}
+
+/* Align badges in dropdown menu */
+.vss-dropdown__link .d-flex {
+    margin-top: 4px;
+}
