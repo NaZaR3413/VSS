@@ -193,5 +193,12 @@ namespace web_backend.HttpApi.Host.Pages.Account
             TempData["EmailVerificationSent"] = "Verification email has been sent.";
             return RedirectToPage();
         }
+
+        public async Task<IActionResult> OnPostCancelSubscriptionAsync()
+        {
+
+            //await _stripeCancellationAppService.CancelSubscriptionAsync();
+            return RedirectToPage();
+        }
     }
 }
