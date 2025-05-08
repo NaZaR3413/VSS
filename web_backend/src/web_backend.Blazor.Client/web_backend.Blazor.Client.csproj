@@ -51,4 +51,8 @@
 		<ProjectReference Include="..\web_backend.Application.Contracts\web_backend.Application.Contracts.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Folder Include="Hubs\" />
+	</ItemGroup>
+
 </Project>

@@ -6,7 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using Serilog.Events;
-using web_backend.Scoreboard;   // Hub namespace
 
 namespace web_backend;
 
@@ -60,7 +59,6 @@ public class Program
             var app = builder.Build();
 
             app.UseCors("OverlayCors");
-            app.MapHub<ScoreboardHub>("/signalr/scoreboard");
 
             await app.InitializeApplicationAsync();
             await app.RunAsync();
