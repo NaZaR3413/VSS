@@ -1,0 +1,322 @@
+﻿@page "/games"
+@page "/games/{GameId:guid}"
+@using System.Net.Http.Json
+@using web_backend.Games
+@using web_backend.Enums
+@inject HttpClient HttpClient
+@inject IJSRuntime JS
+
+<div class="container">
+    @if (GameId == Guid.Empty)
+    {
+        <h2 class="my-4">Games Library</h2>
+
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">Find Games</h4>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="ResetFilters">Reset Filters</button>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="filterEventType" class="form-label">Sport</label>
+                        <select id="filterEventType" class="form-select" @bind="filters.EventType">
+                            <option value="">All Sports</option>
+                            <option value="@EventType.Football">Football</option>
+                            <option value="@EventType.Basketball">Basketball</option>
+                            <option value="@EventType.Baseball">Baseball</option>
+                            <option value="@EventType.Softball">Softball</option>
+                            <option value="@EventType.Lacrosse">Lacrosse</option>
+                            <option value="@EventType.Rugby">Rugby</option>
+                            <option value="@EventType.Soccer">Soccer</option>
+                            <option value="@EventType.Tennis">Tennis</option>
+                            <option value="@EventType.Volleyball">Volleyball</option>
+                            <option value="@EventType.Hockey">Hockey</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="filterHomeTeam" class="form-label">Home Team</label>
+                        <input id="filterHomeTeam" class="form-control" @bind="filters.HomeTeam" />
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="filterAwayTeam" class="form-label">Away Team</label>
+                        <input id="filterAwayTeam" class="form-control" @bind="filters.AwayTeam" />
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="filterBroadcasters" class="form-label">Broadcasters</label>
+                        <input id="filterBroadcasters" class="form-control" @bind="filters.Broadcasters" />
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="filterEventDate" class="form-label">Game Date</label>
+                        <input type="date" id="filterEventDate" class="form-control" @bind="filterDate" />
+                    </div>
+                    <div class="col-md-12">
+                        <button class="btn btn-primary" @onclick="ApplyFilters">Search Games</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="d-flex justify-content-center my-5">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        }
+        else if (games == null || !games.Any())
+        {
+            <div class="alert alert-info">
+                No games found matching your criteria. Try different search filters.
+            </div>
+        }
+        else
+        {
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                @foreach (var game in games)
+                {
+                    <div class="col">
+                        <div class="card h-100 game-card">
+                            <div class="card-header game-card-header">
+                                <span class="badge rounded-pill bg-primary">@game.EventType</span>
+                                <span class="date-badge">@game.EventDate.ToString("MMM d, yyyy")</span>
+                            </div>
+                            <div class="card-body">
+                                <h5 class="card-title">@game.HomeTeam vs @game.AwayTeam</h5>
+                                <h6 class="card-subtitle mb-2 text-muted">@game.GameScore</h6>
+                                <p class="card-text">@(string.IsNullOrEmpty(game.Description) ? "No description available." : game.Description)</p>
+                                <p class="card-text"><small class="text-muted">Broadcasters: @game.Broadcasters</small></p>
+                            </div>
+                            <div class="card-footer">
+                                <a href="/games/@game.Id" class="btn btn-primary w-100">Watch Game</a>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        @if (isLoading)
+        {
+            <div class="d-flex justify-content-center my-5">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        }
+        else if (currentGame == null)
+        {
+            <div class="alert alert-danger my-5">
+                Game not found or has been removed.
+                <a href="/games" class="alert-link">Return to Games List</a>
+            </div>
+        }
+        else
+        {
+            <div class="row my-4">
+                <div class="col-12">
+                    <a href="/games" class="btn btn-sm btn-outline-secondary mb-3">
+                        <i class="bi bi-arrow-left"></i> Back to Games
+                    </a>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h3>@currentGame.HomeTeam vs @currentGame.AwayTeam</h3>
+                                <span class="badge bg-primary">@currentGame.EventType</span>
+                            </div>
+                            <div class="text-muted">
+                                @currentGame.EventDate.ToString("MMMM d, yyyy") • Broadcasters: @currentGame.Broadcasters
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="video-container" style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden;">
+                                <video id="gameVideo"
+                                       controls
+                                       style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
+                                       class="video-js"
+                                       preload="auto">
+                                    <source src="@currentGame.PlaybackUrl" type="video/mp4">
+                                    Your browser does not support the video tag.
+                                </video>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <h4>Game Details</h4>
+                                    <p>@currentGame.Description</p>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="score-box text-center p-3 border rounded">
+                                        <div class="row">
+                                            <div class="col-5 text-end">
+                                                <h5>@currentGame.HomeTeam</h5>
+                                                <h2>@currentGame.HomeScore</h2>
+                                            </div>
+                                            <div class="col-2 d-flex align-items-center justify-content-center">
+                                                <h4 class="mb-0">-</h4>
+                                            </div>
+                                            <div class="col-5 text-start">
+                                                <h5>@currentGame.AwayTeam</h5>
+                                                <h2>@currentGame.AwayScore</h2>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+<style>
+    .game-card {
+        transition: transform 0.2s;
+        border: 1px solid rgba(0,0,0,0.125);
+    }
+
+        .game-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+    .game-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .date-badge {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+
+    .score-box {
+        background-color: #f8f9fa;
+        border-radius: 0.25rem;
+    }
+
+    .video-container {
+        background-color: #000;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public Guid GameId { get; set; } = Guid.Empty;
+
+    private List<GameDto> games = new();
+    private GameDto currentGame;
+    private bool isLoading = true;
+    private GameFilterDto filters = new();
+    private DateTime? filterDate = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (GameId == Guid.Empty)
+        {
+            await LoadGames();
+        }
+        else
+        {
+            await LoadSingleGame();
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (GameId != Guid.Empty)
+        {
+            await LoadSingleGame();
+        }
+    }
+
+    private async Task LoadGames()
+    {
+        try
+        {
+            isLoading = true;
+            games = await HttpClient.GetFromJsonAsync<List<GameDto>>("/api/app/game");
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("console.error", $"Error loading games: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadSingleGame()
+    {
+        try
+        {
+            isLoading = true;
+            currentGame = await HttpClient.GetFromJsonAsync<GameDto>($"/api/app/game/{GameId}");
+
+            await Task.Delay(100); 
+            await JS.InvokeVoidAsync("initializeVideoPlayer", "gameVideo");
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("console.error", $"Error loading game: {ex.Message}");
+            currentGame = null;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ApplyFilters()
+    {
+        try
+        {
+            isLoading = true;
+
+            if (filterDate.HasValue)
+            {
+                filters.EventDate = filterDate.Value;
+            }
+            else
+            {
+                filters.EventDate = null;
+            }
+
+            var response = await HttpClient.PostAsJsonAsync("/api/app/game/filtered-list", filters);
+
+            if (response.IsSuccessStatusCode)
+            {
+                games = await response.Content.ReadFromJsonAsync<List<GameDto>>();
+            }
+            else
+            {
+                var errorMessage = await response.Content.ReadAsStringAsync();
+                await JS.InvokeVoidAsync("console.error", $"Error applying filters: {errorMessage}");
+                await LoadGames();
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("console.error", $"Error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ResetFilters()
+    {
+        filters = new GameFilterDto();
+        filterDate = null;
+        await LoadGames();
+    }
+}
