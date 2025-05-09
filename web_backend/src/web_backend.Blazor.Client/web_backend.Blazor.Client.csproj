@@ -2,19 +2,23 @@
 
   <Import Project="..\..\common.props" />
 
-  <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
+		<GenerateApplicationPartFactory>false</GenerateApplicationPartFactory>
+		<SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
+	</PropertyGroup>
 
-  <ItemGroup>
+
+	<ItemGroup>
     <PackageReference Include="Blazorise.Bootstrap5" Version="1.5.2" />
     <PackageReference Include="Blazorise.Icons.FontAwesome" Version="1.5.2" />
     <PackageReference Include="CsvHelper" Version="33.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.4" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.4" />
-  </ItemGroup>
+	<PackageReference Include="Microsoft.AspNetCore.Mvc.Core" Version="2.3.0" PrivateAssets="all" />
+	</ItemGroup>
 
   <ItemGroup>
 		<PackageReference Include="Volo.Abp.AspNetCore.Components.WebAssembly.BasicTheme" Version="8.3.1" />
@@ -35,6 +39,17 @@
     <ProjectReference Include="..\..\src\web_backend.HttpApi.Client\web_backend.HttpApi.Client.csproj" />
 	<ProjectReference Include="..\web_backend.Domain.Shared\web_backend.Domain.Shared.csproj" />
   </ItemGroup>
+
+	<ItemGroup>
+		<None Remove="obj\**" />
+	</ItemGroup>
+
+	<Target Name="DeleteMvcApplicationPartsAssemblyInfo" BeforeTargets="CoreCompile">
+		<ItemGroup>
+			<MvcPartsFile Include="$(IntermediateOutputPath)$(AssemblyName).MvcApplicationPartsAssemblyInfo.cs" />
+		</ItemGroup>
+		<Delete Files="@(MvcPartsFile)" ContinueOnError="true" />
+	</Target>
 
 
 </Project>
