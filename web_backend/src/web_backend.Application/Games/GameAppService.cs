@@ -1,69 +1,94 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
+﻿using Azure.Storage.Sas;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using Volo.Abp;
 using Volo.Abp.Application.Services;
-using Volo.Abp.BlobStoring;
-using Volo.Abp.ObjectMapping;
-using Azure.Storage.Blobs;                     // ← Azure SDK
+using Volo.Abp.Data;
+using Volo.Abp.Domain.Entities;
+using Volo.Abp.MultiTenancy;
+using web_backend.BlobStorage;
+using web_backend.Enums;
 
-namespace web_backend.Games;
-
-[RemoteService]
-[Area("app")]
-[Route("api/app/game")]
-public class GameAppService : ApplicationService, IGameAppService
+namespace web_backend.Games
 {
-    private const string ContainerName = "videos";
-
-    private readonly IGameRepository _repo;
-    private readonly IObjectMapper _map;
-    private readonly IBlobContainer _blob;          // default container
-    private readonly BlobServiceClient _blobSvc;      // Azure url helper
-
-    public GameAppService(
-        IGameRepository repo,
-        IObjectMapper map,
-        IBlobContainer blob,
-        BlobServiceClient blobSvc)                    // injected by AbpBlobStoring.Azure
+    public class GameAppService : ApplicationService, IGameAppService
     {
-        _repo = repo;
-        _map = map;
-        _blob = blob;
-        _blobSvc = blobSvc;
-    }
+        private readonly IGameRepository _gameRepository;
+        private readonly IDataFilter _dataFilter;
+        private readonly BlobStorageService _blobStorageService;
+        private readonly ILogger<GameAppService> _logger;
 
-    /* ----------  Queries ---------- */
+        public GameAppService(
+            IGameRepository gameRepository,
+            IDataFilter dataFilter,
+            BlobStorageService blobStorageService,
+            ILogger<GameAppService> logger
+            )
+        {
+            _gameRepository = gameRepository;
+            _dataFilter = dataFilter;
+            _blobStorageService = blobStorageService;
+            _logger = logger;
+        }
 
-    [HttpGet("{id}")]
-    public async Task<GameDto> GetAsync(Guid id) =>
-        _map.Map<Game, GameDto>(await _repo.GetAsync(id));
+        /// <summary>
+        /// API to return a game instance
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns>this specific game instance</returns>
+        public async Task<GameDto> GetAsync(Guid id)
+        {
+            using (_dataFilter.Disable<IMultiTenant>())
+            {
+                // retrieve game information
+                var game = await _gameRepository.GetAsync(id);
 
-    [HttpGet]
-    public async Task<List<GameDto>> GetListAsync() =>
-        _map.Map<List<Game>, List<GameDto>>(await _repo.GetListAsync());
+                // map information onto dto
+                var result = ObjectMapper.Map<Game, GameDto>(game);
 
-    [HttpPost("filter")]
-    public async Task<List<GameDto>> GetFilteredListAsync([FromBody] GameFilterDto f)
-    {
-        var list = await _repo.GetFilteredListAsync(
-            f.EventType, f.HomeTeam, f.AwayTeam, f.Broadcasters, f.EventDate);
+                result.PlaybackUrl = await GeneratePlaybackUrlAsync(game);
 
-        return _map.Map<List<Game>, List<GameDto>>(list);
-    }
+                return result;
 
-    /* ----------  Commands ---------- */
+            }
+        }
 
-    // POST /api/app/game/upload (multipart/form‑data)
-    [HttpPost("upload")]
-    [DisableRequestSizeLimit]
-    public async Task<GameDto> CreateAsync([FromForm] CreateGameDto input)
-    {
-        string blobName = string.Empty;
-        string publicUrl = string.Empty;
+        /// <summary>
+        /// API to return a list of all game instances
+        /// </summary>
+        /// <returns>list of all game instances</returns>
+        public async Task<List<GameDto>> GetListAsync()
+        {
+            using (_dataFilter.Disable<IMultiTenant>())
+            {
+                // retrieve game list
+                var game = await _gameRepository.GetListAsync();
+
+                // map information onto a dto
+                var result = ObjectMapper.Map<List<Game>, List<GameDto>>(game);
+
+                return result;
+            }
+        }
+
+        /// <summary>
+        /// API to create a game instance and upload the associated video to Blob Storage.
+        /// </summary>
+        /// <param name="input">The game creation input including metadata and video file.</param>
+        /// <returns>The created game information.</returns>
+        public async Task<GameDto> CreateAsync([FromForm] CreateGameDto input)
+        {
+            using (_dataFilter.Disable<IMultiTenant>())
+            {
+                if (input.VideoFile == null || input.VideoFile.Length == 0)
+                {
+                    throw new UserFriendlyException("No video file uploaded.");
+                }
 
                 var game = new Game
                 {
@@ -78,32 +103,159 @@ public class GameAppService : ApplicationService, IGameAppService
                     EventType = input.EventType
                 };
 
-            await using var stream = input.VideoFile.OpenReadStream();
-            await _blob.SaveAsync(blobName, stream, overrideExisting: false);
+                var created = await _gameRepository.CreateAsync(game);
+                var blobName = BlobStorageName(input.EventType, created.EventDate, created.HomeTeam, created.AwayTeam, created.Id);
 
-            // build https://{account}.blob.core.windows.net/videos/{blobName}
-            var container = _blobSvc.GetBlobContainerClient(ContainerName);
-            publicUrl = container.GetBlobClient(blobName).Uri.ToString();
+                try
+                {
+                    using (var stream = input.VideoFile.OpenReadStream())
+                    {
+                        await _blobStorageService.UploadAsync(blobName, stream);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Upload failed, delete the game from the DB
+                    await _gameRepository.DeleteAsync(created.Id);
+                    throw new UserFriendlyException($"Video upload failed. Game was not saved. Reason: {ex.Message}");
+                }
+                return ObjectMapper.Map<Game, GameDto>(created);
+            }
         }
 
-        var entity = _map.Map<CreateGameDto, Game>(input);
-        entity.GameUrl = publicUrl;
-        entity.PlaybackUrl = publicUrl;
+        /// <summary>
+        /// update a game instance 
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="input"> updated information for the game</param>
+        /// <returns>no specific return, updates the game instance</returns>
+        /// <exception cref="EntityNotFoundException"></exception>
+        public async Task<GameDto> UpdateAsync(Guid id, UpdateGameDto input)
+        {
+            using (_dataFilter.Disable<IMultiTenant>())
+            {
+                var game = await _gameRepository.GetAsync(id);
+                if (game == null)
+                {
+                    throw new EntityNotFoundException(typeof(Game), id);
+                }
 
-        entity = await _repo.CreateAsync(entity);
-        return _map.Map<Game, GameDto>(entity);
+                ObjectMapper.Map(input, game);
+
+                var updatedGame = await _gameRepository.UpdateAsync(game);
+
+                var result = ObjectMapper.Map<Game, GameDto>(updatedGame);
+
+                return result;
+            }
+        }
+
+        /// <summary>
+        /// deletes a game instance 
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        /// <exception cref="EntityNotFoundException"></exception>
+        public async Task DeleteAsync(Guid id)
+        {
+            using (_dataFilter.Disable<IMultiTenant>())
+            {
+                var game = await _gameRepository.GetAsync(id);
+                if (game == null)
+                {
+                    throw new EntityNotFoundException(typeof(Game), id);
+                }
+
+                var blobName = BlobStorageName(game.EventType, game.EventDate, game.HomeTeam, game.AwayTeam, game.Id);
+                var blobClient = _blobStorageService.GetBlobClient(blobName);
+
+                var exists = await blobClient.ExistsAsync();
+                if (exists.Value)
+                {
+                    await blobClient.DeleteAsync();
+                    _logger.LogInformation("Deleted video blob: {BlobName}", blobName);
+                }
+                else
+                {
+                    _logger.LogWarning("Video blob not found during delete: {BlobName}", blobName);
+                }
+                await _gameRepository.DeleteAsync(id);
+            }
+        }
+
+        /// <summary>
+        /// Retrieves a list of games based on the provided filters.
+        /// Supports filtering by EventType, HomeTeam, AwayTeam, Broadcasters, and EventDate.
+        /// </summary>
+        /// <param name="input">
+        /// Filter parameters for querying games.
+        /// - Visit <see cref="GameFilterDto"/> for details on available filters.
+        /// - Dates should be provided in ISO 8601 format: YYYY-MM-DDTHH:MM:SS (e.g., 2025-05-01T19:30:00). or can be yyyy-MM-dd for simplicity
+        /// </param>
+        /// <returns>
+        /// A list of matching <see cref="GameDto"/> objects.
+        /// </returns>
+        public async Task<List<GameDto>> GetFilteredListAsync(GameFilterDto input)
+        {
+            using (_dataFilter.Disable<IMultiTenant>())
+            {
+                var filteredGames = await _gameRepository.GetFilteredListAsync(
+                    input.EventType,
+                    input.HomeTeam,
+                    input.AwayTeam,
+                    input.Broadcasters,
+                    input.EventDate
+                );
+
+                var result = ObjectMapper.Map<List<Game>, List<GameDto>>(filteredGames);
+
+                return result;
+            }
+        }
+
+        /// <summary>
+        /// consistent naming for all blob storage access
+        /// </summary>
+        /// <param name="eventType"></param>
+        /// <param name="gameId"></param>
+        /// <returns></returns>
+        private string BlobStorageName(EventType eventType, DateTime eventDate, string homeTeam, string awayTeam, Guid gameId)
+        {
+            var eventTypeString = eventType.ToString();
+            var dateString = eventDate.ToString("yyyy-MM-dd"); // Keep it sortable and clear
+            var matchupString = $"{homeTeam}vs{awayTeam}".Replace(" ", ""); // Remove spaces for clean filenames
+
+            return $"{dateString}/{eventTypeString}/{matchupString}/{gameId}.mp4";
+        }
+
+        private async Task<string> GeneratePlaybackUrlAsync(Game game)
+        {
+            var blobName = BlobStorageName(game.EventType, game.EventDate, game.HomeTeam, game.AwayTeam, game.Id);
+            var blobClient = _blobStorageService.GetBlobClient(blobName);
+
+            var exists = await blobClient.ExistsAsync();
+            if (!exists.Value)
+            {
+                throw new UserFriendlyException("Video file not found for this game.");
+            }
+
+            var sasBuilder = new BlobSasBuilder
+            {
+                BlobContainerName = blobClient.BlobContainerName,
+                BlobName = blobName,
+                Resource = "b", // Blob
+                ExpiresOn = DateTimeOffset.UtcNow.AddHours(6) // adjust this expiration time as needed
+            };
+            sasBuilder.SetPermissions(BlobSasPermissions.Read);
+
+            var sasUri = blobClient.GenerateSasUri(sasBuilder);
+            return sasUri.ToString();
+        }
+
+
+
+
+
+
     }
-
-    [HttpPut("{id}")]
-    public async Task<GameDto> UpdateAsync(Guid id, [FromBody] UpdateGameDto input)
-    {
-        var e = await _repo.GetAsync(id);
-        _map.Map(input, e);
-
-        e = await _repo.UpdateAsync(e);
-        return _map.Map<Game, GameDto>(e);
-    }
-
-    [HttpDelete("{id}")]
-    public Task DeleteAsync(Guid id) => _repo.DeleteAsync(id);
 }
