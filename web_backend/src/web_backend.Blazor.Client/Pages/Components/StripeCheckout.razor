@@ -1,0 +1,46 @@
+﻿@page "/subscribe"
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@inject NavigationManager Navigation
+@inject IAccessTokenProvider TokenProvider
+@inject HttpClient Http
+
+
+<h3>Subscribe to Premium</h3>
+
+<div class="product">
+    <div class="description">
+        <h4>Test Subscription</h4>
+        <h5>$20.00 / month</h5>
+    </div>
+</div>
+
+<button @onclick="CreateCheckoutSession">Checkout</button>
+
+@code {
+    private async Task CreateCheckoutSession()
+    {
+        var tokenResult = await TokenProvider.RequestAccessToken();
+
+        if (!tokenResult.TryGetToken(out var token))
+        {
+            Console.WriteLine("User is not authenticated. Cannot create checkout session.");
+            return;
+        }
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "https://localhost:44356/api/app/stripe-subscription/checkout-session");
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Value);
+
+        var response = await Http.SendAsync(request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var checkoutUrl = await response.Content.ReadAsStringAsync();
+            Navigation.NavigateTo(checkoutUrl, forceLoad: true);
+        }
+        else
+        {
+            Console.WriteLine("Error creating session: " + response.StatusCode);
+        }
+    }
+}
+

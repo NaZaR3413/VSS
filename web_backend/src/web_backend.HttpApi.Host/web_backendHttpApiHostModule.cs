@@ -33,6 +33,11 @@ using Volo.Abp.UI.Navigation.Urls;
 using Volo.Abp.VirtualFileSystem;
 using Volo.Abp.ObjectExtending;
 using Volo.Abp.Identity;
+using Stripe;
+using web_backend.Stripe;
+using Stripe.Checkout;
+
+
 namespace web_backend;
 
 [DependsOn(
@@ -88,6 +93,23 @@ public class web_backendHttpApiHostModule : AbpModule
         ConfigureVirtualFileSystem(context);
         ConfigureCors(context, configuration);
         ConfigureSwaggerServices(context, configuration);
+        ConfigureStripe(context);
+    }
+
+    private void ConfigureStripe(ServiceConfigurationContext context)
+    {
+        var configuration = context.Services.GetConfiguration();
+
+        // Bind Stripe settings from appsettings.json
+        context.Services.Configure<StripeOptions>(
+            configuration.GetSection("Stripe")
+        );
+
+        context.Services.AddSingleton<SessionService>();
+
+        // Set the Stripe API key at startup
+        StripeConfiguration.ApiKey = configuration["Stripe:SecretKey"];
+
     }
 
     private void ConfigureAuthentication(ServiceConfigurationContext context)
