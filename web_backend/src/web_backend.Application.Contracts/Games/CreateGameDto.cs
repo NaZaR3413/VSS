@@ -10,9 +10,9 @@ namespace web_backend.Games
 {
     public class CreateGameDto
     {
-        public string? GameUrl { get; set; }          // ⇐ nullable (server will fill)
-        public string HomeTeam { get; set; } = default!;
-        public string AwayTeam { get; set; } = default!;
+        public string? GameUrl { get; set; }
+        public string HomeTeam { get; set; }
+        public string AwayTeam { get; set; }
         public int HomeScore { get; set; }
         public int AwayScore { get; set; }
         public string? Broadcasters { get; set; }

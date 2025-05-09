@@ -65,9 +65,18 @@ public class GameAppService : ApplicationService, IGameAppService
         string blobName = string.Empty;
         string publicUrl = string.Empty;
 
-        if (input.VideoFile is { Length: > 0 })
-        {
-            blobName = $"{Guid.NewGuid()}{Path.GetExtension(input.VideoFile.FileName)}";
+                var game = new Game
+                {
+                    GameUrl = "",
+                    HomeTeam = input.HomeTeam,
+                    AwayTeam = input.AwayTeam,
+                    HomeScore = input.HomeScore,
+                    AwayScore = input.AwayScore,
+                    Broadcasters = input.Broadcasters,
+                    Description = input.Description,
+                    EventDate = input.EventDate,
+                    EventType = input.EventType
+                };
 
             await using var stream = input.VideoFile.OpenReadStream();
             await _blob.SaveAsync(blobName, stream, overrideExisting: false);
