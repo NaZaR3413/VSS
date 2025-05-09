@@ -289,8 +289,7 @@
             content.Add(new StringContent(newGame.EventDate.ToString("o")), "EventDate");
             content.Add(new StringContent(((int)newGame.EventType).ToString()), "EventType");
 
-
-            var fileContent = new StreamContent(selectedFile.OpenReadStream(maxFileSize));
+            var fileContent = new StreamContent(selectedFile.OpenReadStream(long.MaxValue));
             fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("video/mp4");
 
             content.Add(fileContent, "VideoFile", selectedFile.Name);
@@ -335,6 +334,7 @@
             isUploading = false;
         }
     }
+
 
     private async Task DeleteGame(Guid id)
     {
