@@ -6,6 +6,11 @@
 @inject HttpClient HttpClient
 @inject IJSRuntime JS
 
+<HeadContent>
+    <script src="js/videoPlayer.js"></script>
+</HeadContent>
+
+
 <AuthorizeView Roles="admin" Context="auth">
     <Authorized>
         <div class="container">
@@ -266,6 +271,18 @@
             return;
         }
 
+        if (string.IsNullOrWhiteSpace(newGame.HomeTeam) || string.IsNullOrWhiteSpace(newGame.AwayTeam))
+        {
+            await JS.InvokeVoidAsync("alert", "Home Team and Away Team are required fields.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(newGame.Description))
+        {
+            await JS.InvokeVoidAsync("alert", "Description is required.");
+            return;
+        }
+
         try
         {
             isUploading = true;
@@ -273,32 +290,47 @@
 
             var timer = new System.Threading.Timer(_ =>
             {
-                uploadProgress += 5;
+                uploadProgress += 2;
                 if (uploadProgress > 95) uploadProgress = 95;
                 InvokeAsync(StateHasChanged);
             }, null, 0, 200);
 
-            var content = new MultipartFormDataContent();
-
-            content.Add(new StringContent(newGame.HomeTeam ?? ""), "HomeTeam");
-            content.Add(new StringContent(newGame.AwayTeam ?? ""), "AwayTeam");
-            content.Add(new StringContent(newGame.HomeScore.ToString()), "HomeScore");
-            content.Add(new StringContent(newGame.AwayScore.ToString()), "AwayScore");
-            content.Add(new StringContent(newGame.Broadcasters ?? ""), "Broadcasters");
-            content.Add(new StringContent(newGame.Description ?? ""), "Description");
-            content.Add(new StringContent(newGame.EventDate.ToString("o")), "EventDate");
-            content.Add(new StringContent(((int)newGame.EventType).ToString()), "EventType");
-
-            var fileContent = new StreamContent(selectedFile.OpenReadStream(long.MaxValue));
-            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("video/mp4");
-
-            content.Add(fileContent, "VideoFile", selectedFile.Name);
-
             try
             {
-                await JS.InvokeVoidAsync("console.log", $"Uploading file: {selectedFile.Name}, Size: {selectedFile.Size} bytes");
+                await JS.InvokeVoidAsync("console.log", $"Starting upload of {selectedFile.Name}, Size: {selectedFile.Size} bytes");
 
-                var response = await HttpClient.PostAsync("/api/app/game", content);
+                var content = new MultipartFormDataContent($"Upload----{DateTime.Now.Ticks}");
+
+                content.Add(new StringContent(newGame.HomeTeam), "HomeTeam");
+                content.Add(new StringContent(newGame.AwayTeam), "AwayTeam");
+                content.Add(new StringContent(newGame.HomeScore.ToString()), "HomeScore");
+                content.Add(new StringContent(newGame.AwayScore.ToString()), "AwayScore");
+                content.Add(new StringContent(newGame.Broadcasters ?? string.Empty), "Broadcasters");
+                content.Add(new StringContent(newGame.Description), "Description");
+                content.Add(new StringContent(newGame.EventDate.ToString("o")), "EventDate");
+                content.Add(new StringContent(((int)newGame.EventType).ToString()), "EventType");
+                content.Add(new StringContent(newGame.GameUrl ?? string.Empty), "GameUrl");
+
+                using var memoryStream = new MemoryStream();
+                var fileStream = selectedFile.OpenReadStream(long.MaxValue);
+                await fileStream.CopyToAsync(memoryStream);
+                memoryStream.Position = 0;
+
+                var fileContent = new ByteArrayContent(memoryStream.ToArray());
+                fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("video/mp4");
+
+                content.Add(fileContent, "VideoFile", selectedFile.Name);
+
+                using var client = new HttpClient();
+                client.Timeout = TimeSpan.FromHours(1);
+                client.BaseAddress = new Uri(HttpClient.BaseAddress.ToString());
+
+                foreach (var header in HttpClient.DefaultRequestHeaders)
+                {
+                    client.DefaultRequestHeaders.Add(header.Key, header.Value);
+                }
+
+                var response = await client.PostAsync("/api/app/game", content);
 
                 await timer.DisposeAsync();
                 uploadProgress = 100;
@@ -309,20 +341,21 @@
                     await JS.InvokeVoidAsync("alert", "Game uploaded successfully!");
                     newGame = new CreateGameDto { EventDate = DateTime.Today };
                     selectedFile = null;
-
                     await LoadGames();
                 }
                 else
                 {
-                    var errorMessage = await response.Content.ReadAsStringAsync();
-                    await JS.InvokeVoidAsync("console.error", $"Error response: {(int)response.StatusCode} - {errorMessage}");
-                    await JS.InvokeVoidAsync("alert", $"Error uploading game: {errorMessage}");
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    await JS.InvokeVoidAsync("console.error", $"Server error: {(int)response.StatusCode} - {response.ReasonPhrase}");
+                    await JS.InvokeVoidAsync("console.error", $"Error details: {errorContent}");
+                    await JS.InvokeVoidAsync("alert", $"Error uploading game: {errorContent}");
                 }
             }
             catch (Exception ex)
             {
-                await JS.InvokeVoidAsync("console.error", $"Exception during upload: {ex.Message}");
-                await JS.InvokeVoidAsync("alert", $"Error during upload: {ex.Message}");
+                await JS.InvokeVoidAsync("console.error", $"Upload exception: {ex.GetType().Name} - {ex.Message}");
+                await JS.InvokeVoidAsync("console.error", $"Stack trace: {ex.StackTrace}");
+                await JS.InvokeVoidAsync("alert", $"Error uploading: {ex.Message}");
             }
         }
         catch (Exception ex)
@@ -334,7 +367,6 @@
             isUploading = false;
         }
     }
-
 
     private async Task DeleteGame(Guid id)
     {
