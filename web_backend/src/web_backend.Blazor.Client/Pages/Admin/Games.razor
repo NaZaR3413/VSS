@@ -271,8 +271,15 @@
             isUploading = true;
             uploadProgress = 0;
 
+            var timer = new System.Threading.Timer(_ =>
+            {
+                uploadProgress += 5;
+                if (uploadProgress > 95) uploadProgress = 95;
+                InvokeAsync(StateHasChanged);
+            }, null, 0, 200);
+
             var content = new MultipartFormDataContent();
-            
+
             content.Add(new StringContent(newGame.HomeTeam ?? ""), "HomeTeam");
             content.Add(new StringContent(newGame.AwayTeam ?? ""), "AwayTeam");
             content.Add(new StringContent(newGame.HomeScore.ToString()), "HomeScore");
@@ -281,26 +288,42 @@
             content.Add(new StringContent(newGame.Description ?? ""), "Description");
             content.Add(new StringContent(newGame.EventDate.ToString("o")), "EventDate");
             content.Add(new StringContent(((int)newGame.EventType).ToString()), "EventType");
-            
-            var streamContent = new StreamContent(selectedFile.OpenReadStream(maxAllowedSize: long.MaxValue));
-            content.Add(streamContent, "VideoFile", selectedFile.Name);
 
-            var response = await HttpClient.PostAsync("/api/app/game", content);
-            
-            if (response.IsSuccessStatusCode)
+
+            var fileContent = new StreamContent(selectedFile.OpenReadStream(maxFileSize));
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("video/mp4");
+
+            content.Add(fileContent, "VideoFile", selectedFile.Name);
+
+            try
             {
-                await JS.InvokeVoidAsync("alert", "Game uploaded successfully!");
-                newGame = new CreateGameDto { EventDate = DateTime.Today };
-                selectedFile = null;
-                
-                await LoadGames();
-                
-                await JS.InvokeVoidAsync("document.getElementById", "uploadForm").AsTask();
+                await JS.InvokeVoidAsync("console.log", $"Uploading file: {selectedFile.Name}, Size: {selectedFile.Size} bytes");
+
+                var response = await HttpClient.PostAsync("/api/app/game", content);
+
+                await timer.DisposeAsync();
+                uploadProgress = 100;
+                await InvokeAsync(StateHasChanged);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    await JS.InvokeVoidAsync("alert", "Game uploaded successfully!");
+                    newGame = new CreateGameDto { EventDate = DateTime.Today };
+                    selectedFile = null;
+
+                    await LoadGames();
+                }
+                else
+                {
+                    var errorMessage = await response.Content.ReadAsStringAsync();
+                    await JS.InvokeVoidAsync("console.error", $"Error response: {(int)response.StatusCode} - {errorMessage}");
+                    await JS.InvokeVoidAsync("alert", $"Error uploading game: {errorMessage}");
+                }
             }
-            else
+            catch (Exception ex)
             {
-                var errorMessage = await response.Content.ReadAsStringAsync();
-                await JS.InvokeVoidAsync("alert", $"Error uploading game: {errorMessage}");
+                await JS.InvokeVoidAsync("console.error", $"Exception during upload: {ex.Message}");
+                await JS.InvokeVoidAsync("alert", $"Error during upload: {ex.Message}");
             }
         }
         catch (Exception ex)
@@ -351,7 +374,7 @@
         try
         {
             isLoading = true;
-            
+
             if (filterDate.HasValue)
             {
                 filters.EventDate = filterDate.Value;
@@ -361,8 +384,27 @@
                 filters.EventDate = null;
             }
 
-            var response = await HttpClient.PostAsJsonAsync("/api/app/game/filtered-list", filters);
-            
+            var queryParams = new List<string>();
+
+            if (filters.EventType.HasValue)
+                queryParams.Add($"EventType={Uri.EscapeDataString(((int)filters.EventType.Value).ToString())}");
+
+            if (!string.IsNullOrEmpty(filters.HomeTeam))
+                queryParams.Add($"HomeTeam={Uri.EscapeDataString(filters.HomeTeam)}");
+
+            if (!string.IsNullOrEmpty(filters.AwayTeam))
+                queryParams.Add($"AwayTeam={Uri.EscapeDataString(filters.AwayTeam)}");
+
+            if (!string.IsNullOrEmpty(filters.Broadcasters))
+                queryParams.Add($"Broadcasters={Uri.EscapeDataString(filters.Broadcasters)}");
+
+            if (filters.EventDate.HasValue)
+                queryParams.Add($"EventDate={Uri.EscapeDataString(filters.EventDate.Value.ToString("o"))}");
+
+            var queryString = queryParams.Count > 0 ? "?" + string.Join("&", queryParams) : "";
+
+            var response = await HttpClient.GetAsync($"/api/app/game/filtered-list{queryString}");
+
             if (response.IsSuccessStatusCode)
             {
                 games = await response.Content.ReadFromJsonAsync<List<GameDto>>();

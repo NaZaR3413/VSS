@@ -6,6 +6,10 @@
 @inject HttpClient HttpClient
 @inject IJSRuntime JS
 
+<HeadContent>
+    <script src="js/videoPlayer.js"></script>
+</HeadContent>
+
 <div class="container">
     @if (GameId == Guid.Empty)
     {
@@ -261,8 +265,24 @@
             isLoading = true;
             currentGame = await HttpClient.GetFromJsonAsync<GameDto>($"/api/app/game/{GameId}");
 
-            await Task.Delay(100); 
-            await JS.InvokeVoidAsync("initializeVideoPlayer", "gameVideo");
+            await Task.Delay(100);
+
+            // Only initialize player if currentGame is not null and PlaybackUrl exists
+            if (currentGame != null && !string.IsNullOrEmpty(currentGame.PlaybackUrl))
+            {
+                await JS.InvokeVoidAsync("initializeVideoPlayer", "gameVideo");
+            }
+            else
+            {
+                // Show error message about missing video URL
+                await JS.InvokeVoidAsync("console.error", "Game data loaded but no playback URL is available.");
+            }
+        }
+        catch (HttpRequestException ex) when (ex.Message.Contains("403"))
+        {
+            // Specific handling for 403 Forbidden errors
+            await JS.InvokeVoidAsync("console.error", "Access to this game is forbidden. You may not have permission to view this content.");
+            currentGame = null;
         }
         catch (Exception ex)
         {
