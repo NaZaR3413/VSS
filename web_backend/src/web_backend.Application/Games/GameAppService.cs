@@ -92,7 +92,7 @@ namespace web_backend.Games
 
                 var game = new Game
                 {
-                    GameUrl = "",
+                    GameUrl = null,
                     HomeTeam = input.HomeTeam,
                     AwayTeam = input.AwayTeam,
                     HomeScore = input.HomeScore,
